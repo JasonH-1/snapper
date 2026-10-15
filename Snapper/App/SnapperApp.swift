@@ -2,11 +2,11 @@ import SwiftUI
 
 @main
 struct SnapperApp: App {
-    @State private var camera = CameraModel(library: .bundled())
+    @State private var app = AppModel(store: FreeTierPurchaseService())
 
     var body: some Scene {
         WindowGroup {
-            CameraView(model: camera, hasPremium: false, lastCapture: nil, isProcessingCapture: false)
+            RootView(app: app)
         }
     }
 }
