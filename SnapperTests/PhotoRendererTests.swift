@@ -47,3 +47,10 @@ final class PhotoRendererTests: XCTestCase {
         XCTAssertTrue(LookPipeline.apply(nil, to: image) === image)
     }
 }
+
+final class WatermarkTests: XCTestCase {
+    func testWatermarkNeverGrowsSmallImages() {
+        let tiny = CIImage(color: .white).cropped(to: CGRect(x: 0, y: 0, width: 30, height: 40))
+        XCTAssertEqual(Watermark.apply(to: tiny).extent, tiny.extent)
+    }
+}

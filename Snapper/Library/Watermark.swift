@@ -14,11 +14,14 @@ enum Watermark {
         let margin = min(extent.width, extent.height) * 0.035
         let x = extent.maxX - mark.extent.width - margin
         let y = extent.minY + margin
-        return mark.transformed(by: CGAffineTransform(translationX: x, y: y)).composited(over: image)
+        // Crop back to the photo so the mark can never grow the canvas.
+        return mark.transformed(by: CGAffineTransform(translationX: x, y: y))
+            .composited(over: image)
+            .cropped(to: extent)
     }
 
     private static func render(shortSide: CGFloat) -> CIImage? {
-        let fontSize = max(12, shortSide * 0.024)
+        let fontSize = max(6, shortSide * 0.024)
         let font = CTFontCreateUIFontForLanguage(.emphasizedSystem, fontSize, nil)
             ?? CTFontCreateWithName("Helvetica-Bold" as CFString, fontSize, nil)
         let attributes: [NSAttributedString.Key: Any] = [
