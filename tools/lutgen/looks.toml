@@ -1,0 +1,425 @@
+# Snapper looks — design parameters.
+#
+# Each [[look]] is turned into Snapper/Resources/Filters/LUTs/<id>.cube by
+#     python3 tools/lutgen/lutgen.py build
+# Tweak a number, rebuild, then `lutgen.py review` to see the contact sheets.
+#
+# Parameter reference (all optional; omitted = neutral):
+#   temperature      -1..1   white balance, + warmer (Bradford adaptation)
+#   tint             -1..1   + magenta, - green
+#   exposure         EV      brightness in linear light
+#   highlight_rolloff 0..1   soft shoulder so highlights never clip (default 0.35)
+#   contrast         -1..1   S-curve around `pivot` (default pivot 0.45)
+#   curve            [[in,out], ...]  master tone curve (monotone cubic)
+#   curve_r/g/b      per-channel curves (for colour crossovers)
+#   black / white    output black level (fade) and white point
+#   saturation       chroma multiplier; vibrance boosts muted colours more
+#   hue_sat / hue_shift / hue_light   per hue family:
+#                    red orange yellow green aqua blue purple magenta
+#                    (saturation multiplier / hue degrees / lightness)
+#   shadow_tint / highlight_tint = { hue = <Oklab degrees>, amount = <chroma> }
+#                    hue guide: 25 red, 55 orange, 75 amber, 100 yellow,
+#                    145 green, 200 teal, 255 blue, 300 violet, 340 pink
+#   split_balance    -1..1   moves the shadow/highlight split point
+#   shadow_desat / highlight_desat  0..1  film-like colour rolloff
+#   skin_protect     0..1   keeps skin hue/chroma natural (default 0.7)
+#   monochrome, mono_tone   black & white with an optional tone
+
+[collections.disposable]
+name = "Disposable"
+tagline = "Sun-faded, warm and a little overexposed, like a 90s throwaway camera."
+
+[collections.neon]
+name = "Neon Nights"
+tagline = "Teal shadows, warm skin and glowing signs for the city after dark."
+
+[collections.soft]
+name = "Soft Portrait"
+tagline = "Gentle contrast, creamy highlights and skin that looks like skin."
+
+# ---------------------------------------------------------------- Disposable
+
+[[look]]
+id = "boardwalk"
+name = "Boardwalk"
+collection = "disposable"
+description = "The signature: warm highlights, green shadows, faded blacks."
+temperature = 0.18
+tint = -0.04
+exposure = 0.15
+highlight_rolloff = 0.75
+contrast = 0.1
+curve = [[0, 0.07], [0.25, 0.28], [0.5, 0.55], [0.75, 0.785], [1, 0.99]]
+saturation = 1.05
+hue_sat = { green = 0.85, blue = 0.9 }
+hue_shift = { green = -6, blue = -10 }
+shadow_tint = { hue = 150, amount = 0.035 }
+highlight_tint = { hue = 75, amount = 0.03 }
+
+[[look]]
+id = "sunburn"
+name = "Sunburn"
+collection = "disposable"
+description = "Hot summer afternoon: bright, warm, punchy reds."
+temperature = 0.28
+exposure = 0.2
+highlight_rolloff = 0.8
+contrast = 0.15
+curve = [[0, 0.05], [0.5, 0.53], [1, 0.98]]
+saturation = 1.1
+hue_sat = { red = 1.12, yellow = 1.05, blue = 0.85 }
+shadow_tint = { hue = 155, amount = 0.025 }
+highlight_tint = { hue = 60, amount = 0.03 }
+
+[[look]]
+id = "flashbulb"
+name = "Flashbulb"
+collection = "disposable"
+description = "Direct-flash party snaps: punchy, clean skin, cool shadows."
+temperature = 0.05
+exposure = 0.1
+highlight_rolloff = 0.5
+contrast = 0.3
+black = 0.02
+saturation = 1.08
+shadow_tint = { hue = 170, amount = 0.03 }
+highlight_tint = { hue = 80, amount = 0.015 }
+
+[[look]]
+id = "backyard"
+name = "Backyard"
+collection = "disposable"
+description = "Muted greens and soft fade, like prints from a shoebox."
+temperature = 0.1
+tint = -0.1
+exposure = 0.15
+contrast = 0.05
+curve = [[0, 0.08], [0.5, 0.53], [1, 0.96]]
+saturation = 0.88
+hue_sat = { yellow = 0.9 }
+shadow_tint = { hue = 145, amount = 0.04 }
+shadow_desat = 0.1
+
+[[look]]
+id = "postcard"
+name = "Postcard"
+collection = "disposable"
+description = "Holiday print: cyan skies, lush greens, sunny warmth."
+temperature = 0.15
+contrast = 0.15
+curve = [[0, 0.04], [0.5, 0.51], [1, 0.99]]
+saturation = 1.15
+vibrance = 0.15
+hue_sat = { blue = 1.15, aqua = 1.15, yellow = 1.05 }
+hue_shift = { blue = -12, green = 8 }
+highlight_tint = { hue = 80, amount = 0.02 }
+
+[[look]]
+id = "cornershop"
+name = "Corner Shop"
+collection = "disposable"
+description = "Drugstore one-hour print: cool, muted, lifted blacks."
+temperature = -0.02
+tint = -0.06
+exposure = 0.2
+contrast = -0.1
+curve = [[0, 0.09], [0.5, 0.52], [1, 0.95]]
+saturation = 0.85
+shadow_tint = { hue = 190, amount = 0.03 }
+highlight_tint = { hue = 85, amount = 0.02 }
+
+[[look]]
+id = "roadtrip"
+name = "Road Trip"
+collection = "disposable"
+description = "Golden highlights and dusty fade from a long drive."
+temperature = 0.25
+contrast = 0.08
+curve = [[0, 0.08], [0.5, 0.53], [1, 0.97]]
+saturation = 0.95
+hue_sat = { yellow = 1.1, blue = 0.85 }
+shadow_tint = { hue = 160, amount = 0.02 }
+highlight_tint = { hue = 85, amount = 0.045 }
+
+[[look]]
+id = "expired"
+name = "Expired"
+collection = "disposable"
+description = "Found-in-a-drawer roll: teal shadows, peachy highlights."
+temperature = 0.08
+exposure = 0.15
+contrast = 0.05
+black = 0.07
+white = 0.95
+saturation = 0.82
+curve_b = [[0, 0.05], [0.5, 0.5], [1, 0.94]]
+skin_protect = 0.85
+shadow_tint = { hue = 200, amount = 0.04 }
+highlight_tint = { hue = 50, amount = 0.03 }
+
+[[look]]
+id = "poolparty"
+name = "Pool Party"
+collection = "disposable"
+description = "Bright and splashy with electric aqua water."
+temperature = 0.12
+exposure = 0.3
+highlight_rolloff = 0.65
+contrast = 0.1
+curve = [[0, 0.04], [0.5, 0.51], [1, 0.98]]
+saturation = 1.05
+hue_sat = { aqua = 1.3, blue = 1.1 }
+hue_shift = { blue = -15, aqua = -5 }
+highlight_tint = { hue = 70, amount = 0.02 }
+
+[[look]]
+id = "mixtape"
+name = "Mixtape"
+collection = "disposable"
+description = "Matte and muted with warm, hazy highlights."
+temperature = 0.1
+contrast = 0.1
+curve = [[0, 0.1], [0.3, 0.32], [0.7, 0.71], [1, 0.95]]
+saturation = 0.75
+shadow_tint = { hue = 200, amount = 0.02 }
+highlight_tint = { hue = 65, amount = 0.035 }
+
+# ---------------------------------------------------------------- Neon Nights
+
+[[look]]
+id = "afterglow"
+name = "Afterglow"
+collection = "neon"
+description = "Balanced teal and amber with rich, cinematic contrast."
+highlight_rolloff = 0.5
+contrast = 0.22
+black = 0.015
+saturation = 1.0
+hue_sat = { aqua = 1.1, green = 0.8 }
+hue_shift = { green = 25, blue = -10 }
+shadow_tint = { hue = 210, amount = 0.045 }
+highlight_tint = { hue = 65, amount = 0.025 }
+
+[[look]]
+id = "neon"
+name = "Neon"
+collection = "neon"
+description = "Vivid signs and deep teal shadows; skin stays warm."
+highlight_rolloff = 0.7
+contrast = 0.25
+saturation = 1.15
+hue_sat = { magenta = 1.25, purple = 1.2, aqua = 1.2, red = 1.1 }
+skin_protect = 0.85
+shadow_tint = { hue = 220, amount = 0.04 }
+
+[[look]]
+id = "midnight"
+name = "Midnight"
+collection = "neon"
+description = "Moody blue-teal night with warm faces."
+temperature = -0.15
+exposure = -0.2
+contrast = 0.2
+black = 0.02
+saturation = 0.9
+hue_sat = { orange = 1.05 }
+shadow_tint = { hue = 230, amount = 0.04 }
+highlight_tint = { hue = 70, amount = 0.02 }
+
+[[look]]
+id = "downpour"
+name = "Downpour"
+collection = "neon"
+description = "Rain-soaked streets: muted colour, crisp contrast."
+contrast = 0.25
+saturation = 0.75
+hue_sat = { red = 0.9 }
+shadow_tint = { hue = 205, amount = 0.035 }
+highlight_tint = { hue = 70, amount = 0.03 }
+
+[[look]]
+id = "arcade"
+name = "Arcade"
+collection = "neon"
+description = "Electric violet and cyan with hard contrast."
+temperature = -0.05
+contrast = 0.3
+hue_sat = { purple = 1.25, blue = 1.15, aqua = 1.15, magenta = 1.2 }
+hue_shift = { blue = 15, red = -5 }
+shadow_tint = { hue = 280, amount = 0.03 }
+highlight_tint = { hue = 190, amount = 0.015 }
+
+[[look]]
+id = "lantern"
+name = "Lantern"
+collection = "neon"
+description = "Paper-lantern amber over green-teal shadows."
+temperature = 0.2
+contrast = 0.2
+hue_sat = { yellow = 1.1, orange = 1.05, green = 0.8 }
+shadow_tint = { hue = 185, amount = 0.04 }
+highlight_tint = { hue = 72, amount = 0.045 }
+
+[[look]]
+id = "taxi"
+name = "Taxi"
+collection = "neon"
+description = "Sodium-vapour yellow and green mixed light."
+temperature = 0.1
+tint = -0.08
+contrast = 0.2
+saturation = 0.95
+hue_sat = { yellow = 1.15, green = 0.9 }
+shadow_tint = { hue = 170, amount = 0.035 }
+highlight_tint = { hue = 95, amount = 0.035 }
+
+[[look]]
+id = "bluehour"
+name = "Blue Hour"
+collection = "neon"
+description = "Cool dusk blues with warm lights left glowing."
+temperature = -0.12
+contrast = 0.15
+hue_sat = { orange = 1.1, red = 1.05, blue = 1.1 }
+skin_protect = 0.85
+shadow_tint = { hue = 250, amount = 0.03 }
+highlight_tint = { hue = 60, amount = 0.015 }
+
+[[look]]
+id = "vapor"
+name = "Vapor"
+collection = "neon"
+description = "Soft pastel neon: pink highlights, teal shade."
+contrast = -0.05
+curve = [[0, 0.08], [0.5, 0.52], [1, 0.97]]
+saturation = 0.9
+hue_sat = { magenta = 1.2, aqua = 1.15 }
+skin_protect = 0.9
+shadow_tint = { hue = 210, amount = 0.04 }
+highlight_tint = { hue = 350, amount = 0.025 }
+
+[[look]]
+id = "lasttrain"
+name = "Last Train"
+collection = "neon"
+description = "Low saturation, hard contrast, cold teal shadows."
+contrast = 0.32
+saturation = 0.65
+highlight_desat = 0.2
+shadow_tint = { hue = 200, amount = 0.03 }
+
+# ---------------------------------------------------------------- Soft Portrait
+
+[[look]]
+id = "cream"
+name = "Cream"
+collection = "soft"
+description = "Gentle contrast and creamy, rolled-off highlights."
+temperature = 0.08
+highlight_rolloff = 0.8
+contrast = 0.05
+curve = [[0, 0.03], [0.5, 0.51], [1, 0.98]]
+saturation = 0.95
+hue_sat = { green = 0.9, blue = 0.92 }
+skin_protect = 0.9
+highlight_tint = { hue = 80, amount = 0.02 }
+
+[[look]]
+id = "linen"
+name = "Linen"
+collection = "soft"
+description = "Airy and bright with quiet colour."
+exposure = 0.3
+highlight_rolloff = 0.8
+contrast = -0.05
+curve = [[0, 0.06], [0.5, 0.52], [1, 0.98]]
+saturation = 0.82
+highlight_tint = { hue = 85, amount = 0.012 }
+
+[[look]]
+id = "peach"
+name = "Peach"
+collection = "soft"
+description = "Warm, flattering glow for faces."
+temperature = 0.15
+contrast = 0.08
+saturation = 0.98
+hue_sat = { orange = 1.05, red = 0.95 }
+skin_protect = 0.9
+highlight_tint = { hue = 55, amount = 0.02 }
+
+[[look]]
+id = "honey"
+name = "Honey"
+collection = "soft"
+description = "Golden-hour warmth, soft and glowing."
+temperature = 0.3
+highlight_rolloff = 0.7
+contrast = 0.1
+saturation = 1.02
+highlight_tint = { hue = 78, amount = 0.035 }
+
+[[look]]
+id = "silk"
+name = "Silk"
+collection = "soft"
+description = "Smooth neutral skin with cool, quiet shadows."
+highlight_rolloff = 0.75
+contrast = 0.06
+saturation = 0.92
+shadow_tint = { hue = 230, amount = 0.02 }
+highlight_tint = { hue = 70, amount = 0.012 }
+
+[[look]]
+id = "petal"
+name = "Petal"
+collection = "soft"
+description = "Pastel and minty with a whisper of rose."
+exposure = 0.15
+curve = [[0, 0.05], [0.5, 0.52], [1, 0.98]]
+saturation = 0.85
+hue_sat = { green = 0.75, yellow = 0.85 }
+hue_shift = { green = 12 }
+highlight_tint = { hue = 40, amount = 0.012 }
+
+[[look]]
+id = "studio"
+name = "Studio"
+collection = "soft"
+description = "Clean, natural colour with a polished finish."
+temperature = 0.03
+highlight_rolloff = 0.6
+contrast = 0.1
+saturation = 1.0
+
+[[look]]
+id = "matte"
+name = "Matte"
+collection = "soft"
+description = "Faded blacks and low contrast for a printed feel."
+temperature = 0.05
+curve = [[0, 0.1], [0.2, 0.24], [0.5, 0.52], [0.8, 0.8], [1, 0.95]]
+saturation = 0.9
+
+[[look]]
+id = "porcelain"
+name = "Porcelain"
+collection = "soft"
+description = "Cool, bright and clean."
+temperature = -0.06
+exposure = 0.15
+highlight_rolloff = 0.8
+contrast = 0.05
+saturation = 0.9
+hue_sat = { orange = 0.95 }
+
+[[look]]
+id = "silver"
+name = "Silver"
+collection = "soft"
+description = "Soft black and white with a hint of warmth."
+monochrome = true
+highlight_rolloff = 0.7
+contrast = 0.12
+black = 0.02
+mono_tone = { hue = 70, amount = 0.006 }

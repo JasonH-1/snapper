@@ -1,0 +1,232 @@
+{
+  "version": 1,
+  "collections": [
+    {
+      "id": "disposable",
+      "name": "Disposable",
+      "tagline": "Sun-faded, warm and a little overexposed, like a 90s throwaway camera."
+    },
+    {
+      "id": "neon",
+      "name": "Neon Nights",
+      "tagline": "Teal shadows, warm skin and glowing signs for the city after dark."
+    },
+    {
+      "id": "soft",
+      "name": "Soft Portrait",
+      "tagline": "Gentle contrast, creamy highlights and skin that looks like skin."
+    }
+  ],
+  "looks": [
+    {
+      "id": "boardwalk",
+      "name": "Boardwalk",
+      "collection": "disposable",
+      "lut": "boardwalk.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "sunburn",
+      "name": "Sunburn",
+      "collection": "disposable",
+      "lut": "sunburn.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "flashbulb",
+      "name": "Flashbulb",
+      "collection": "disposable",
+      "lut": "flashbulb.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "backyard",
+      "name": "Backyard",
+      "collection": "disposable",
+      "lut": "backyard.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "postcard",
+      "name": "Postcard",
+      "collection": "disposable",
+      "lut": "postcard.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "cornershop",
+      "name": "Corner Shop",
+      "collection": "disposable",
+      "lut": "cornershop.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "roadtrip",
+      "name": "Road Trip",
+      "collection": "disposable",
+      "lut": "roadtrip.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "expired",
+      "name": "Expired",
+      "collection": "disposable",
+      "lut": "expired.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "poolparty",
+      "name": "Pool Party",
+      "collection": "disposable",
+      "lut": "poolparty.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "mixtape",
+      "name": "Mixtape",
+      "collection": "disposable",
+      "lut": "mixtape.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "afterglow",
+      "name": "Afterglow",
+      "collection": "neon",
+      "lut": "afterglow.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "neon",
+      "name": "Neon",
+      "collection": "neon",
+      "lut": "neon.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "midnight",
+      "name": "Midnight",
+      "collection": "neon",
+      "lut": "midnight.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "downpour",
+      "name": "Downpour",
+      "collection": "neon",
+      "lut": "downpour.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "arcade",
+      "name": "Arcade",
+      "collection": "neon",
+      "lut": "arcade.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "lantern",
+      "name": "Lantern",
+      "collection": "neon",
+      "lut": "lantern.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "taxi",
+      "name": "Taxi",
+      "collection": "neon",
+      "lut": "taxi.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "bluehour",
+      "name": "Blue Hour",
+      "collection": "neon",
+      "lut": "bluehour.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "vapor",
+      "name": "Vapor",
+      "collection": "neon",
+      "lut": "vapor.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "lasttrain",
+      "name": "Last Train",
+      "collection": "neon",
+      "lut": "lasttrain.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "cream",
+      "name": "Cream",
+      "collection": "soft",
+      "lut": "cream.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "linen",
+      "name": "Linen",
+      "collection": "soft",
+      "lut": "linen.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "peach",
+      "name": "Peach",
+      "collection": "soft",
+      "lut": "peach.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "honey",
+      "name": "Honey",
+      "collection": "soft",
+      "lut": "honey.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "silk",
+      "name": "Silk",
+      "collection": "soft",
+      "lut": "silk.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "petal",
+      "name": "Petal",
+      "collection": "soft",
+      "lut": "petal.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "studio",
+      "name": "Studio",
+      "collection": "soft",
+      "lut": "studio.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "matte",
+      "name": "Matte",
+      "collection": "soft",
+      "lut": "matte.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "porcelain",
+      "name": "Porcelain",
+      "collection": "soft",
+      "lut": "porcelain.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "silver",
+      "name": "Silver",
+      "collection": "soft",
+      "lut": "silver.cube",
+      "tier": "premium"
+    }
+  ]
+}
