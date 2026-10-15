@@ -6,8 +6,9 @@ enum LookTier: String, Codable, Sendable {
     case premium
 }
 
-/// A colour look (filter). Looks are data: a display name, a collection and a
-/// 3D LUT file. The list and its order come from `filters.json`.
+/// A look (filter). Looks are data: a display name, a collection, a 3D LUT
+/// file and optional effects drawn after it. The list and its order come from
+/// `filters.json`.
 struct Look: Identifiable, Hashable, Sendable {
     let id: String
     let name: String
@@ -15,6 +16,7 @@ struct Look: Identifiable, Hashable, Sendable {
     /// File name of the .cube LUT in the bundle, or `nil` for the unfiltered original.
     let lutFile: String?
     let tier: LookTier
+    var effects: LookEffects = .none
 
     var isOriginal: Bool { lutFile == nil }
     var isPremium: Bool { tier == .premium }
@@ -45,6 +47,8 @@ struct LookManifest: Decodable, Sendable {
         let tier: LookTier?
         /// Set to `false` to hide a look without deleting its entry.
         let enabled: Bool?
+        /// Written by tools/lutgen from looks.toml.
+        let effects: LookEffects?
     }
 
     let version: Int

@@ -128,7 +128,7 @@ struct PaywallView: View {
             Text(model.title)
                 .font(Theme.lookTitle(size: 30))
                 .multilineTextAlignment(.center)
-            Text("All \(model.totalLookCount) looks across Disposable, Neon Nights and Soft Portrait, without a watermark.")
+            Text("All \(model.totalLookCount) looks in every collection, without a watermark.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

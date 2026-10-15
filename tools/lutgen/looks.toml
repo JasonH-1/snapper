@@ -24,6 +24,22 @@
 #   shadow_desat / highlight_desat  0..1  film-like colour rolloff
 #   skin_protect     0..1   keeps skin hue/chroma natural (default 0.7)
 #   monochrome, mono_tone   black & white with an optional tone
+#
+# Effects (optional) are drawn by the app after the cube, so they are not in
+# the .cube files, the quality gates or the contact sheets: check them in the
+# app. Add one as a sub-table after the look's other keys, e.g.
+#     [look.effects.glow]
+#     intensity = 0.8
+# Lengths are fractions of the photo's shorter side. Omitted values use the
+# defaults in effects.py:
+#   gradient              size, exposure, tint_hue, tint   (graduated filter from the top)
+#   glow                  threshold, radius, intensity, saturation, tint_hue, tint
+#   chromatic_aberration  amount
+#   chroma_bleed          radius
+#   glitch                slices, shift, rgb_split
+#   scanlines             spacing, intensity
+#   noise                 amount, size
+#   vignette              intensity, radius
 
 [collections.disposable]
 name = "Disposable"
@@ -36,6 +52,10 @@ tagline = "Teal shadows, warm skin and glowing signs for the city after dark."
 [collections.soft]
 name = "Soft Portrait"
 tagline = "Gentle contrast, creamy highlights and skin that looks like skin."
+
+[collections.overclock]
+name = "Overclock"
+tagline = "Neon glow, broken signals and chrome-edged colour from a future that never happened."
 
 # ---------------------------------------------------------------- Disposable
 
@@ -432,3 +452,157 @@ highlight_rolloff = 0.7
 contrast = 0.12
 black = 0.02
 mono_tone = { hue = 70, amount = 0.006 }
+
+# ---------------------------------------------------------------- Overclock
+
+[[look]]
+id = "overdrive"
+name = "Overdrive"
+collection = "overclock"
+description = "Teal shadows, hot-pink highlights and signs that bloom."
+temperature = -0.08
+tint = 0.05
+contrast = 0.28
+highlight_rolloff = 0.6
+saturation = 1.1
+hue_sat = { magenta = 1.3, purple = 1.2, aqua = 1.25, blue = 1.1 }
+shadow_tint = { hue = 200, amount = 0.05 }
+highlight_tint = { hue = 340, amount = 0.03 }
+skin_protect = 0.85
+
+[look.effects.glow]
+threshold = 0.68
+radius = 0.03
+intensity = 0.65
+saturation = 1.6
+
+[look.effects.chromatic_aberration]
+amount = 0.0025
+
+[look.effects.vignette]
+intensity = 0.6
+radius = 0.85
+
+[[look]]
+id = "redline"
+name = "Redline"
+collection = "overclock"
+description = "Cold blue streets with red lights burning through the rain."
+# Fitted to a reference before/after grade with every global control,
+# within the quality gates; the sky lift and cyan glow stand in for its
+# local edits.
+temperature = -0.525
+tint = 0.15
+exposure = -0.05
+contrast = 0.475
+pivot = 0.435
+black = 0.04
+highlight_rolloff = 1.0
+saturation = 1.4
+vibrance = 0.15
+shadow_desat = 0.4
+split_balance = 0.8
+shadow_tint = { hue = 240, amount = 0.07 }
+hue_sat = { red = 1.5, orange = 1.35, yellow = 0.3 }
+hue_shift = { orange = -14, red = 13.5 }
+hue_light = { red = -0.15, orange = 0.09, yellow = -0.24, blue = 0.045, purple = 0.015 }
+curve_r = [[0, 0], [0.25, 0.23], [0.5, 0.54], [0.75, 0.75], [1, 1]]
+curve_g = [[0, 0], [0.25, 0.24], [0.5, 0.59], [0.75, 0.75], [1, 1]]
+curve_b = [[0, 0], [0.25, 0.26], [0.5, 0.62], [0.75, 0.77], [1, 1]]
+skin_protect = 0.9
+
+[look.effects.gradient]
+size = 0.5
+exposure = 0.6
+tint = 0
+
+[look.effects.glow]
+threshold = 0.45
+radius = 0.06
+intensity = 0.8
+saturation = 1.5
+tint_hue = 190
+tint = 0.5
+
+[look.effects.vignette]
+intensity = 0.55
+radius = 0.75
+
+[[look]]
+id = "signal"
+name = "Signal"
+collection = "overclock"
+description = "A worn videotape: smeared colour, soft blacks and scanlines."
+curve = [[0, 0.06], [0.5, 0.52], [1, 0.94]]
+contrast = 0.1
+tint = 0.05
+saturation = 1.05
+hue_sat = { green = 0.8, red = 1.1 }
+shadow_tint = { hue = 255, amount = 0.03 }
+highlight_tint = { hue = 55, amount = 0.015 }
+skin_protect = 0.85
+
+[look.effects.chroma_bleed]
+radius = 0.012
+
+[look.effects.scanlines]
+spacing = 0.006
+intensity = 0.25
+
+[look.effects.noise]
+amount = 0.14
+size = 0.0015
+
+[look.effects.chromatic_aberration]
+amount = 0.0015
+
+[[look]]
+id = "chrome"
+name = "Chrome"
+collection = "overclock"
+description = "Cold steel and cyan light, fringed like a cheap lens."
+temperature = -0.1
+contrast = 0.3
+saturation = 0.6
+highlight_desat = 0.2
+hue_sat = { orange = 1.1 }
+shadow_tint = { hue = 230, amount = 0.03 }
+highlight_tint = { hue = 195, amount = 0.02 }
+skin_protect = 0.85
+
+[look.effects.chromatic_aberration]
+amount = 0.004
+
+[look.effects.glow]
+threshold = 0.75
+radius = 0.02
+intensity = 0.4
+saturation = 1.0
+
+[look.effects.vignette]
+intensity = 0.7
+radius = 0.8
+
+[[look]]
+id = "hologram"
+name = "Hologram"
+collection = "overclock"
+description = "Cyan monochrome projected through scanlines."
+monochrome = true
+mono_tone = { hue = 200, amount = 0.08 }
+contrast = 0.2
+curve = [[0, 0.05], [1, 0.97]]
+highlight_rolloff = 0.6
+
+[look.effects.scanlines]
+spacing = 0.004
+intensity = 0.3
+
+[look.effects.glow]
+threshold = 0.6
+radius = 0.025
+intensity = 0.6
+saturation = 1.2
+
+[look.effects.noise]
+amount = 0.06

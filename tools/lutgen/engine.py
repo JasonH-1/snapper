@@ -28,6 +28,8 @@ from typing import Any
 
 import numpy as np
 
+from effects import normalize_effects
+
 # --------------------------------------------------------------------------
 # Transfer functions and colour spaces
 
@@ -254,6 +256,8 @@ class Look:
     skin_protect: float = 0.75
     monochrome: bool = False
     mono_tone: Tint = field(default_factory=Tint)
+    # Drawn by the app after the cube; not part of the colour transform (effects.py).
+    effects: dict = field(default_factory=dict)
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "Look":
@@ -261,6 +265,8 @@ class Look:
         for key in ("shadow_tint", "highlight_tint", "mono_tone"):
             if key in d:
                 d[key] = Tint(**d[key])
+        if "effects" in d:
+            d["effects"] = normalize_effects(d.get("id"), d["effects"])
         known = set(Look.__dataclass_fields__)
         unknown = set(d) - known
         if unknown:

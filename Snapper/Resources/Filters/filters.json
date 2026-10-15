@@ -15,6 +15,11 @@
       "id": "soft",
       "name": "Soft Portrait",
       "tagline": "Gentle contrast, creamy highlights and skin that looks like skin."
+    },
+    {
+      "id": "overclock",
+      "name": "Overclock",
+      "tagline": "Neon glow, broken signals and chrome-edged colour from a future that never happened."
     }
   ],
   "looks": [
@@ -227,6 +232,129 @@
       "collection": "soft",
       "lut": "matte.cube",
       "tier": "premium"
+    },
+    {
+      "id": "overdrive",
+      "name": "Overdrive",
+      "collection": "overclock",
+      "lut": "overdrive.cube",
+      "tier": "premium",
+      "effects": {
+        "glow": {
+          "threshold": 0.68,
+          "radius": 0.03,
+          "intensity": 0.65,
+          "saturation": 1.6,
+          "tint_hue": 0.0,
+          "tint": 0.0
+        },
+        "chromatic_aberration": {
+          "amount": 0.0025
+        },
+        "vignette": {
+          "intensity": 0.6,
+          "radius": 0.85
+        }
+      }
+    },
+    {
+      "id": "redline",
+      "name": "Redline",
+      "collection": "overclock",
+      "lut": "redline.cube",
+      "tier": "premium",
+      "effects": {
+        "gradient": {
+          "size": 0.5,
+          "exposure": 0.6,
+          "tint_hue": 240.0,
+          "tint": 0.0
+        },
+        "glow": {
+          "threshold": 0.45,
+          "radius": 0.06,
+          "intensity": 0.8,
+          "saturation": 1.5,
+          "tint_hue": 190.0,
+          "tint": 0.5
+        },
+        "vignette": {
+          "intensity": 0.55,
+          "radius": 0.75
+        }
+      }
+    },
+    {
+      "id": "signal",
+      "name": "Signal",
+      "collection": "overclock",
+      "lut": "signal.cube",
+      "tier": "premium",
+      "effects": {
+        "chromatic_aberration": {
+          "amount": 0.0015
+        },
+        "chroma_bleed": {
+          "radius": 0.012
+        },
+        "scanlines": {
+          "spacing": 0.006,
+          "intensity": 0.25
+        },
+        "noise": {
+          "amount": 0.14,
+          "size": 0.0015
+        }
+      }
+    },
+    {
+      "id": "chrome",
+      "name": "Chrome",
+      "collection": "overclock",
+      "lut": "chrome.cube",
+      "tier": "premium",
+      "effects": {
+        "glow": {
+          "threshold": 0.75,
+          "radius": 0.02,
+          "intensity": 0.4,
+          "saturation": 1.0,
+          "tint_hue": 0.0,
+          "tint": 0.0
+        },
+        "chromatic_aberration": {
+          "amount": 0.004
+        },
+        "vignette": {
+          "intensity": 0.7,
+          "radius": 0.8
+        }
+      }
+    },
+    {
+      "id": "hologram",
+      "name": "Hologram",
+      "collection": "overclock",
+      "lut": "hologram.cube",
+      "tier": "premium",
+      "effects": {
+        "glow": {
+          "threshold": 0.6,
+          "radius": 0.025,
+          "intensity": 0.6,
+          "saturation": 1.2,
+          "tint_hue": 0.0,
+          "tint": 0.0
+        },
+        "scanlines": {
+          "spacing": 0.004,
+          "intensity": 0.3
+        },
+        "noise": {
+          "amount": 0.06,
+          "size": 0.0012
+        }
+      }
     }
   ]
 }

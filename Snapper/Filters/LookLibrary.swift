@@ -67,7 +67,8 @@ final class LookLibrary: Sendable {
                               name: entry.name,
                               collectionID: entry.collection,
                               lutFile: entry.lut,
-                              tier: entry.tier ?? .premium))
+                              tier: entry.tier ?? .premium,
+                              effects: entry.effects ?? .none))
         }
         self.init(looks: looks, collections: collections)
     }

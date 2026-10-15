@@ -120,7 +120,7 @@ final class CaptureLibrary {
         let url = store.url(for: record)
         let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
         return try await renderer.export(source: data, look: look(for: record), strength: Float(record.strength),
-                                         watermark: watermark, format: format)
+                                         seed: record.id.effectsSeed, watermark: watermark, format: format)
     }
 
     /// Saves a capture to the photo library with its current recipe.
@@ -155,7 +155,7 @@ final class CaptureLibrary {
 
     func refreshThumbnail(for record: CaptureRecord) async {
         let image = await renderer.thumbnail(sourceURL: store.url(for: record), look: look(for: record),
-                                             strength: Float(record.strength))
+                                             strength: Float(record.strength), seed: record.id.effectsSeed)
         if let image {
             thumbnails[record.id] = image
         }

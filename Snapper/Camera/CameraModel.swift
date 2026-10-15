@@ -109,7 +109,7 @@ final class CameraModel {
     }
 
     private func startDemo() {
-        if let url = Bundle.main.url(forResource: "demo-scene", withExtension: "jpg") {
+        if let url = DemoScene.url {
             renderer.startDemo(imageURL: url)
         }
         capabilities = CameraCapabilities(position: .back, hasFlash: false, canSwitchCamera: false,
@@ -185,7 +185,7 @@ final class CameraModel {
     // MARK: - Looks
 
     func lookState(for look: Look) -> PreviewRenderer.LookState {
-        PreviewRenderer.LookState(id: look.id, lut: lutStore.lut(for: look))
+        PreviewRenderer.LookState(id: look.id, lut: lutStore.lut(for: look), effects: look.effects)
     }
 
     /// Jumps straight to a look (from the look picker).
@@ -329,8 +329,7 @@ final class CameraModel {
     /// In the Simulator the shutter "captures" the demo image so the rest of
     /// the app (review, saving, paywall) can be exercised without a camera.
     private func captureDemoPhoto(look: Look) {
-        guard let url = Bundle.main.url(forResource: "demo-scene", withExtension: "jpg"),
-              let data = try? Data(contentsOf: url) else { return }
+        guard let url = DemoScene.url, let data = try? Data(contentsOf: url) else { return }
         onCapture?(CapturedPhoto(data: data, isFrontCamera: false), look)
     }
 }

@@ -9,8 +9,7 @@ final class LookThumbnails {
     @ObservationIgnored private var isLoading = false
 
     func load(looks: [Look], renderer: PhotoRenderer) {
-        guard !isLoading, images.isEmpty,
-              let url = Bundle.main.url(forResource: "demo-scene", withExtension: "jpg") else { return }
+        guard !isLoading, images.isEmpty, let url = DemoScene.url else { return }
         isLoading = true
         Task {
             images = await renderer.thumbnails(sourceURL: url, looks: looks, maxPixelSize: 240)

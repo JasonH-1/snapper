@@ -43,15 +43,17 @@ actor PhotoRenderer {
     // MARK: - Export
 
     /// Full-resolution render of `source` (camera file data) with `look`.
+    /// `seed` fixes the look's random effects (use the capture's id).
     func export(source: Data,
                 look: Look,
                 strength: Float,
+                seed: UInt64 = 0,
                 watermark: Bool,
                 format: ExportFormat) throws -> Data {
         guard let original = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
             throw RenderError.unreadableImage
         }
-        var image = LookPipeline.apply(lutStore.lut(for: look), strength: strength, to: original)
+        var image = render(look, strength: strength, seed: seed, to: original)
         if watermark {
             image = Watermark.apply(to: image)
         }
@@ -90,8 +92,7 @@ actor PhotoRenderer {
     /// A screen-sized render for the review screen.
     func preview(id: UUID, sourceURL: URL, look: Look, strength: Float, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        let image = LookPipeline.apply(lutStore.lut(for: look), strength: strength, to: proxy)
-        return makeUIImage(image)
+        return makeUIImage(render(look, strength: strength, seed: id.effectsSeed, to: proxy))
     }
 
     /// The unfiltered original at preview size (for press-and-hold compare).
@@ -105,22 +106,25 @@ actor PhotoRenderer {
         guard let small = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return [:] }
         var result: [String: UIImage] = [:]
         for look in looks {
-            let image = LookPipeline.apply(lutStore.lut(for: look), to: small)
-            result[look.id] = makeUIImage(image)
+            result[look.id] = makeUIImage(render(look, to: small))
         }
         return result
     }
 
     /// One small render (camera thumbnail, roll strip).
-    func thumbnail(sourceURL: URL, look: Look, strength: Float, maxPixelSize: Int = 240) -> UIImage? {
+    func thumbnail(sourceURL: URL, look: Look, strength: Float, seed: UInt64 = 0, maxPixelSize: Int = 240) -> UIImage? {
         guard let small = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(LookPipeline.apply(lutStore.lut(for: look), strength: strength, to: small))
+        return makeUIImage(render(look, strength: strength, seed: seed, to: small))
     }
 
     /// Renders a bundled showcase image (onboarding, paywall) in a look.
     func showcase(url: URL, look: Look, maxPixelSize: Int = 1400) -> UIImage? {
         guard let source = Self.downsampled(url: url, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(LookPipeline.apply(lutStore.lut(for: look), to: source))
+        return makeUIImage(render(look, to: source))
+    }
+
+    private func render(_ look: Look, strength: Float = 1, seed: UInt64 = 0, to image: CIImage) -> CIImage {
+        LookPipeline.apply(look, lut: lutStore.lut(for: look), strength: strength, seed: seed, to: image)
     }
 
     func forget(id: UUID) {

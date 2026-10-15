@@ -11,12 +11,13 @@ import QuartzCore
 /// thread. The main thread only changes small pieces of shared state (which
 /// look is showing, swipe progress) under a lock.
 final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
-    /// One look as the renderer needs it: an id plus its LUT (nil = original).
+    /// One look as the renderer needs it: an id, its LUT (nil = original) and its effects.
     struct LookState: Sendable, Equatable {
         let id: String
         let lut: CubeLUT?
+        let effects: LookEffects
 
-        static let original = LookState(id: Look.original.id, lut: nil)
+        static let original = LookState(id: Look.original.id, lut: nil, effects: .none)
 
         static func == (lhs: LookState, rhs: LookState) -> Bool { lhs.id == rhs.id }
     }
@@ -161,12 +162,15 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
 
         let size = CGSize(width: drawable.texture.width, height: drawable.texture.height)
         let base = Self.aspectFill(source, in: size)
-        var image = LookPipeline.apply(current.lut, to: base)
+        // Random effects (glitch, noise) re-roll a few times a second while
+        // live; a captured photo keeps its own seed.
+        let seed = UInt64(CACurrentMediaTime() * 3)
+        var image = Self.render(current, on: base, seed: seed)
 
         if let swipe {
             let progress = resolveProgress(of: swipe)
             if progress > 0.001 {
-                let incoming = LookPipeline.apply(swipe.incoming.lut, to: base)
+                let incoming = Self.render(swipe.incoming, on: base, seed: seed)
                 let split = swipe.edge == .trailing ? size.width * (1 - progress) : size.width * progress
                 let revealRect = swipe.edge == .trailing
                     ? CGRect(x: split, y: 0, width: size.width - split, height: size.height)
@@ -202,6 +206,10 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
             }
         }
         return progress
+    }
+
+    private static func render(_ look: LookState, on base: CIImage, seed: UInt64) -> CIImage {
+        LookPipeline.applyEffects(look.effects, seed: seed, to: LookPipeline.apply(look.lut, to: base))
     }
 
     static func aspectFill(_ image: CIImage, in size: CGSize) -> CIImage {

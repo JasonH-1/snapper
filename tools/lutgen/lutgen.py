@@ -89,7 +89,8 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
     """Adds looks/collections that are missing from the app manifest.
 
     Existing entries (order, names, tiers) are never changed: the manifest is
-    the app's source of truth and is meant to be edited by hand.
+    the app's source of truth and is meant to be edited by hand. The one
+    exception is `effects`, which looks.toml owns and is rewritten every build.
     """
     if MANIFEST.exists():
         manifest = json.loads(MANIFEST.read_text())
@@ -111,6 +112,15 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
                 "tier": "premium",
             })
             added.append(lk.id)
+    by_id = {lk.id: lk for lk in looks}
+    for entry in manifest["looks"]:
+        lk = by_id.get(entry["id"])
+        if lk is None:
+            continue
+        if lk.effects:
+            entry["effects"] = lk.effects
+        else:
+            entry.pop("effects", None)
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)
     MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
     if added:
@@ -163,6 +173,10 @@ def cmd_verify(args) -> int:
     for entry in manifest["looks"]:
         if not (LUT_DIR / entry["lut"]).exists():
             problems.append(f"manifest look '{entry['id']}' points to missing {entry['lut']}")
+    entries = {entry["id"]: entry for entry in manifest["looks"]}
+    for lk in looks:
+        if lk.id in entries and entries[lk.id].get("effects", {}) != lk.effects:
+            problems.append(f"effects for '{lk.id}' in {MANIFEST.name} are stale — run lutgen.py build")
     for lk in looks:
         path = LUT_DIR / f"{lk.id}.cube"
         if not path.exists():
