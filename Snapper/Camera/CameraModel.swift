@@ -52,6 +52,10 @@ final class CameraModel {
     /// Called when the selected look changes (swipe or picker).
     @ObservationIgnored var onLookChange: ((Look) -> Void)?
 
+    /// The id the next photo will get. The preview renders random effects
+    /// with its seed, and each shot advances it, like winding on a roll.
+    @ObservationIgnored private var nextFrameID = UUID()
+
     init(library: LookLibrary, lutStore: LUTStore = .shared) {
         let renderer = PreviewRenderer()
         self.renderer = renderer
@@ -60,6 +64,7 @@ final class CameraModel {
         self.looks = library.looks
         self.captureService = CaptureService(renderer: renderer)
         renderer.show(lookState(for: currentLook))
+        renderer.setSeed(nextFrameID.effectsSeed)
         preloadLooks()
         listenForEvents()
     }
@@ -304,16 +309,18 @@ final class CameraModel {
         let look = currentLook
         shutterCount += 1
         if status == .noCamera {
-            captureDemoPhoto(look: look)
+            captureDemoPhoto(look: look, id: advanceFrame())
             return
         }
         guard status == .running else { return }
+        let frameID = advanceFrame()
         isCapturing = true
         let flash = capabilities.hasFlash ? flashMode : .off
         Task {
             defer { isCapturing = false }
             do {
-                let photo = try await captureService.capturePhoto(flash: flash, onShutter: {})
+                var photo = try await captureService.capturePhoto(flash: flash, onShutter: {})
+                photo.id = frameID
                 onCapture?(photo, look)
             } catch {
                 Logger.camera.error("Capture failed: \(error.localizedDescription, privacy: .public)")
@@ -328,8 +335,16 @@ final class CameraModel {
 
     /// In the Simulator the shutter "captures" the demo image so the rest of
     /// the app (review, saving, paywall) can be exercised without a camera.
-    private func captureDemoPhoto(look: Look) {
+    private func captureDemoPhoto(look: Look, id: UUID) {
         guard let url = DemoScene.url, let data = try? Data(contentsOf: url) else { return }
-        onCapture?(CapturedPhoto(data: data, isFrontCamera: false), look)
+        onCapture?(CapturedPhoto(data: data, isFrontCamera: false, id: id), look)
+    }
+
+    /// Returns the frame the preview is showing and moves on to a fresh one.
+    private func advanceFrame() -> UUID {
+        let frameID = nextFrameID
+        nextFrameID = UUID()
+        renderer.setSeed(nextFrameID.effectsSeed)
+        return frameID
     }
 }

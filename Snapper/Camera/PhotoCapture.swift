@@ -6,6 +6,9 @@ struct CapturedPhoto: Sendable {
     /// HEIF (or JPEG) file data with orientation in its metadata.
     let data: Data
     let isFrontCamera: Bool
+    /// Becomes the capture's id. The camera sets it to the frame the live
+    /// preview showed, whose seed placed the look's grain, dust and leaks.
+    var id = UUID()
 }
 
 /// Wraps AVCapturePhotoOutput. Owned and only used by `CaptureService`, so it

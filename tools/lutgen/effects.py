@@ -23,6 +23,9 @@ DEFAULTS: dict[str, dict[str, float]] = {
     # threshold: brightness 0..1 where the glow starts. tint (0..1) pulls the
     # glow towards tint_hue (Oklab degrees), e.g. cyan halos around white lamps.
     "glow": {"threshold": 0.6, "radius": 0.02, "intensity": 0.7, "saturation": 1.4, "tint_hue": 0, "tint": 0},
+    # Film halation: a red-orange halo around bright light (light bouncing
+    # off the film base through the red-sensitive layer; never blue).
+    "halation": {"threshold": 0.7, "radius": 0.012, "intensity": 0.6},
     # Lens colour fringing: red and blue drift apart towards the edges.
     # amount: how far (as a scale factor) the channels separate at the edge.
     "chromatic_aberration": {"amount": 0.003},
@@ -31,10 +34,23 @@ DEFAULTS: dict[str, dict[str, float]] = {
     # Digital glitch: a red/blue split plus horizontal slices pushed sideways.
     # shift: largest slice offset as a fraction of the image width.
     "glitch": {"slices": 6, "shift": 0.03, "rgb_split": 0.004},
+    # Film burn: full-height bands of light from the left/right edges that
+    # streak along the film and burn red → orange → yellow where strongest.
+    # Edges, band count, widths and peaks come from each photo's seed.
+    # size: band width as a fraction of the image width; tint_hue sets the
+    # burn's middle colour (Oklab degrees).
+    "light_leak": {"intensity": 0.6, "size": 0.45, "tint_hue": 45},
     # Dark horizontal lines, like a CRT or a paused tape.
     "scanlines": {"spacing": 0.006, "intensity": 0.22},
     # Fine luminance noise; size is one noise cell.
     "noise": {"amount": 0.12, "size": 0.0012},
+    # Film grain: clumpy (roughness 0..1), strongest in mid-tones and shadows,
+    # mostly grey (color 0..1 adds colour grain).
+    "grain": {"amount": 0.25, "size": 0.0012, "roughness": 0.5, "color": 0.15},
+    # Film damage from textures.py's images: amount = dust specks, scratches
+    # = hairs, long scratches and horizontal scratch bands (0..1 each). The
+    # texture, flip and position come from each photo's seed.
+    "dust": {"amount": 0.3, "scratches": 0.3},
     # Darkened corners; radius is a fraction of the half-diagonal.
     "vignette": {"intensity": 0.5, "radius": 0.9},
 }

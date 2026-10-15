@@ -34,11 +34,15 @@
 # defaults in effects.py:
 #   gradient              size, exposure, tint_hue, tint   (graduated filter from the top)
 #   glow                  threshold, radius, intensity, saturation, tint_hue, tint
+#   halation              threshold, radius, intensity   (red-orange film halo)
 #   chromatic_aberration  amount
 #   chroma_bleed          radius
 #   glitch                slices, shift, rgb_split
+#   light_leak            intensity, size, tint_hue   (side/height vary per photo)
 #   scanlines             spacing, intensity
 #   noise                 amount, size
+#   grain                 amount, size, roughness, color   (film grain)
+#   dust                  amount, scratches
 #   vignette              intensity, radius
 
 [collections.disposable]
@@ -56,6 +60,10 @@ tagline = "Gentle contrast, creamy highlights and skin that looks like skin."
 [collections.overclock]
 name = "Overclock"
 tagline = "Neon glow, broken signals and chrome-edged colour from a future that never happened."
+
+[collections.darkroom]
+name = "Darkroom"
+tagline = "Grain, halation and faded colour from old film and shoebox prints."
 
 # ---------------------------------------------------------------- Disposable
 
@@ -606,3 +614,155 @@ saturation = 1.2
 
 [look.effects.noise]
 amount = 0.06
+
+# ---------------------------------------------------------------- Darkroom
+
+[[look]]
+id = "halo"
+name = "Halo"
+collection = "darkroom"
+description = "Warm cinema print: highlights bloom red at the edges."
+temperature = 0.12
+contrast = 0.18
+curve = [[0, 0.04], [0.5, 0.52], [1, 0.97]]
+saturation = 0.95
+highlight_rolloff = 0.7
+highlight_desat = 0.15
+shadow_tint = { hue = 185, amount = 0.03 }
+highlight_tint = { hue = 70, amount = 0.025 }
+
+[look.effects.halation]
+threshold = 0.65
+radius = 0.014
+intensity = 0.8
+
+[look.effects.grain]
+amount = 0.18
+roughness = 0.4
+
+[look.effects.vignette]
+intensity = 0.35
+radius = 0.85
+
+[[look]]
+id = "crossroad"
+name = "Crossroad"
+collection = "darkroom"
+description = "Cross-processed slide film: blue shadows, yellow-green highlights."
+contrast = 0.35
+curve_r = [[0, 0], [0.25, 0.2], [0.75, 0.86], [1, 1]]
+curve_g = [[0, 0.03], [0.5, 0.58], [1, 1]]
+curve_b = [[0, 0.15], [0.5, 0.42], [1, 0.75]]
+saturation = 1.0
+skin_protect = 0.95
+
+[look.effects.grain]
+amount = 0.2
+
+[look.effects.vignette]
+intensity = 0.4
+radius = 0.8
+
+[[look]]
+id = "instant"
+name = "Instant"
+collection = "darkroom"
+description = "Instant-camera print: soft blacks, cool shade, creamy whites."
+black = 0.08
+contrast = -0.1
+curve = [[0, 0.1], [0.5, 0.53], [1, 0.94]]
+saturation = 0.85
+temperature = 0.05
+highlight_rolloff = 0.8
+shadow_tint = { hue = 200, amount = 0.04 }
+highlight_tint = { hue = 85, amount = 0.03 }
+
+[look.effects.halation]
+threshold = 0.8
+radius = 0.008
+intensity = 0.3
+
+[look.effects.grain]
+amount = 0.1
+size = 0.0015
+roughness = 0.3
+color = 0.3
+
+[look.effects.vignette]
+intensity = 0.5
+radius = 0.75
+
+[[look]]
+id = "leak"
+name = "Leak"
+collection = "darkroom"
+description = "A light-struck roll: burnt edges, dust and scratches."
+temperature = 0.15
+tint = 0.04
+black = 0.05
+contrast = 0.1
+saturation = 0.9
+shadow_tint = { hue = 330, amount = 0.025 }
+highlight_tint = { hue = 70, amount = 0.03 }
+
+[look.effects.light_leak]
+intensity = 1.5
+size = 0.6
+tint_hue = 40
+
+[look.effects.grain]
+amount = 0.22
+
+[look.effects.dust]
+amount = 0.7
+scratches = 0.7
+
+[[look]]
+id = "grit"
+name = "Grit"
+collection = "darkroom"
+description = "Pushed black and white: hard contrast, heavy grain."
+monochrome = true
+contrast = 0.4
+curve = [[0, 0.02], [0.5, 0.5], [1, 0.98]]
+highlight_rolloff = 0.5
+
+[look.effects.grain]
+amount = 0.35
+size = 0.0016
+roughness = 0.8
+color = 0
+
+[look.effects.vignette]
+intensity = 0.4
+radius = 0.8
+
+[look.effects.dust]
+amount = 0.15
+scratches = 0.15
+
+[[look]]
+id = "heirloom"
+name = "Heirloom"
+collection = "darkroom"
+description = "An old sepia print: faded, dusty and scratched."
+monochrome = true
+mono_tone = { hue = 70, amount = 0.05 }
+contrast = 0.05
+black = 0.07
+white = 0.93
+highlight_rolloff = 0.8
+
+[look.effects.grain]
+amount = 0.15
+size = 0.0014
+roughness = 0.6
+color = 0
+
+[look.effects.dust]
+amount = 0.45
+scratches = 0.4
+
+[look.effects.vignette]
+intensity = 0.7
+radius = 0.7

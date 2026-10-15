@@ -43,6 +43,46 @@ struct LookEffects: Codable, Hashable, Sendable {
         }
     }
 
+    /// Film halation: a red-orange halo around bright light, from light
+    /// bouncing off the film base back through the red-sensitive layer.
+    struct Halation: Codable, Hashable, Sendable {
+        /// Brightness (0…1) where the halo starts.
+        var threshold: Double
+        var radius: Double
+        var intensity: Double
+    }
+
+    /// Warm light bleeding in from one edge, placed per photo by the seed.
+    struct LightLeak: Codable, Hashable, Sendable {
+        var intensity: Double
+        /// How far it reaches in, as a fraction of the image width.
+        var size: Double
+        /// Oklab hue (degrees) of the leak.
+        var tintHue: Double
+
+        enum CodingKeys: String, CodingKey {
+            case intensity, size
+            case tintHue = "tint_hue"
+        }
+    }
+
+    /// Film grain: clumpy, strongest in the mid-tones and shadows.
+    struct Grain: Codable, Hashable, Sendable {
+        var amount: Double
+        /// One fine grain cell.
+        var size: Double
+        /// 0 = fine and even, 1 = coarse and clumpy.
+        var roughness: Double
+        /// 0 = grey grain, 1 = fully coloured.
+        var color: Double
+    }
+
+    /// Dust specks and fine vertical scratches, as on an old scan.
+    struct Dust: Codable, Hashable, Sendable {
+        var amount: Double
+        var scratches: Double
+    }
+
     /// Lens fringing: red and blue drift apart towards the edges.
     struct ChromaticAberration: Codable, Hashable, Sendable {
         /// Scale difference between the red and blue channels at full strength.
@@ -89,11 +129,15 @@ struct LookEffects: Codable, Hashable, Sendable {
 
     var gradient: Gradient?
     var glow: Glow?
+    var halation: Halation?
     var chromaticAberration: ChromaticAberration?
     var chromaBleed: ChromaBleed?
     var glitch: Glitch?
+    var lightLeak: LightLeak?
     var scanlines: Scanlines?
     var noise: Noise?
+    var grain: Grain?
+    var dust: Dust?
     var vignette: Vignette?
 
     static let none = LookEffects()
@@ -101,9 +145,10 @@ struct LookEffects: Codable, Hashable, Sendable {
     var isEmpty: Bool { self == .none }
 
     enum CodingKeys: String, CodingKey {
-        case gradient, glow, glitch, scanlines, noise, vignette
+        case gradient, glow, halation, glitch, scanlines, noise, grain, dust, vignette
         case chromaticAberration = "chromatic_aberration"
         case chromaBleed = "chroma_bleed"
+        case lightLeak = "light_leak"
     }
 
     /// Linear-light RGB for an Oklab hue (degrees), scaled to unit luminance

@@ -13,9 +13,13 @@ final class LookEffectsTests: XCTestCase {
          "glow": {"threshold": 0.5, "radius": 0.03, "intensity": 0.8, "saturation": 1.5, "tint_hue": 200, "tint": 0.5},
          "chromatic_aberration": {"amount": 0.01},
          "chroma_bleed": {"radius": 0.02},
+         "halation": {"threshold": 0.2, "radius": 0.03, "intensity": 0.8},
          "glitch": {"slices": 8, "shift": 0.05, "rgb_split": 0.01},
+         "light_leak": {"intensity": 0.6, "size": 0.5, "tint_hue": 45},
          "scanlines": {"spacing": 0.02, "intensity": 0.3},
          "noise": {"amount": 0.2, "size": 0.01},
+         "grain": {"amount": 0.3, "size": 0.01, "roughness": 0.5, "color": 0.2},
+         "dust": {"amount": 0.5, "scratches": 0.5},
          "vignette": {"intensity": 0.6, "radius": 0.8}}
         """
         return try JSONDecoder().decode(LookEffects.self, from: Data(json.utf8))
@@ -71,12 +75,16 @@ final class LookEffectsTests: XCTestCase {
         XCTAssertEqual(Array(bytes[(bottomRow * 160)..<(bottomRow * 160 + 3)]), Array(original[(bottomRow * 160)..<(bottomRow * 160 + 3)]))
     }
 
-    func testOverclockLooksCarryTheirEffects() throws {
+    func testEffectLooksCarryTheirEffects() throws {
         let library = LookLibrary.bundled()
-        for id in ["overdrive", "redline", "signal", "chrome", "hologram"] {
-            let look = try XCTUnwrap(library.looks.first { $0.id == id }, "\(id) missing from filters.json")
-            XCTAssertEqual(look.collectionID, "overclock", id)
-            XCTAssertFalse(look.effects.isEmpty, "\(id) should have effects")
+        let expected = ["overclock": ["overdrive", "redline", "signal", "chrome", "hologram"],
+                        "darkroom": ["halo", "crossroad", "instant", "leak", "grit", "heirloom"]]
+        for (collection, ids) in expected {
+            for id in ids {
+                let look = try XCTUnwrap(library.looks.first { $0.id == id }, "\(id) missing from filters.json")
+                XCTAssertEqual(look.collectionID, collection, id)
+                XCTAssertFalse(look.effects.isEmpty, "\(id) should have effects")
+            }
         }
         let boardwalk = try XCTUnwrap(library.looks.first { $0.id == "boardwalk" })
         XCTAssertTrue(boardwalk.effects.isEmpty, "colour-only looks have no effects")
@@ -95,12 +103,26 @@ final class LookEffectsTests: XCTestCase {
         }
     }
 
+    /// One effect at a time: real looks use a few each, and stacking all of
+    /// them makes Core Image compile one huge filter graph (slow on CI).
     func testSameSeedRendersIdentically() throws {
-        let effects = try allEffects()
-        let first = pixels(LookPipeline.applyEffects(effects, seed: 7, to: sample()))
-        let second = pixels(LookPipeline.applyEffects(effects, seed: 7, to: sample()))
-        XCTAssertEqual(first, second, "a photo must render the same way every time")
-        XCTAssertNotEqual(first, pixels(sample()), "effects should change the image")
+        let all = try allEffects()
+        let single: [(String, LookEffects)] = [
+            ("gradient", LookEffects(gradient: all.gradient)), ("glow", LookEffects(glow: all.glow)),
+            ("halation", LookEffects(halation: all.halation)),
+            ("chromatic_aberration", LookEffects(chromaticAberration: all.chromaticAberration)),
+            ("chroma_bleed", LookEffects(chromaBleed: all.chromaBleed)), ("glitch", LookEffects(glitch: all.glitch)),
+            ("light_leak", LookEffects(lightLeak: all.lightLeak)), ("scanlines", LookEffects(scanlines: all.scanlines)),
+            ("noise", LookEffects(noise: all.noise)), ("grain", LookEffects(grain: all.grain)),
+            ("dust", LookEffects(dust: all.dust)), ("vignette", LookEffects(vignette: all.vignette)),
+        ]
+        let original = pixels(sample())
+        for (name, effects) in single {
+            let first = pixels(LookPipeline.applyEffects(effects, seed: 7, to: sample()))
+            let second = pixels(LookPipeline.applyEffects(effects, seed: 7, to: sample()))
+            XCTAssertEqual(first, second, "\(name): a photo must render the same way every time")
+            XCTAssertNotEqual(first, original, "\(name) should change the image")
+        }
     }
 
     func testSeedChangesTheGlitch() {
@@ -108,6 +130,36 @@ final class LookEffectsTests: XCTestCase {
         let a = pixels(LookPipeline.applyEffects(glitch, seed: 1, to: sample()))
         let b = pixels(LookPipeline.applyEffects(glitch, seed: 2, to: sample()))
         XCTAssertNotEqual(a, b)
+    }
+
+    func testSeedMovesTheLightLeak() {
+        let grey = CIImage(color: CIColor(red: 0.3, green: 0.3, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 120, height: 90))
+        let leak = LookEffects(lightLeak: .init(intensity: 0.8, size: 0.5, tintHue: 45))
+        let renders = (1...6).map { pixels(LookPipeline.applyEffects(leak, seed: UInt64($0), to: grey)) }
+        XCTAssertGreaterThan(Set(renders).count, 1, "each photo's leak should land differently")
+    }
+
+    func testGrainAddsNoColourCast() {
+        let grey = CIImage(color: CIColor(red: 0.45, green: 0.45, blue: 0.45)).cropped(to: CGRect(x: 0, y: 0, width: 200, height: 200))
+        let grain = LookEffects(grain: .init(amount: 0.3, size: 0.01, roughness: 0.5, color: 0.2))
+        let before = pixels(grey), after = pixels(LookPipeline.applyEffects(grain, seed: 9, to: grey))
+        XCTAssertNotEqual(before, after, "grain should change pixels")
+        for channel in 0..<3 {
+            let mean = { (bytes: [UInt8]) in
+                Double(stride(from: channel, to: bytes.count, by: 4).reduce(0) { $0 + Int(bytes[$1]) }) / Double(bytes.count / 4)
+            }
+            XCTAssertEqual(mean(after), mean(before), accuracy: 4, "channel \(channel) mean should barely move")
+        }
+    }
+
+    func testHalationGlowsRedNotBlue() {
+        let black = CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let light = CIImage(color: CIColor(red: 1, green: 1, blue: 1)).cropped(to: CGRect(x: 45, y: 45, width: 10, height: 10))
+        let halation = LookEffects(halation: .init(threshold: 0.5, radius: 0.05, intensity: 1))
+        let bytes = pixels(LookPipeline.applyEffects(halation, to: light.composited(over: black)))
+        let near = (50 * 100 + 60) * 4 // just right of the light
+        XCTAssertGreaterThan(bytes[near], 20, "a red halo appears")
+        XCTAssertGreaterThan(bytes[near], bytes[near + 2], "red, never blue")
     }
 
     func testSeededGeneratorMatchesSplitMix64() {

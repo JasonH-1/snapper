@@ -42,6 +42,7 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         var swipe: Swipe?
         var generation = 0
         var isEnabled = true
+        var seed: UInt64 = 0
     }
 
     let renderQueue = DispatchQueue(label: "app.snapper.preview.render", qos: .userInteractive)
@@ -77,6 +78,12 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     /// Pauses drawing (app in background or preview covered).
     func setEnabled(_ enabled: Bool) {
         shared.withLock { $0.isEnabled = enabled }
+    }
+
+    /// The seed for the look's random effects (grain, dust, light leaks): the
+    /// next photo's, so the preview shows exactly what the shutter will save.
+    func setSeed(_ seed: UInt64) {
+        shared.withLock { $0.seed = seed }
     }
 
     /// Shows `look` immediately, cancelling any swipe.
@@ -145,12 +152,12 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     }
 
     private func render(_ source: CIImage) {
-        let snapshot = shared.withLock { state -> (CAMetalLayer, LookState, Swipe?)? in
+        let snapshot = shared.withLock { state -> (CAMetalLayer, LookState, Swipe?, UInt64)? in
             guard state.isEnabled, let layer = state.layer else { return nil }
-            return (layer, state.current, state.swipe)
+            return (layer, state.current, state.swipe, state.seed)
         }
         guard let snapshot, let commandQueue, let context else { return }
-        let (layer, current, swipe) = snapshot
+        let (layer, current, swipe, seed) = snapshot
 
         // Drop the frame rather than queue up latency when the GPU is behind.
         guard inFlight.wait(timeout: .now()) == .success else { return }
@@ -162,9 +169,6 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
 
         let size = CGSize(width: drawable.texture.width, height: drawable.texture.height)
         let base = Self.aspectFill(source, in: size)
-        // Random effects (glitch, noise) re-roll a few times a second while
-        // live; a captured photo keeps its own seed.
-        let seed = UInt64(CACurrentMediaTime() * 3)
         var image = Self.render(current, on: base, seed: seed)
 
         if let swipe {

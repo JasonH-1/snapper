@@ -63,7 +63,7 @@ final class CaptureLibrary {
             pendingCaptures -= 1
             isProcessingCapture = pendingCaptures > 0
         }
-        let id = UUID()
+        let id = photo.id
         let fileName = "\(id.uuidString).\(CaptureStore.fileExtension(for: photo.data))"
         let store = self.store
         let data = photo.data

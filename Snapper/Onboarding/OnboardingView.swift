@@ -70,7 +70,7 @@ struct OnboardingView: View {
             .frame(height: 420)
 
             pageText(title: Text("Swipe to change the mood"),
-                     detail: Text("Four collections: Disposable, Neon Nights, Soft Portrait and Overclock. Swipe the preview to try each look, or star your favorites."))
+                     detail: Text("Five collections: Disposable, Neon Nights, Soft Portrait, Overclock and Darkroom. Swipe the preview to try each look, or star your favorites."))
         }
         .padding(.top, 24)
     }
