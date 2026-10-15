@@ -50,7 +50,7 @@ jobs:
             -scheme Snapper \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
 
       - name: Fail on warnings
         run: scripts/check-warnings.sh build/xcodebuild.log
@@ -64,7 +64,7 @@ jobs:
             -derivedDataPath build/DerivedData \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 120 \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
 
       - name: Upload logs
         if: always()
