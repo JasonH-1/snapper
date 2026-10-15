@@ -84,16 +84,17 @@ private struct LookTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
-                Group {
-                    if let image {
-                        Image(uiImage: image).resizable().scaledToFill()
-                    } else {
-                        Rectangle().fill(.quaternary)
+                // The thumbnail is an overlay on a fixed box, so a landscape
+                // image fills and crops instead of widening the grid cell.
+                Rectangle().fill(.quaternary)
+                    .frame(height: 124)
+                    .frame(maxWidth: .infinity)
+                    .overlay {
+                        if let image {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        }
                     }
-                }
-                .frame(height: 124)
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 3)

@@ -284,17 +284,19 @@ struct LookStrip: View {
         let isSelected = look.id == selectedID
         return VStack(spacing: 6) {
             ZStack(alignment: .topTrailing) {
-                Group {
-                    if let image = thumbnails[look.id] {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Rectangle().fill(.quaternary)
+                // An overlay, so a landscape thumbnail can't spill into (and
+                // catch taps meant for) its neighbours.
+                Rectangle().fill(.quaternary)
+                    .frame(width: 62, height: 76)
+                    .overlay {
+                        if let image = thumbnails[look.id] {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                        }
                     }
-                }
-                .frame(width: 62, height: 76)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2.5)
