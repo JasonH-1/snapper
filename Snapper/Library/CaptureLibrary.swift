@@ -36,8 +36,10 @@ final class CaptureLibrary {
     func load() async {
         let store = self.store
         let loaded = await Task.detached(priority: .userInitiated) { store.load() }.value
-        records = loaded
-        for record in loaded.prefix(12) {
+        // Keep anything captured while the index was loading.
+        let known = Set(records.map(\.id))
+        records = (records + loaded.filter { !known.contains($0.id) }).sorted { $0.createdAt > $1.createdAt }
+        for record in records.prefix(12) where thumbnails[record.id] == nil {
             await refreshThumbnail(for: record)
         }
     }

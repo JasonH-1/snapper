@@ -124,6 +124,12 @@ final class CameraModel {
 
     func scenePhaseChanged(_ phase: ScenePhase) {
         isAppActive = phase != .background
+        // Coming back from the Settings app: camera access may have changed.
+        if phase == .active, status == .denied || status == .needsPermission {
+            renderer.setEnabled(isPreviewVisible)
+            Task { await start() }
+            return
+        }
         updateRunningState()
     }
 
