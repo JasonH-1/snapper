@@ -50,12 +50,17 @@ jobs:
             -scheme Snapper \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath build/DerivedData \
-            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Fail on warnings
         run: scripts/check-warnings.sh build/xcodebuild.log
 
       - name: Unit tests
+        env:
+          # StoreKit's test daemon can't be configured on hosted runners
+          # (SKTestSession fails with SKInternalErrorDomain 3), so the StoreKit
+          # integration tests skip here and run when you test from Xcode.
+          TEST_RUNNER_SNAPPER_SKIP_STOREKIT_INTEGRATION: "1"
         run: |
           scripts/xcb.sh build/test.log test-without-building \
             -project Snapper.xcodeproj \
@@ -64,7 +69,7 @@ jobs:
             -derivedDataPath build/DerivedData \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 120 \
-            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Upload logs
         if: always()

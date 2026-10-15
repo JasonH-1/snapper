@@ -42,7 +42,7 @@ Run `xcodegen generate` again whenever you add, remove or rename files. The `.xc
 
 **Against App Store Connect (sandbox):** in Edit Scheme › Run › Options, set StoreKit Configuration to *None*. Sign in with a Sandbox Apple Account on the iPhone (Settings › Developer › Sandbox Apple Account on iOS 18 and later; Settings › App Store on iOS 17), then run from Xcode or TestFlight.
 
-**Unit tests:** `StoreKitPurchaseServiceTests` uses `SKTestSession` with the same `.storekit` file to check plan loading, the trial and a purchase.
+**Unit tests:** `StoreKitPurchaseServiceTests` uses `SKTestSession` with the same `.storekit` file to check plan loading, the trial and a purchase. Run them from Xcode (⌘U). Hosted CI runners can't configure StoreKit's test daemon, so CI skips those two tests and covers the paywall's purchase, pending and restore paths through `PaywallModelTests`, which uses a fake backend.
 
 ## Filters
 

@@ -15,12 +15,21 @@ final class StoreKitPurchaseServiceTests: XCTestCase {
         return session
     }
 
+    /// Hosted CI runners can't configure StoreKit's test daemon; there the
+    /// workflow sets this flag and these tests skip instead of failing.
+    private func skipIfStoreKitTestingUnavailable(_ service: StoreKitPurchaseService) throws {
+        guard service.plans.isEmpty,
+              ProcessInfo.processInfo.environment["SNAPPER_SKIP_STOREKIT_INTEGRATION"] == "1" else { return }
+        throw XCTSkip("StoreKit testing is unavailable on this runner; run these tests from Xcode.")
+    }
+
     @MainActor
     func testLoadsYearlyFirstWithFreeTrial() async throws {
         let session = try makeSession()
         defer { session.clearTransactions() }
         let service = StoreKitPurchaseService()
         await service.loadPlans()
+        try skipIfStoreKitTestingUnavailable(service)
 
         XCTAssertEqual(service.plansState, .loaded)
         XCTAssertEqual(service.plans.map(\.id), [AppConfig.yearlyProductID, AppConfig.monthlyProductID])
@@ -38,6 +47,7 @@ final class StoreKitPurchaseServiceTests: XCTestCase {
         defer { session.clearTransactions() }
         let service = StoreKitPurchaseService()
         await service.loadPlans()
+        try skipIfStoreKitTestingUnavailable(service)
         let monthly = try XCTUnwrap(service.plans.first { $0.period == .month })
 
         let outcome = try await service.purchase(monthly)
