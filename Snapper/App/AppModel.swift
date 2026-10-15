@@ -44,6 +44,7 @@ final class AppModel {
     let captures: CaptureLibrary
     let renderer: PhotoRenderer
     let store: any PurchaseService
+    let lookThumbnails = LookThumbnails()
 
     /// Which screen presents the paywall: always the one on top.
     enum PaywallHost {
@@ -130,7 +131,33 @@ final class AppModel {
         withAnimation(.easeInOut(duration: 0.25)) { toast = nil }
     }
 
+    // MARK: - Onboarding
+
+    var needsOnboarding: Bool { !settings.hasCompletedOnboarding }
+
+    /// Ends onboarding; the paywall is offered once, right after, and can be closed.
+    func finishOnboarding() {
+        settings.hasCompletedOnboarding = true
+        guard !settings.hasSeenIntroPaywall else { return }
+        settings.hasSeenIntroPaywall = true
+        guard !hasPremium else { return }
+        Task {
+            try? await Task.sleep(for: .milliseconds(700))
+            presentPaywall(.intro)
+        }
+    }
+
     // MARK: - Navigation
+
+    func selectLook(_ look: Look) {
+        camera.select(look)
+        settings.lastLookID = look.id
+    }
+
+    func openLookPicker() {
+        lookThumbnails.load(looks: library.looks, renderer: renderer)
+        isShowingLookPicker = true
+    }
 
     func openReview(id: UUID? = nil) {
         guard !captures.records.isEmpty else { return }
@@ -193,6 +220,7 @@ final class AppModel {
 
     func openSettings() {
         camera.setPreviewVisible(false)
+        lookThumbnails.load(looks: library.looks, renderer: renderer)
         isShowingSettings = true
     }
 
