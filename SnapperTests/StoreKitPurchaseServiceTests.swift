@@ -17,6 +17,7 @@ final class StoreKitPurchaseServiceTests: XCTestCase {
 
     /// Hosted CI runners can't configure StoreKit's test daemon; there the
     /// workflow sets this flag and these tests skip instead of failing.
+    @MainActor
     private func skipIfStoreKitTestingUnavailable(_ service: StoreKitPurchaseService) throws {
         guard service.plans.isEmpty,
               ProcessInfo.processInfo.environment["SNAPPER_SKIP_STOREKIT_INTEGRATION"] == "1" else { return }
