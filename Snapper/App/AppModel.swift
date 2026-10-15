@@ -5,15 +5,15 @@ import SwiftUI
 enum PaywallContext: Identifiable {
     /// Shown once after onboarding.
     case intro
-    /// Tried to save or share with a premium look.
-    case lockedLook(Look, UIImage?)
+    /// Tried to save or share with a premium look (with the photo before and after).
+    case lockedLook(Look, before: UIImage?, after: UIImage?)
     /// Tapped an upgrade entry point (camera badge, settings, watermark note).
     case upgrade
 
     var id: String {
         switch self {
         case .intro: "intro"
-        case .lockedLook(let look, _): "locked-\(look.id)"
+        case .lockedLook(let look, _, _): "locked-\(look.id)"
         case .upgrade: "upgrade"
         }
     }
@@ -45,8 +45,13 @@ final class AppModel {
     let renderer: PhotoRenderer
     let store: any PurchaseService
 
+    /// Which screen presents the paywall: always the one on top.
+    enum PaywallHost {
+        case root, review, settings
+    }
+
     var review: ReviewModel?
-    var paywall: PaywallContext?
+    var paywall: PaywallModel?
     var isShowingSettings = false
     var isShowingLookPicker = false
     var toast: Toast?
@@ -136,8 +141,8 @@ final class AppModel {
             startAt: id,
             hasPremium: { [weak self] in self?.hasPremium ?? false },
             alsoSaveOriginal: { [weak self] in self?.settings.alsoSaveOriginal ?? false },
-            requestPremium: { [weak self] look, image in
-                self?.presentPaywall(.lockedLook(look, image))
+            requestPremium: { [weak self] look, before, after in
+                self?.presentPaywall(.lockedLook(look, before: before, after: after))
             }
         )
     }
@@ -148,13 +153,42 @@ final class AppModel {
     }
 
     func presentPaywall(_ context: PaywallContext) {
+        guard paywall == nil else { return }
         camera.setPreviewVisible(false)
-        paywall = context
+        paywall = PaywallModel(context: context,
+                               store: store,
+                               library: library,
+                               renderer: renderer,
+                               photoURL: captures.latest.map(captures.url(for:)))
     }
 
     func paywallDismissed() {
+        let unlocked = paywall?.didUnlock ?? false
         paywall = nil
         updateCameraVisibility()
+        if unlocked {
+            show(Toast(message: String(localized: "Welcome to Snapper Premium. Every look is yours."), symbol: "sparkles"))
+        }
+    }
+
+    private var paywallHost: PaywallHost {
+        if review != nil { return .review }
+        if isShowingSettings { return .settings }
+        return .root
+    }
+
+    /// Binding for `host` to present the paywall; only the top-most screen
+    /// gets a non-nil value, so SwiftUI never stacks two presentations.
+    func paywallBinding(for host: PaywallHost) -> Binding<PaywallModel?> {
+        Binding(
+            get: { [weak self] in
+                guard let self, self.paywallHost == host else { return nil }
+                return self.paywall
+            },
+            set: { [weak self] newValue in
+                if newValue == nil { self?.paywall = nil }
+            }
+        )
     }
 
     func openSettings() {

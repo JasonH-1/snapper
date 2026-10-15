@@ -49,7 +49,7 @@ final class ReviewModel: Identifiable {
     let looks: [Look]
 
     @ObservationIgnored private let hasPremium: () -> Bool
-    @ObservationIgnored private let requestPremium: (Look, UIImage?) -> Void
+    @ObservationIgnored private let requestPremium: (Look, UIImage?, UIImage?) -> Void
     @ObservationIgnored private let alsoSaveOriginal: () -> Bool
     @ObservationIgnored private var thumbnailsForID: UUID?
     @ObservationIgnored private var pendingRender: (id: UUID, look: Look, strength: Float)?
@@ -60,7 +60,7 @@ final class ReviewModel: Identifiable {
          startAt id: UUID?,
          hasPremium: @escaping () -> Bool,
          alsoSaveOriginal: @escaping () -> Bool,
-         requestPremium: @escaping (Look, UIImage?) -> Void) {
+         requestPremium: @escaping (Look, UIImage?, UIImage?) -> Void) {
         self.library = library
         self.looks = looks
         self.hasPremium = hasPremium
@@ -163,7 +163,7 @@ final class ReviewModel: Identifiable {
         guard let record = current, !isSaving else { return }
         let look = currentLook
         if look.isPremium && !hasPremium() {
-            requestPremium(look, previews[record.id])
+            requestPremium(look, originals[record.id], previews[record.id])
             return
         }
         isSaving = true
@@ -187,7 +187,7 @@ final class ReviewModel: Identifiable {
         guard let record = current, !isPreparingShare else { return }
         let look = currentLook
         if look.isPremium && !hasPremium() {
-            requestPremium(look, previews[record.id])
+            requestPremium(look, originals[record.id], previews[record.id])
             return
         }
         isPreparingShare = true
