@@ -214,7 +214,7 @@ SKIN_HUE_HALF_WIDTH = 42.0
 # Creative drift tolerated on skin before protection pulls it back.
 SKIN_WARM_DRIFT = 6.0      # degrees toward yellow/orange
 SKIN_COOL_DRIFT = 3.0      # degrees toward pink/magenta
-SKIN_CHROMA_RANGE = (0.84, 1.22)  # chroma ratio band vs. the original
+SKIN_CHROMA_RANGE = (0.86, 1.14)  # chroma ratio band vs. the original
 
 
 @dataclass

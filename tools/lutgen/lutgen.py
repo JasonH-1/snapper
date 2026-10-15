@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from engine import Look, build_cube, format_cube, parse_cube  # noqa: E402
+from engine import Look, apply_cube, build_cube, format_cube, parse_cube  # noqa: E402
 from quality import Report, evaluate  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +32,16 @@ LOOKS_FILE = Path(__file__).resolve().parent / "looks.toml"
 LUT_DIR = ROOT / "Snapper/Resources/Filters/LUTs"
 MANIFEST = ROOT / "Snapper/Resources/Filters/filters.json"
 REVIEW_DIR = ROOT / "filter-review"
+FIXTURE = ROOT / "SnapperTests/Fixtures/lut-reference.json"
+
+# Colours sampled into the unit-test fixture: the app renders these through
+# Core Image and must match the Python reference within a small tolerance.
+REFERENCE_INPUTS = [
+    [0.0, 0.0, 0.0], [0.18, 0.18, 0.18], [0.5, 0.5, 0.5], [0.85, 0.85, 0.85], [1.0, 1.0, 1.0],
+    [0.92, 0.76, 0.66], [0.63, 0.47, 0.34], [0.36, 0.25, 0.20],
+    [0.80, 0.20, 0.20], [0.20, 0.60, 0.25], [0.25, 0.45, 0.85], [0.95, 0.80, 0.20],
+    [0.45, 0.70, 0.90], [0.70, 0.35, 0.75], [0.10, 0.15, 0.30], [0.30, 0.55, 0.50],
+]
 PHOTOS_DIR = ROOT / "test-photos"
 N = 33
 
@@ -111,6 +121,16 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
             print(f"warning: manifest look '{entry['id']}' has no cube file {entry['lut']}")
 
 
+def reference_fixture(looks: list[Look]) -> dict:
+    inputs = np.array(REFERENCE_INPUTS)
+    fixture = {"inputs": REFERENCE_INPUTS, "looks": {}}
+    for lk in looks:
+        _, cube = parse_cube((LUT_DIR / f"{lk.id}.cube").read_text())
+        out = apply_cube(cube, N, inputs)
+        fixture["looks"][lk.id] = [[round(float(v), 4) for v in row] for row in out]
+    return fixture
+
+
 def cmd_build(args) -> int:
     collections, looks = load_config()
     LUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -121,6 +141,8 @@ def cmd_build(args) -> int:
         reports.append(evaluate(lk.id, np.round(cube, 4), N, lk.monochrome))
     print_report(reports)
     update_manifest(collections, looks)
+    FIXTURE.parent.mkdir(parents=True, exist_ok=True)
+    FIXTURE.write_text(json.dumps(reference_fixture(looks)) + "\n")
     return 0 if all(r.ok for r in reports) else 1
 
 
@@ -154,6 +176,10 @@ def cmd_verify(args) -> int:
         rep = evaluate(lk.id, committed, n, lk.monochrome)
         if not rep.ok:
             problems.append(f"{lk.id} fails quality gates: {'; '.join(rep.failures)}")
+    if not problems:
+        committed_fixture = json.loads(FIXTURE.read_text()) if FIXTURE.exists() else None
+        if committed_fixture != json.loads(json.dumps(reference_fixture(looks))):
+            problems.append(f"{FIXTURE.relative_to(ROOT)} is stale — run lutgen.py build")
     if problems:
         print("\n".join(problems))
         return 1
