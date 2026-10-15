@@ -21,16 +21,22 @@ struct CameraView: View {
 
     private var isLocked: Bool { model.currentLook.isPremium && !hasPremium }
 
+    private static let topBarHeight: CGFloat = 52
+    /// Approximate height of the look caption + shutter row.
+    private static let controlsHeight: CGFloat = 166
+
     var body: some View {
         GeometryReader { geometry in
             let previewSize = CGSize(width: geometry.size.width, height: geometry.size.width * 4 / 3)
+            // On shorter iPhones the controls overlap the bottom of the preview.
+            let overlap = max(0, Self.topBarHeight + previewSize.height + Self.controlsHeight - geometry.size.height)
             ZStack(alignment: .top) {
                 Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     topBar
-                        .frame(height: 52)
-                    preview(size: previewSize)
+                        .frame(height: Self.topBarHeight)
+                    preview(size: previewSize, bottomInset: overlap)
                         .frame(width: previewSize.width, height: previewSize.height)
                     Spacer(minLength: 0)
                 }
@@ -114,7 +120,7 @@ struct CameraView: View {
 
     // MARK: - Preview
 
-    private func preview(size: CGSize) -> some View {
+    private func preview(size: CGSize, bottomInset: CGFloat) -> some View {
         ZStack {
             CameraPreviewView(renderer: model.renderer)
 
@@ -153,7 +159,7 @@ struct CameraView: View {
                                 iconRotation: orientation.iconRotation) { preset in
                         model.setZoom(preset, animated: true)
                     }
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 14 + bottomInset)
                 }
             }
 
