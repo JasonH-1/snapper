@@ -103,7 +103,7 @@ private struct LookTile: View {
                     Button(action: toggleFavorite) {
                         Image(systemName: isFavorite ? "star.fill" : "star")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(isFavorite ? Color.yellow : .white)
+                            .foregroundStyle(isFavorite ? Theme.accent : .white)
                             .frame(width: 30, height: 30)
                             .background(.black.opacity(0.4), in: Circle())
                     }
@@ -115,7 +115,7 @@ private struct LookTile: View {
                 if isLocked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Theme.premiumGradient)
+                        .foregroundStyle(Theme.accent)
                 }
                 Text(look.name)
                     .font(.subheadline.weight(isSelected ? .semibold : .regular))

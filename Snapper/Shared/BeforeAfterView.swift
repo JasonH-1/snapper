@@ -71,11 +71,11 @@ struct BeforeAfterView: View {
     private func divider(height: CGFloat) -> some View {
         ZStack {
             Rectangle()
-                .fill(.white)
+                .fill(Theme.accent)
                 .frame(width: 2, height: height)
                 .shadow(color: .black.opacity(0.35), radius: 3)
             Circle()
-                .fill(.white)
+                .fill(Theme.accent)
                 .frame(width: 30, height: 30)
                 .shadow(color: .black.opacity(0.3), radius: 4)
                 .overlay {

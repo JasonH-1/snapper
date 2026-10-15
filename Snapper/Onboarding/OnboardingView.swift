@@ -150,7 +150,7 @@ struct OnboardingView: View {
         HStack(alignment: .center, spacing: 14) {
             Image(systemName: symbol)
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Theme.premiumGradient)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 44, height: 44)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {

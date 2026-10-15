@@ -11,11 +11,10 @@ enum Theme {
         .system(size: size, weight: .medium, design: .serif)
     }
 
-    static let premiumGradient = LinearGradient(
-        colors: [Color(red: 1.0, green: 0.76, blue: 0.37), Color(red: 1.0, green: 0.45, blue: 0.42)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    /// Signal yellow (the AccentColor asset). Fills carry black content; as a
+    /// text or icon colour it needs a dark surface, which is why the app is
+    /// dark-only.
+    static let accent = Color.accentColor
 }
 
 /// A round, translucent button used for camera controls.
@@ -38,21 +37,27 @@ struct CameraIconButtonStyle: ButtonStyle {
 struct PrimaryButtonStyle: ButtonStyle {
     var isProminent = true
 
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .foregroundStyle(isProminent ? Color.black : Color.primary)
-            .background {
-                if isProminent {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.premiumGradient)
-                } else {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous).fill(.quaternary)
-                }
-            }
+            .foregroundStyle(foreground)
+            .background(background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .opacity(configuration.isPressed ? 0.85 : 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+
+    /// Disabled buttons go grey so they never look tappable.
+    private var foreground: Color {
+        guard isEnabled else { return Color(.systemGray) }
+        return isProminent ? .black : .primary
+    }
+
+    private var background: Color {
+        isEnabled && isProminent ? Theme.accent : Color(.systemGray5)
     }
 }

@@ -6,7 +6,6 @@ struct PaywallView: View {
     @Bindable var model: PaywallModel
     var onClose: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
     @State private var slideTimer: Task<Void, Never>?
 
     var body: some View {
@@ -60,8 +59,7 @@ struct PaywallView: View {
     // MARK: - Sections
 
     private var background: some View {
-        LinearGradient(colors: [Color(.systemBackground), Color(.secondarySystemBackground)],
-                       startPoint: .top, endPoint: .bottom)
+        Color(.systemBackground)
             .ignoresSafeArea()
     }
 
@@ -108,7 +106,7 @@ struct PaywallView: View {
                 HStack(spacing: 6) {
                     ForEach(model.slides.indices, id: \.self) { index in
                         Capsule()
-                            .fill(.white.opacity(index == model.slideIndex ? 0.95 : 0.4))
+                            .fill(index == model.slideIndex ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.white.opacity(0.4)))
                             .frame(width: index == model.slideIndex ? 16 : 6, height: 6)
                     }
                 }
@@ -126,7 +124,7 @@ struct PaywallView: View {
             Text("SNAPPER PREMIUM")
                 .font(.caption.weight(.bold))
                 .tracking(2)
-                .foregroundStyle(Theme.premiumGradient)
+                .foregroundStyle(Theme.accent)
             Text(model.title)
                 .font(Theme.lookTitle(size: 30))
                 .multilineTextAlignment(.center)
@@ -149,7 +147,7 @@ struct PaywallView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.background.opacity(colorScheme == .dark ? 0.35 : 0.8),
+        .background(Color(.secondarySystemBackground),
                     in: RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
     }
 
@@ -157,7 +155,7 @@ struct PaywallView: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: symbol)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Theme.premiumGradient)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 title.font(.subheadline.weight(.semibold))
@@ -304,7 +302,7 @@ private struct PlanCard: View {
         HStack(spacing: 14) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 22))
-                .foregroundStyle(isSelected ? AnyShapeStyle(Theme.premiumGradient) : AnyShapeStyle(.tertiary))
+                .foregroundStyle(isSelected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.tertiary))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(plan.period.adjective)
@@ -314,7 +312,7 @@ private struct PlanCard: View {
                             .font(.caption2.weight(.bold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(Theme.premiumGradient, in: Capsule())
+                            .background(Theme.accent, in: Capsule())
                             .foregroundStyle(.black)
                     }
                 }
@@ -332,10 +330,10 @@ private struct PlanCard: View {
             }
         }
         .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(isSelected ? AnyShapeStyle(Theme.premiumGradient) : AnyShapeStyle(.quaternary),
+                .strokeBorder(isSelected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.quaternary),
                               lineWidth: isSelected ? 2 : 1)
         }
         .contentShape(Rectangle())

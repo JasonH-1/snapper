@@ -6,7 +6,7 @@ struct FocusReticle: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4, style: .continuous)
-            .strokeBorder(Color.yellow, lineWidth: 1.5)
+            .strokeBorder(Theme.accent, lineWidth: 1.5)
             .frame(width: 76, height: 76)
             .scaleEffect(settled ? 1 : 1.35)
             .opacity(settled ? 0.9 : 0)

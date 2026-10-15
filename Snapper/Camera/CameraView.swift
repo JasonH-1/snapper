@@ -76,7 +76,7 @@ struct CameraView: View {
                     model.cycleFlash()
                 } label: {
                     Image(systemName: model.flashMode.symbolName)
-                        .foregroundStyle(model.flashMode == .off ? Color.white : Color.yellow)
+                        .foregroundStyle(model.flashMode == .off ? Color.white : Theme.accent)
                         .contentTransition(.symbolEffect(.replace))
                         .rotationEffect(orientation.iconRotation)
                 }
@@ -98,7 +98,7 @@ struct CameraView: View {
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(Theme.premiumGradient, in: Capsule())
+                    .background(Theme.accent, in: Capsule())
                 }
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                 .accessibilityHint(Text("Shows Snapper Premium"))
@@ -263,8 +263,7 @@ struct CameraView: View {
         .padding(.top, 16)
         .padding(.bottom, 12)
         .background(alignment: .bottom) {
-            LinearGradient(colors: [.black.opacity(0), .black.opacity(0.65), .black],
-                           startPoint: .top, endPoint: .bottom)
+            Color.black.opacity(0.7)
                 .ignoresSafeArea()
         }
     }

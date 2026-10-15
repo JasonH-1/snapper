@@ -9,7 +9,7 @@ struct ToastView: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: toast.symbol)
-                .foregroundStyle(toast.action == .showPaywall ? AnyShapeStyle(Theme.premiumGradient) : AnyShapeStyle(.white))
+                .foregroundStyle(toast.action == .showPaywall ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.white))
             Text(toast.message)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(.white)
@@ -22,7 +22,7 @@ struct ToastView: View {
                         .font(.footnote.weight(.bold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(.white, in: Capsule())
+                        .background(action == .showPaywall ? Theme.accent : .white, in: Capsule())
                         .foregroundStyle(.black)
                 }
             }

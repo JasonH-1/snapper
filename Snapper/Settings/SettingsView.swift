@@ -61,7 +61,7 @@ struct SettingsView: View {
                     }
                 } icon: {
                     Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(Theme.premiumGradient)
+                        .foregroundStyle(Theme.accent)
                 }
                 Button("Manage Subscription") { showManageSubscriptions = true }
             } else {
@@ -79,7 +79,7 @@ struct SettingsView: View {
                         }
                     } icon: {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(Theme.premiumGradient)
+                            .foregroundStyle(Theme.accent)
                     }
                 }
             }
@@ -286,7 +286,7 @@ struct FavoritesView: View {
                 }
                 Spacer()
                 Image(systemName: settings.isFavorite(look) ? "star.fill" : "star")
-                    .foregroundStyle(settings.isFavorite(look) ? Color.yellow : Color.secondary)
+                    .foregroundStyle(settings.isFavorite(look) ? Theme.accent : Color.secondary)
                     .font(.system(size: 18))
             }
         }

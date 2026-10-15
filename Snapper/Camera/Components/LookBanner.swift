@@ -22,7 +22,7 @@ struct LookBanner: View {
                 if isLocked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Theme.premiumGradient)
+                        .foregroundStyle(Theme.accent)
                         .accessibilityLabel(Text("Premium look"))
                 }
             }
@@ -47,7 +47,7 @@ struct LookCaption: View {
                 if isLocked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.premiumGradient)
+                        .foregroundStyle(Theme.accent)
                 }
                 Text(look.name)
                     .font(Theme.lookTitle(size: 17))

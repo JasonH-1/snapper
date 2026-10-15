@@ -20,7 +20,7 @@ struct ZoomControl: View {
                 } label: {
                     Text(label(for: preset, isActive: isActive))
                         .font(.system(size: isActive ? 13 : 11, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(isActive ? Color.yellow : .white)
+                        .foregroundStyle(isActive ? Theme.accent : .white)
                         .frame(width: isActive ? 38 : 30, height: isActive ? 38 : 30)
                         .background(.black.opacity(0.45), in: Circle())
                         .rotationEffect(iconRotation)
