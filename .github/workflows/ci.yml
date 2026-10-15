@@ -62,6 +62,8 @@ jobs:
             -scheme Snapper \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath build/DerivedData \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Upload logs
