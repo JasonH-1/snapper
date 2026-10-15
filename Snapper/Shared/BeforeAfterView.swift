@@ -9,6 +9,7 @@ struct BeforeAfterView: View {
     var autoSweep = true
     var showsLabels = true
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var position: CGFloat = 0.5
     @State private var userControlled = false
     @State private var sweepTask: Task<Void, Never>?
@@ -112,7 +113,7 @@ struct BeforeAfterView: View {
     }
 
     private func startSweep() {
-        guard autoSweep, !userControlled else { return }
+        guard autoSweep, !userControlled, !reduceMotion else { return }
         sweepTask?.cancel()
         sweepTask = Task { @MainActor in
             var target: CGFloat = 0.78

@@ -42,7 +42,9 @@ struct CameraView: View {
             }
         }
         .statusBarHidden()
-        .preferredColorScheme(.dark)
+        // The camera is always dark; scoped to this screen so sheets and the
+        // review screen still follow the system appearance.
+        .environment(\.colorScheme, .dark)
         .task {
             orientation.start()
             await model.start()
@@ -183,7 +185,9 @@ struct CameraView: View {
     private func swipeGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .local)
             .onChanged { value in
-                guard abs(value.translation.width) > abs(value.translation.height) * 0.6 else { return }
+                // Two-finger pinches also move a drag; never treat them as swipes.
+                guard zoomAtGestureStart == nil,
+                      abs(value.translation.width) > abs(value.translation.height) * 0.6 else { return }
                 model.swipeChanged(translation: value.translation.width, width: width)
             }
             .onEnded { value in
@@ -197,7 +201,10 @@ struct CameraView: View {
         MagnifyGesture()
             .onChanged { value in
                 let start = zoomAtGestureStart ?? model.zoom
-                if zoomAtGestureStart == nil { zoomAtGestureStart = start }
+                if zoomAtGestureStart == nil {
+                    zoomAtGestureStart = start
+                    model.cancelSwipe()
+                }
                 model.setZoom(start * value.magnification)
             }
             .onEnded { _ in

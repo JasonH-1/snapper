@@ -59,6 +59,8 @@ final class AppModel {
 
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     @ObservationIgnored private var hasWarnedAboutPhotosAccess = false
+    /// Premium looks we've already explained this session (one toast per look).
+    @ObservationIgnored private var lockedLooksExplained: Set<String> = []
 
     var hasPremium: Bool { store.isPremium }
 
@@ -80,6 +82,9 @@ final class AppModel {
         camera.onCapture = { [weak self] photo, look in
             self?.handleCapture(photo, look: look)
         }
+        camera.onLookChange = { [weak self] look in
+            self?.settings.lastLookID = look.id
+        }
     }
 
     // MARK: - Capture
@@ -91,6 +96,7 @@ final class AppModel {
                 let record = try await captures.add(photo, look: look)
                 guard settings.autoSaveToPhotos else { return }
                 if look.isPremium && !hasPremium {
+                    guard lockedLooksExplained.insert(look.id).inserted else { return }
                     show(Toast(message: String(localized: "\(look.name) is a Premium look. Unlock it to save to Photos."),
                                symbol: "lock.fill", action: .showPaywall, actionTitle: String(localized: "Unlock")))
                     return
@@ -151,7 +157,6 @@ final class AppModel {
 
     func selectLook(_ look: Look) {
         camera.select(look)
-        settings.lastLookID = look.id
     }
 
     func openLookPicker() {

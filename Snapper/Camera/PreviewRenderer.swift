@@ -90,6 +90,11 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     /// Follows a finger: `progress` 0…1 of the incoming look revealed.
     func updateSwipe(incoming: LookState, edge: SwipeEdge, progress: CGFloat) {
         shared.withLock {
+            // A new swipe can start while the last one is still animating to
+            // completion; land that one first so the base look is right.
+            if let previous = $0.swipe, let animation = previous.animation, animation.to >= 1 {
+                $0.current = previous.incoming
+            }
             $0.generation += 1
             $0.swipe = Swipe(incoming: incoming, edge: edge, progress: min(max(progress, 0), 1), animation: nil, generation: $0.generation)
         }

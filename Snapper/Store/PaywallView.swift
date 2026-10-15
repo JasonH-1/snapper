@@ -18,11 +18,18 @@ struct PaywallView: View {
                     header
                     benefits
                     plans
-                    callToAction
                     footer
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
+            }
+            // The button and its price summary stay on screen on every iPhone size.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                callToAction
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    .background(.bar)
             }
             closeButton
         }

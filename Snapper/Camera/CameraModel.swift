@@ -49,6 +49,8 @@ final class CameraModel {
 
     /// Called with each new photo and the look it was taken with.
     @ObservationIgnored var onCapture: ((CapturedPhoto, Look) -> Void)?
+    /// Called when the selected look changes (swipe or picker).
+    @ObservationIgnored var onLookChange: ((Look) -> Void)?
 
     init(library: LookLibrary, lutStore: LUTStore = .shared) {
         let renderer = PreviewRenderer()
@@ -186,13 +188,19 @@ final class CameraModel {
         lookIndex = index
         renderer.show(lookState(for: look))
         lookChangeCount += 1
+        onLookChange?(look)
     }
 
     /// Reorders the swipe sequence (e.g. favourites first) and keeps the current look.
     func setLookOrder(_ ordered: [Look]) {
         let current = currentLook
         looks = ordered.isEmpty ? [.original] : ordered
-        lookIndex = looks.firstIndex(of: current) ?? 0
+        if let index = looks.firstIndex(of: current) {
+            lookIndex = index
+        } else {
+            lookIndex = 0
+            renderer.show(lookState(for: currentLook))
+        }
     }
 
     private func wrapped(_ index: Int) -> Int {
@@ -218,7 +226,15 @@ final class CameraModel {
         if commit {
             lookIndex = target
             lookChangeCount += 1
+            onLookChange?(currentLook)
         }
+    }
+
+    /// Abandons an in-progress swipe (e.g. when a pinch starts).
+    func cancelSwipe() {
+        guard swipeTarget != nil else { return }
+        swipeTarget = nil
+        renderer.finishSwipe(commit: false)
     }
 
     private func preloadLooks() {
