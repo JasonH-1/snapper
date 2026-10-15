@@ -77,12 +77,6 @@ struct LookEffects: Codable, Hashable, Sendable {
         var color: Double
     }
 
-    /// Dust specks and fine vertical scratches, as on an old scan.
-    struct Dust: Codable, Hashable, Sendable {
-        var amount: Double
-        var scratches: Double
-    }
-
     /// Lens fringing: red and blue drift apart towards the edges.
     struct ChromaticAberration: Codable, Hashable, Sendable {
         /// Scale difference between the red and blue channels at full strength.
@@ -137,7 +131,6 @@ struct LookEffects: Codable, Hashable, Sendable {
     var scanlines: Scanlines?
     var noise: Noise?
     var grain: Grain?
-    var dust: Dust?
     var vignette: Vignette?
 
     static let none = LookEffects()
@@ -145,7 +138,7 @@ struct LookEffects: Codable, Hashable, Sendable {
     var isEmpty: Bool { self == .none }
 
     enum CodingKeys: String, CodingKey {
-        case gradient, glow, halation, glitch, scanlines, noise, grain, dust, vignette
+        case gradient, glow, halation, glitch, scanlines, noise, grain, vignette
         case chromaticAberration = "chromatic_aberration"
         case chromaBleed = "chroma_bleed"
         case lightLeak = "light_leak"

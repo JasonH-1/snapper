@@ -80,7 +80,7 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         shared.withLock { $0.isEnabled = enabled }
     }
 
-    /// The seed for the look's random effects (grain, dust, light leaks): the
+    /// The seed for the look's random effects (grain, light leaks): the
     /// next photo's, so the preview shows exactly what the shutter will save.
     func setSeed(_ seed: UInt64) {
         shared.withLock { $0.seed = seed }

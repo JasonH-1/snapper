@@ -7,7 +7,7 @@ struct CapturedPhoto: Sendable {
     let data: Data
     let isFrontCamera: Bool
     /// Becomes the capture's id. The camera sets it to the frame the live
-    /// preview showed, whose seed placed the look's grain, dust and leaks.
+    /// preview showed, whose seed placed the look's grain and leaks.
     var id = UUID()
 }
 

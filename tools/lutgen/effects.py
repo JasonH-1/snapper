@@ -47,10 +47,6 @@ DEFAULTS: dict[str, dict[str, float]] = {
     # Film grain: clumpy (roughness 0..1), strongest in mid-tones and shadows,
     # mostly grey (color 0..1 adds colour grain).
     "grain": {"amount": 0.25, "size": 0.0012, "roughness": 0.5, "color": 0.15},
-    # Film damage from textures.py's images: amount = dust specks, scratches
-    # = hairs, long scratches and horizontal scratch bands (0..1 each). The
-    # texture, flip and position come from each photo's seed.
-    "dust": {"amount": 0.3, "scratches": 0.3},
     # Darkened corners; radius is a fraction of the half-diagonal.
     "vignette": {"intensity": 0.5, "radius": 0.9},
 }

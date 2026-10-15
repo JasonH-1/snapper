@@ -5,7 +5,7 @@ An iPhone camera with live film looks, sold with an auto-renewing subscription.
 - **Live preview through every look:** Core Image + Metal, 30 fps, off the main thread. Swipe the preview to change looks, with a live split as you drag.
 - **What you see is what you save:** the preview, the full-resolution photo and every export go through the same pipeline (`LookPipeline`).
 - **41 original looks in five collections:** Disposable, Neon Nights, Soft Portrait, Overclock and Darkroom. Six are free.
-- **Looks are data:** each look is a 33-point `.cube` file listed in `filters.json`, plus optional effects (sky gradient, glow, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, noise, film grain, dust, vignette) drawn after it. A Python tool generates and quality-checks them.
+- **Looks are data:** each look is a 33-point `.cube` file listed in `filters.json`, plus optional effects (sky gradient, glow, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, noise, film grain, vignette) drawn after it. A Python tool generates and quality-checks them.
 - **StoreKit 2:** monthly and yearly plans (7-day trial on yearly). There are no accounts and no backend; the Apple ID is the account.
 
 Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6 on `macos-latest`.

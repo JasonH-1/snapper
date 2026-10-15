@@ -42,7 +42,6 @@
 #   scanlines             spacing, intensity
 #   noise                 amount, size
 #   grain                 amount, size, roughness, color   (film grain)
-#   dust                  amount, scratches
 #   vignette              intensity, radius
 
 [collections.disposable]
@@ -696,7 +695,7 @@ radius = 0.75
 id = "leak"
 name = "Leak"
 collection = "darkroom"
-description = "A light-struck roll: burnt edges, dust and scratches."
+description = "A light-struck roll: burnt edges and faded warmth."
 temperature = 0.15
 tint = 0.04
 black = 0.05
@@ -712,10 +711,6 @@ tint_hue = 40
 
 [look.effects.grain]
 amount = 0.22
-
-[look.effects.dust]
-amount = 0.7
-scratches = 0.7
 
 [[look]]
 id = "grit"
@@ -737,15 +732,11 @@ color = 0
 intensity = 0.4
 radius = 0.8
 
-[look.effects.dust]
-amount = 0.15
-scratches = 0.15
-
 [[look]]
 id = "heirloom"
 name = "Heirloom"
 collection = "darkroom"
-description = "An old sepia print: faded, dusty and scratched."
+description = "An old sepia print: faded, soft and grainy."
 monochrome = true
 mono_tone = { hue = 70, amount = 0.05 }
 contrast = 0.05
@@ -758,10 +749,6 @@ amount = 0.15
 size = 0.0014
 roughness = 0.6
 color = 0
-
-[look.effects.dust]
-amount = 0.45
-scratches = 0.4
 
 [look.effects.vignette]
 intensity = 0.7

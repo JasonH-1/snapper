@@ -445,10 +445,6 @@
           "size": 0.0012,
           "roughness": 0.5,
           "color": 0.15
-        },
-        "dust": {
-          "amount": 0.7,
-          "scratches": 0.7
         }
       }
     },
@@ -464,10 +460,6 @@
           "size": 0.0016,
           "roughness": 0.8,
           "color": 0.0
-        },
-        "dust": {
-          "amount": 0.15,
-          "scratches": 0.15
         },
         "vignette": {
           "intensity": 0.4,
@@ -487,10 +479,6 @@
           "size": 0.0014,
           "roughness": 0.6,
           "color": 0.0
-        },
-        "dust": {
-          "amount": 0.45,
-          "scratches": 0.4
         },
         "vignette": {
           "intensity": 0.7,

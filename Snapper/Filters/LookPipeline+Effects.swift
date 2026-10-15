@@ -15,7 +15,7 @@ extension LookPipeline {
     /// Lengths scale with the image's shorter side and `strength` scales every
     /// effect, so the live preview, the review screen's slider and a
     /// full-resolution export agree. `seed` fixes the random parts: the same
-    /// seed always gives the same glitch slices, noise, grain, dust and leaks.
+    /// seed always gives the same glitch slices, noise, grain and leaks.
     static func applyEffects(_ effects: LookEffects, strength: Float = 1, seed: UInt64 = 0, to image: CIImage) -> CIImage {
         let extent = image.extent
         let strength = CGFloat(strength)
@@ -54,9 +54,6 @@ extension LookPipeline {
         }
         if let grain = effects.grain {
             output = applyGrain(grain, strength: strength, unit: unit, seed: seed, to: output)
-        }
-        if let dust = effects.dust {
-            output = applyDust(dust, strength: strength, seed: seed, to: output)
         }
         if let vignette = effects.vignette {
             output = applyVignette(vignette, strength: strength, to: output)
@@ -471,47 +468,6 @@ extension LookPipeline {
         return blend.outputImage ?? image
     }
 
-    /// Film damage from the bundled textures (tools/lutgen/textures.py):
-    /// dust in the red channel, hairs and long scratches in green, bands of
-    /// horizontal scratches in blue, screened on in white. The seed picks the
-    /// texture, flips it and moves it, so neighbouring frames differ.
-    private static func applyDust(_ dust: LookEffects.Dust, strength: CGFloat, seed: UInt64,
-                                  to image: CIImage) -> CIImage {
-        let amount = CGFloat(min(max(dust.amount, 0), 1)) * strength
-        let scratches = CGFloat(min(max(dust.scratches, 0), 1)) * strength
-        let textures = FilmTextures.shared.dust
-        guard amount > 0.001 || scratches > 0.001, !textures.isEmpty else { return image }
-        let extent = image.extent
-        var random = SeededGenerator(seed: mixedSeed(seed, 0x4455_5354))
-        let texture = textures[Int(random.next() % UInt64(textures.count))]
-        let size = texture.extent.size
-
-        // Cover the photo with room to move, then flip and shift.
-        let cover = max(extent.width / size.width, extent.height / size.height) * 1.15
-        let flipX: CGFloat = random.next() & 1 == 1 ? -1 : 1
-        let flipY: CGFloat = random.next() & 1 == 1 ? -1 : 1
-        let placedWidth = size.width * cover, placedHeight = size.height * cover
-        let dx = CGFloat.random(in: 0...(placedWidth - extent.width), using: &random)
-        let dy = CGFloat.random(in: 0...(placedHeight - extent.height), using: &random)
-        let placed = texture
-            .transformed(by: CGAffineTransform(translationX: -size.width / 2, y: -size.height / 2))
-            .transformed(by: CGAffineTransform(scaleX: flipX * cover, y: flipY * cover))
-            .transformed(by: CGAffineTransform(translationX: extent.minX + placedWidth / 2 - dx,
-                                               y: extent.minY + placedHeight / 2 - dy))
-            .cropped(to: extent)
-
-        // Grey = dust × amount + (hairs + scratch bands) × scratches.
-        let mix = CIFilter.colorMatrix()
-        mix.inputImage = placed
-        let row = CIVector(x: amount, y: scratches, z: scratches, w: 0)
-        mix.rVector = row
-        mix.gVector = row
-        mix.bVector = row
-        mix.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
-        guard let damage = clamped(mix.outputImage) else { return image }
-        return screened(damage, over: image)
-    }
-
     private static func applyVignette(_ vignette: LookEffects.Vignette, strength: CGFloat, to image: CIImage) -> CIImage {
         let extent = image.extent
         let filter = CIFilter.vignetteEffect()
@@ -540,7 +496,7 @@ extension LookPipeline {
             .settingAlphaOne(in: extent)
     }
 
-    /// A separate seed per effect, so grain, dust and leaks don't line up.
+    /// A separate seed per effect, so grain and leaks don't line up.
     private static func mixedSeed(_ seed: UInt64, _ salt: UInt64) -> UInt64 {
         var random = SeededGenerator(seed: seed ^ salt)
         return random.next()
@@ -613,17 +569,3 @@ extension LookPipeline {
     }
 }
 
-/// The bundled film-damage textures, loaded once. Their values are used as
-/// they are (no colour management), like the effects' other grey masks.
-private final class FilmTextures: @unchecked Sendable {
-    static let shared = FilmTextures()
-
-    let dust: [CIImage]
-
-    private init() {
-        dust = (1...8).compactMap { n in
-            Bundle.main.url(forResource: "film-dust-\(n)", withExtension: "png")
-                .flatMap { CIImage(contentsOf: $0, options: [.colorSpace: NSNull()]) }
-        }
-    }
-}

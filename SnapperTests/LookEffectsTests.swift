@@ -19,7 +19,6 @@ final class LookEffectsTests: XCTestCase {
          "scanlines": {"spacing": 0.02, "intensity": 0.3},
          "noise": {"amount": 0.2, "size": 0.01},
          "grain": {"amount": 0.3, "size": 0.01, "roughness": 0.5, "color": 0.2},
-         "dust": {"amount": 0.5, "scratches": 0.5},
          "vignette": {"intensity": 0.6, "radius": 0.8}}
         """
         return try JSONDecoder().decode(LookEffects.self, from: Data(json.utf8))
@@ -114,7 +113,7 @@ final class LookEffectsTests: XCTestCase {
             ("chroma_bleed", LookEffects(chromaBleed: all.chromaBleed)), ("glitch", LookEffects(glitch: all.glitch)),
             ("light_leak", LookEffects(lightLeak: all.lightLeak)), ("scanlines", LookEffects(scanlines: all.scanlines)),
             ("noise", LookEffects(noise: all.noise)), ("grain", LookEffects(grain: all.grain)),
-            ("dust", LookEffects(dust: all.dust)), ("vignette", LookEffects(vignette: all.vignette)),
+            ("vignette", LookEffects(vignette: all.vignette)),
         ]
         let original = pixels(sample())
         for (name, effects) in single {
