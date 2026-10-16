@@ -59,7 +59,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Snapper Premium")
                             .font(.headline)
-                        Text("Active — every look unlocked, no watermark.")
+                        Text("Active — all looks, unlimited presets, batch styling and finishing.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -77,7 +77,7 @@ struct SettingsView: View {
                             Text("Upgrade to Premium")
                                 .font(.headline)
                                 .foregroundStyle(.primary)
-                            Text("All \(app.library.looks.count - 1) looks and no watermark.")
+                            Text("All \(app.library.looks.count - 1) looks, personal presets and finishing tools.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -101,7 +101,7 @@ struct SettingsView: View {
             Text("Premium")
         } footer: {
             if !app.hasPremium {
-                Text("Free exports include a small Snapper watermark. Premium removes it.")
+                Text("Six looks, basic editing and one personal preset are free. All exports are watermark-free.")
             }
         }
     }

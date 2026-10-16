@@ -128,7 +128,7 @@ struct PaywallView: View {
             Text(model.title)
                 .font(Theme.lookTitle(size: 30))
                 .multilineTextAlignment(.center)
-            Text("All \(model.totalLookCount) looks in every collection, without a watermark.")
+            Text("All \(model.totalLookCount) looks, personal presets and finishing tools.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -140,10 +140,12 @@ struct PaywallView: View {
         VStack(alignment: .leading, spacing: 14) {
             benefit(symbol: "camera.filters", title: Text("\(model.premiumLookCount) premium looks"),
                     detail: Text("Every collection, complete. Preview them live, keep the ones you love."))
-            benefit(symbol: "checkmark.seal", title: Text("No watermark"),
-                    detail: Text("Clean, full-resolution photos when you save or share."))
+            benefit(symbol: "slider.horizontal.3", title: Text("Make your style repeatable"),
+                    detail: Text("Save unlimited personal presets and apply them across a whole album."))
+            benefit(symbol: "rectangle.portrait", title: Text("Ready to share"),
+                    detail: Text("Add frames, date stamps and fitted post or story layouts."))
             benefit(symbol: "calendar.badge.clock", title: Text("Cancel anytime"),
-                    detail: Text("Manage your subscription in your Apple ID settings."))
+                    detail: Text("Premium tools and new premium collections released during your subscription. Manage it in Apple ID settings."))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)

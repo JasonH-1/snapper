@@ -8,7 +8,7 @@ import SwiftUI
 @Observable
 final class EditorModel: Identifiable, Hashable {
     enum Tab: String, CaseIterable, Identifiable {
-        case looks, adjust, crop
+        case looks, adjust, crop, finish
 
         var id: String { rawValue }
 
@@ -17,6 +17,7 @@ final class EditorModel: Identifiable, Hashable {
             case .looks: "Looks"
             case .adjust: "Adjust"
             case .crop: "Crop"
+            case .finish: "Finish"
             }
         }
     }
@@ -136,8 +137,8 @@ final class EditorModel: Identifiable, Hashable {
 
     var record: CaptureRecord? { library.record(id: id) }
     var currentLook: Look { looks.look(id: recipe.lookID) ?? .original }
-    var isLocked: Bool { currentLook.isPremium && !hasPremium() }
-    var showsWatermarkNote: Bool { !hasPremium() && !currentLook.isPremium }
+    var isLocked: Bool { (currentLook.isPremium || recipe.finish.isActive) && !hasPremium() }
+    var hasPremiumNow: Bool { hasPremium() }
     var isImported: Bool { record?.isImported ?? false }
     var isEdited: Bool { record.map { recipe != $0.initialRecipe } ?? false }
     var canUndo: Bool { !undoStack.isEmpty }
@@ -148,6 +149,7 @@ final class EditorModel: Identifiable, Hashable {
     var isLookChanged: Bool { recipe.lookID != initialRecipe.lookID || recipe.strength != initialRecipe.strength }
     var isLightChanged: Bool { recipe.adjustments != initialRecipe.adjustments }
     var isCropChanged: Bool { recipe.crop != initialRecipe.crop }
+    var isFinishChanged: Bool { recipe.finish != initialRecipe.finish }
 
     var collectionName: String? { looks.collection(for: currentLook)?.name }
     var isCurrentLookFavorite: Bool { settings.isFavorite(currentLook) }
@@ -197,6 +199,51 @@ final class EditorModel: Identifiable, Hashable {
     func toggleFavorite(_ look: Look) {
         settings.toggleFavorite(look)
     }
+
+    // MARK: - Personal presets and finishing
+
+    @discardableResult
+    func applyPreset(_ preset: SavedPreset) -> Bool {
+        guard settings.presets.canUse(preset, hasPremium: hasPremium()), looks.look(id: preset.lookID) != nil else { return false }
+        step { $0 = preset.applying(to: $0) }
+        refreshLookThumbnails()
+        return true
+    }
+
+    var frame: PhotoFinish.Frame {
+        get { recipe.finish.frame }
+        set { step { $0.finish.frame = newValue } }
+    }
+    var border: Double {
+        get { recipe.finish.border }
+        set { update { $0.finish.border = min(max(newValue, 0.01), 0.16) } }
+    }
+    var exportLayout: PhotoFinish.Layout {
+        get { recipe.finish.layout }
+        set { step { $0.finish.layout = newValue } }
+    }
+    var hasDateStamp: Bool {
+        get { recipe.finish.dateStamp != nil }
+        set {
+            let date = newValue ? Self.stampFormatter.string(from: stampDate) : nil
+            step { $0.finish.dateStamp = date }
+        }
+    }
+    var stampDate: Date {
+        get {
+            recipe.finish.dateStamp.flatMap(Self.stampFormatter.date(from:))
+                ?? record?.takenAt ?? record?.createdAt ?? Date()
+        }
+        set { step { $0.finish.dateStamp = Self.stampFormatter.string(from: newValue) } }
+    }
+    private static var stampFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy.MM.dd"
+        return formatter
+    }
+    func resetFinish() { step { $0.finish = .none } }
 
     // MARK: - Adjust
 
@@ -419,6 +466,7 @@ final class EditorModel: Identifiable, Hashable {
             if key != cropBaseKey || cropBase == nil {
                 var base = recipe
                 base.crop = PhotoCrop(shape: .free, quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)
+                base.finish = .none
                 if let image = await renderer.preview(id: id, sourceURL: url, look: look, recipe: base) {
                     cropBase = image
                     cropBaseKey = key
@@ -474,7 +522,7 @@ final class EditorModel: Identifiable, Hashable {
             return
         }
         isSaving = true
-        let watermark = !hasPremium()
+        let watermark = false
         let includeOriginal = settings.alsoSaveOriginal
         let format = settings.photoFormat
         Task {
@@ -498,7 +546,7 @@ final class EditorModel: Identifiable, Hashable {
             return
         }
         isPreparingShare = true
-        let watermark = !hasPremium()
+        let watermark = false
         Task {
             defer { isPreparingShare = false }
             do {

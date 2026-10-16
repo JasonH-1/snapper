@@ -136,7 +136,7 @@ struct CameraView: View {
                 Button(action: onShowPaywall) {
                     HStack(spacing: 6) {
                         Image(systemName: "lock.fill")
-                        Text("Premium look")
+                        Text("Premium to save")
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.black)

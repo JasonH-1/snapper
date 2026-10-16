@@ -250,7 +250,7 @@ final class CaptureLibrary {
         let image = await renderer.thumbnail(sourceURL: store.url(for: record), look: look(for: record),
                                              recipe: record.recipe, seed: record.id.effectsSeed)
         // Skip photos deleted while drawing.
-        guard let image, self.record(id: record.id) != nil else { return }
+        guard let image, self.record(id: record.id)?.recipe == record.recipe else { return }
         thumbnails[record.id] = image
         thumbnailOrder.removeAll { $0 == record.id }
         thumbnailOrder.append(record.id)

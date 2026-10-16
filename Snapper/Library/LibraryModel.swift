@@ -93,6 +93,10 @@ final class LibraryModel: Identifiable {
     var alert: Alert?
     var shareItems: ShareItems?
     var isChoosingLook = false
+    var isChoosingPreset = false
+    /// Last batch only; skip any photos individually edited afterwards.
+    private(set) var batchUndo: [UUID: (before: PhotoRecipe, after: PhotoRecipe)] = [:]
+    var canUndoBatch: Bool { !batchUndo.isEmpty }
     /// The first selected photo in every look, for the Apply Look sheet.
     let lookThumbnails = LookThumbnails()
     private(set) var isWorking = false
@@ -276,7 +280,7 @@ final class LibraryModel: Identifiable {
     }
 
     private func isLocked(_ record: CaptureRecord) -> Bool {
-        captures.look(for: record).isPremium && !hasPremium()
+        (captures.look(for: record).isPremium || record.recipe.finish.isActive) && !hasPremium()
     }
 
     // MARK: - Batch actions
@@ -290,13 +294,13 @@ final class LibraryModel: Identifiable {
             return
         }
         isWorking = true
-        let watermark = !hasPremium()
+        let watermark = false
         Task {
             defer { isWorking = false }
             do {
                 shareItems = ShareItems(urls: try await captures.exportForSharing(allowed, watermark: watermark))
                 if allowed.count < chosen.count {
-                    show(String(localized: "Photos with Premium looks were left out."))
+                    show(String(localized: "Photos with Premium looks or finishing were left out."))
                 }
             } catch {
                 alert = .error(error.localizedDescription)
@@ -313,7 +317,7 @@ final class LibraryModel: Identifiable {
             return
         }
         isWorking = true
-        let watermark = !hasPremium()
+        let watermark = false
         let includeOriginal = settings.alsoSaveOriginal
         let format = settings.photoFormat
         Task {
@@ -327,7 +331,7 @@ final class LibraryModel: Identifiable {
                 }
                 let skipped = chosen.count - allowed.count
                 show(skipped > 0
-                     ? String(localized: "Saved \(Self.photoCount(saved)). Premium looks need Snapper Premium to save.")
+                     ? String(localized: "Saved \(Self.photoCount(saved)). Premium looks and finishing need Premium to save.")
                      : String(localized: "Saved \(Self.photoCount(saved)) to Photos"))
                 isSelecting = false
             } catch PhotoLibrarySaver.SaveError.notAuthorized {
@@ -342,15 +346,48 @@ final class LibraryModel: Identifiable {
     /// other edits.
     func applyLookToSelection(_ look: Look) {
         let chosen = selectedRecords
-        for record in chosen {
+        applyBatch(chosen) { record in
             var recipe = record.recipe
             recipe.lookID = look.id
             recipe.strength = 1
-            captures.updateRecipe(id: record.id, recipe)
+            return recipe
         }
         settings.noteRecentlyUsed(look)
         show(String(localized: "Applied \(look.name) to \(Self.photoCount(chosen.count))"))
         isSelecting = false
+    }
+
+    @discardableResult
+    func applyPresetToSelection(_ preset: SavedPreset) -> Bool {
+        guard hasPremium(), !isWorking, looks.look(id: preset.lookID) != nil else { return false }
+        let chosen = selectedRecords
+        guard !chosen.isEmpty else { return false }
+        applyBatch(chosen) { preset.applying(to: $0.recipe) }
+        if let look = looks.look(id: preset.lookID) { settings.noteRecentlyUsed(look) }
+        show(String(localized: "Applied \(preset.name) to \(Self.photoCount(chosen.count)). Crops and finishing kept."))
+        isSelecting = false
+        return true
+    }
+
+    private func applyBatch(_ records: [CaptureRecord], recipe: (CaptureRecord) -> PhotoRecipe) {
+        batchUndo = [:]
+        for record in records {
+            let next = recipe(record)
+            guard next != record.recipe else { continue }
+            batchUndo[record.id] = (before: record.recipe, after: next)
+            captures.updateRecipe(id: record.id, next)
+        }
+    }
+
+    func undoBatch() {
+        var restored = 0
+        for (id, change) in batchUndo {
+            guard let current = captures.record(id: id), current.recipe == change.after else { continue }
+            captures.updateRecipe(id: id, change.before)
+            restored += 1
+        }
+        batchUndo = [:]
+        show(String(localized: "Restored \(Self.photoCount(restored)). Later edits were kept."))
     }
 
     func prepareLookChoice() {
