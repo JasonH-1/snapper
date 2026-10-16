@@ -318,9 +318,9 @@ struct CameraView: View {
                 }
                 .accessibilityHint("Choose a saved style to shoot with")
                 Button(action: onOpenLookPicker) {
-                LookCaption(look: model.currentLook, collectionName: model.collectionName, isLocked: isLocked)
-                    .animation(.easeInOut(duration: 0.2), value: model.currentLook)
-            }
+                    LookCaption(look: model.currentLook, collectionName: model.collectionName, isLocked: isLocked)
+                        .animation(.easeInOut(duration: 0.2), value: model.currentLook)
+                }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)

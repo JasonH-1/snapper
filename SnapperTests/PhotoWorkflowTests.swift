@@ -188,6 +188,36 @@ final class PhotoWorkflowTests: XCTestCase {
         XCTAssertEqual(frameOnly.finish.dateStamp, "2000.01.01")
     }
 
+    func testCameraRestoresPresetAndHandlesExpiryRenameAndDeletion() throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        _ = try settings.presets.save(name: "Free", recipe: PhotoRecipe(lookID: "boardwalk"), hasPremium: true)
+        let premiumSlot = try settings.presets.save(name: "Second", recipe: PhotoRecipe(lookID: "cream", strength: 0.4), hasPremium: true)
+        settings.lastPresetID = premiumSlot.id
+        let service = FakePurchaseService()
+        service.isPremium = true
+        let app = AppModel(store: service, settings: settings)
+        app.synchronizeCameraPreset()
+        XCTAssertEqual(app.camera.activePreset, premiumSlot)
+        service.isPremium = false
+        app.synchronizeCameraPreset()
+        XCTAssertNil(app.camera.activePreset)
+        XCTAssertEqual(settings.lastPresetID, premiumSlot.id, "remember choice for renewal")
+        XCTAssertFalse(app.shootWithPreset(premiumSlot))
+        service.isPremium = true
+        app.synchronizeCameraPreset()
+        XCTAssertEqual(app.camera.activePreset, premiumSlot)
+        try settings.presets.rename(premiumSlot, to: "Renamed")
+        app.synchronizeCameraPreset()
+        XCTAssertEqual(app.camera.activePreset?.name, "Renamed")
+        try settings.presets.delete(premiumSlot)
+        app.synchronizeCameraPreset()
+        XCTAssertNil(app.camera.activePreset)
+        XCTAssertNil(settings.lastPresetID)
+    }
+
     func testLastCameraPresetPersists() throws {
         let suite = UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

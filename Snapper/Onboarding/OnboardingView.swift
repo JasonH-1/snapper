@@ -51,7 +51,7 @@ struct OnboardingView: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
             .padding(.horizontal, 24)
 
-            pageText(title: Text("Film looks, live"),
+            pageText(title: Text("Find your look"),
                      detail: Text("See your scene through each look before you take the shot. Start with six free looks and save without a watermark."))
         }
         .padding(.top, 24)
@@ -70,7 +70,7 @@ struct OnboardingView: View {
             .frame(height: 420)
 
             pageText(title: Text("Swipe to change the mood"),
-                     detail: Text("Five collections: Disposable, Neon Nights, Soft Portrait, Overclock and Darkroom. Swipe the preview to try each look, or star your favorites."))
+                     detail: Text("Choose a look for your day, star your favorites, or save your own style in Presets. Shoot with it and reuse it on imported photos."))
         }
         .padding(.top, 24)
     }

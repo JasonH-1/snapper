@@ -34,8 +34,8 @@ struct RootView: View {
         } message: { Text(importError ?? "") }
         .task {
             app.store.start()
-            await app.captures.load()
             app.synchronizeCameraPreset()
+            await app.captures.load()
         }
     }
 
@@ -53,6 +53,7 @@ struct RootView: View {
             onOpenLookPicker: { app.openLookPicker() },
             onOpenPresets: { app.isShowingCameraPresets = true }
         )
+        .onAppear { app.synchronizeCameraPreset() }
         .onChange(of: app.hasPremium) { _, _ in app.synchronizeCameraPreset() }
         .onChange(of: app.settings.presets.presets) { _, _ in app.synchronizeCameraPreset() }
         .sheet(isPresented: $app.isShowingCameraPresets, onDismiss: {

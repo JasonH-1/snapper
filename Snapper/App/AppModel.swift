@@ -69,9 +69,8 @@ final class AppModel {
 
     var hasPremium: Bool { store.isPremium }
 
-    init(store: any PurchaseService) {
+    init(store: any PurchaseService, settings: AppSettings = AppSettings()) {
         let library = LookLibrary.bundled()
-        let settings = AppSettings()
         let renderer = PhotoRenderer()
         self.library = library
         self.settings = settings

@@ -100,7 +100,7 @@ struct PresetsView: View {
                                     .disabled(isPreparingShare)
                                 Button("Share Style Card", systemImage: "photo") {
                                     guard store.canUse(preset, hasPremium: hasPremium),
-                                          hasPremium || looks.look(id: preset.lookID)?.isPremium == false else { upgrade(); return }
+                                          hasPremium || (looks.look(id: preset.lookID)?.isPremium == false && currentRecipe?.finish.isActive != true) else { upgrade(); return }
                                     share(preset, card: true)
                                 }
                                 .disabled(isPreparingShare || looks.look(id: preset.lookID) == nil)
@@ -123,6 +123,7 @@ struct PresetsView: View {
                         .padding(.vertical, 4)
                     }
                 }
+                if isPreparingShare { ProgressView("Preparing style to share…") }
                 if let message { Text(message).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently) }
             }
             .fileImporter(isPresented: $isImporting, allowedContentTypes: [.snapperPreset, .json]) { result in
@@ -139,7 +140,8 @@ struct PresetsView: View {
             }
             .navigationTitle("Personal Presets")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.disabled(isPreparingShare) } }
+            .interactiveDismissDisabled(isPreparingShare)
             .alert("Rename Preset", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
                 TextField("Name", text: $renameText)
                 Button("Cancel", role: .cancel) { renaming = nil }
@@ -181,7 +183,7 @@ struct PresetsView: View {
                 if card {
                     guard let source = samplePhotoURL ?? DemoScene.url, let look = looks.look(id: preset.lookID),
                           let photo = await PhotoRenderer().preview(id: UUID(), sourceURL: source, look: look,
-                                                                   recipe: PresetFile(preset).recipe, maxPixelSize: 1200),
+                                                                   recipe: preset.applying(to: currentRecipe ?? .untouched), maxPixelSize: 1200),
                           let data = StyleCard.image(photo: photo, preset: preset, lookName: look.name,
                                                      isSample: samplePhotoURL == nil).jpegData(compressionQuality: 0.92) else {
                         throw PhotoRenderer.RenderError.unreadableImage

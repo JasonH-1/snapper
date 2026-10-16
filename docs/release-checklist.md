@@ -62,7 +62,7 @@ Use the checked-in StoreKit configuration locally, then validate real products i
 - [ ] Rename/delete/reorder the active preset; expire/restore Premium. Confirm the camera stops using a restricted preset while stored presets remain intact. Test an in-flight capture while changing the selected style.
 - [ ] Select mixed portrait/landscape photos with different crops and dates. Preview frame-only, layout-only and combined finishing; apply/share and undo. Later individual edits must survive undo. Check large selections on the oldest supported phone.
 - [ ] Share a preset through Files, Messages and AirDrop; open it in a cold and already-running app, including while editing or showing a paywall. Confirm before importing. Test cancel, a full free slot, premium-look imports, unknown versions and corrupt files.
-- [ ] Share a style card from an editor and from the camera. The former uses the original photo and selected style; the latter must be labeled as a sample. Check long preset names and that normal photo exports remain unbranded.
+- [ ] Share a style card from an editor and from the camera. The former preserves the photo’s crop and finishing while applying the selected style; the latter must be labeled as a sample. Check long preset names and that normal photo exports remain unbranded.
 - [ ] Check every occasion at large Dynamic Type sizes and with VoiceOver. Each must offer at least one free look.
 
 ### Photographic approval still requires owned real photos

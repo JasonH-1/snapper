@@ -40,7 +40,7 @@ struct PresetImportView: View {
                     }
                 }
                 Section {
-                    Button("Import Preset") {
+                    Button(hasPremium || store.presets.isEmpty ? "Import Preset" : "Unlock More Presets") {
                         guard hasPremium || store.presets.isEmpty else { onUpgrade(); dismiss(); return }
                         do {
                             try store.save(name: name, recipe: file.recipe, hasPremium: hasPremium)
