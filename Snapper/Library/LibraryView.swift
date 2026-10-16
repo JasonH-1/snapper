@@ -12,6 +12,7 @@ struct LibraryView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showDeleteConfirmation = false
+    @State private var upgradeAfterPresets = false
     /// Photos grow into the editor from their grid cell and shrink back.
     @Namespace private var photoZoom
 
@@ -50,6 +51,13 @@ struct LibraryView: View {
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $model.isChoosingPreset, onDismiss: {
+            if upgradeAfterPresets { upgradeAfterPresets = false; onShowPaywall() }
+        }) {
+            PresetsView(store: model.settings.presets, looks: model.looks, hasPremium: model.hasPremiumNow,
+                        onApply: { model.applyPresetToSelection($0) },
+                        onUpgrade: { upgradeAfterPresets = true })
         }
         .confirmationDialog(deleteTitle, isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
@@ -348,6 +356,13 @@ struct LibraryView: View {
                     .padding(.horizontal, 24)
                     .transition(bottomTransition)
             }
+            if model.canUndoBatch {
+                Button("Undo Last Batch", systemImage: "arrow.uturn.backward") { model.undoBatch() }
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .glassSurface(in: Capsule(), tint: .black.opacity(0.55))
+                    .disabled(model.isWorking)
+            }
             if model.isSelecting {
                 selectionBar
                     .transition(bottomTransition)
@@ -363,9 +378,20 @@ struct LibraryView: View {
         HStack(spacing: 0) {
             barButton("Share", systemImage: "square.and.arrow.up") { model.shareSelected() }
             barButton("Save", systemImage: "square.and.arrow.down") { model.saveSelected() }
-            barButton("Apply Look", systemImage: "camera.filters") {
-                model.prepareLookChoice()
+            Menu {
+                Button("Apply a Look", systemImage: "camera.filters") { model.prepareLookChoice() }
+                Button("Apply Personal Preset", systemImage: "slider.horizontal.3") {
+                    if model.hasPremiumNow { model.isChoosingPreset = true }
+                    else { onShowPaywall() }
+                }
+            } label: {
+                VStack(spacing: 5) {
+                    Image(systemName: "camera.filters").font(.system(size: 20, weight: .medium))
+                    Text("Style").font(.caption.weight(.semibold))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.vertical, 10)
             }
+            .tint(.white)
             barButton("Delete", systemImage: "trash", tint: Color(red: 1, green: 0.41, blue: 0.38)) {
                 showDeleteConfirmation = true
             }

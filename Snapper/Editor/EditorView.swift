@@ -7,6 +7,8 @@ import SwiftUI
 /// too, so it needs no confirmation.
 struct EditorView: View {
     @Bindable var model: EditorModel
+    @State private var showsPresets = false
+    @State private var upgradeAfterPresets = false
     var onShowPaywall: () -> Void = {}
 
     @Environment(\.openURL) private var openURL
@@ -36,6 +38,13 @@ struct EditorView: View {
             ShareSheet(items: [item.url])
                 .presentationDetents([.medium, .large])
                 .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showsPresets, onDismiss: {
+            if upgradeAfterPresets { upgradeAfterPresets = false; onShowPaywall() }
+        }) {
+            PresetsView(store: model.settings.presets, looks: model.looks, hasPremium: model.hasPremiumNow,
+                        currentRecipe: model.recipe, onApply: { model.applyPreset($0) },
+                        onUpgrade: { upgradeAfterPresets = true })
         }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {
@@ -123,6 +132,10 @@ struct EditorView: View {
                     withAnimation(animation) { model.resetCrop() }
                 }
                 .disabled(!model.isCropChanged)
+                Button("Reset Finish", systemImage: "rectangle") {
+                    withAnimation(animation) { model.resetFinish() }
+                }
+                .disabled(!model.isFinishChanged)
                 Divider()
                 Button("Reset All Edits", systemImage: "arrow.counterclockwise", role: .destructive) {
                     withAnimation(animation) { model.reset() }
@@ -233,12 +246,21 @@ struct EditorView: View {
         case .looks: looksPanel
         case .adjust: adjustPanel
         case .crop: cropPanel
+        case .finish: finishPanel
         }
     }
 
     private var looksPanel: some View {
         VStack(spacing: 8) {
-            lookCaption
+            HStack {
+                lookCaption
+                Button("Presets", systemImage: "slider.horizontal.3") { showsPresets = true }
+                    .font(.subheadline.weight(.semibold)).padding(.trailing, 16)
+            }
+            if let guide = LookGuide.forLook(model.currentLook.id) {
+                Text(guide.bestFor).font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
+            }
             LookBrowser(catalog: model.catalog,
                         selectedID: model.currentLook.id,
                         thumbnails: model.lookThumbnails,
@@ -357,6 +379,46 @@ struct EditorView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private var finishPanel: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if !model.hasPremiumNow {
+                    Label("Premium finishing · preview free", systemImage: "lock.fill")
+                        .font(.caption).foregroundStyle(Theme.accent)
+                }
+                Picker("Frame", selection: $model.frame) {
+                    ForEach(PhotoFinish.Frame.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.menu)
+                if model.frame != .none {
+                    HStack {
+                        Text("Border").font(.subheadline)
+                        Slider(value: $model.border, in: 0.01...0.16)
+                            .accessibilityLabel("Border width")
+                    }
+                }
+                Picker("Export layout", selection: $model.exportLayout) {
+                    ForEach(PhotoFinish.Layout.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.menu)
+                Text("Layouts fit your whole cropped photo inside the canvas.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Date stamp", isOn: $model.hasDateStamp)
+                if model.hasDateStamp {
+                    DatePicker("Date on photo", selection: $model.stampDate, displayedComponents: .date)
+                    if model.isImported && model.record?.takenAt == nil {
+                        Text("No capture date was found. Choose the date to print.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Button("Remove All Finishing") { model.resetFinish() }
+                    .disabled(!model.recipe.finish.isActive)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 6)
+        }
+        .frame(maxHeight: 230)
     }
 
     private var cropPanel: some View {
@@ -480,18 +542,14 @@ struct EditorView: View {
             }
             .padding(.horizontal, 16)
 
-            if model.showsWatermarkNote {
-                HStack(spacing: 6) {
-                    Image(systemName: "seal")
-                    Text("Free exports include a small watermark.")
-                    Button("Remove", action: onShowPaywall)
-                        .fontWeight(.semibold)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            if model.isLocked {
+                Text("Preview free. Premium is required to save this look or finish.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            } else if model.savedCount > 0 && !model.hasPremiumNow {
+                Button("Photo saved. Explore Premium styles", action: onShowPaywall)
+                    .font(.caption.weight(.semibold))
             }
+
         }
         .animation(animation, value: model.isSaved)
         .animation(animation, value: model.isLocked)

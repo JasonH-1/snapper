@@ -109,8 +109,14 @@ final class AppModel {
                     warnAboutPhotosAccess()
                     return
                 }
-                try await captures.saveToPhotos(record, watermark: !hasPremium, includeOriginal: settings.alsoSaveOriginal,
+                try await captures.saveToPhotos(record, watermark: false, includeOriginal: settings.alsoSaveOriginal,
                                                 format: settings.photoFormat)
+                if !hasPremium && !settings.hasSeenIntroPaywall {
+                    settings.hasSeenIntroPaywall = true
+                    show(Toast(message: String(localized: "Photo saved. Make your next style your own."),
+                               symbol: "checkmark.circle.fill", action: .showPaywall,
+                               actionTitle: String(localized: "Explore Premium")))
+                }
             } catch PhotoLibrarySaver.SaveError.notAuthorized {
                 warnAboutPhotosAccess()
             } catch {
@@ -146,16 +152,10 @@ final class AppModel {
 
     var needsOnboarding: Bool { !settings.hasCompletedOnboarding }
 
-    /// Ends onboarding; the paywall is offered once, right after, and can be closed.
+    /// Start shooting immediately; upgrade offers follow a successful save
+    /// or an explicit request for a premium feature.
     func finishOnboarding() {
         settings.hasCompletedOnboarding = true
-        guard !settings.hasSeenIntroPaywall else { return }
-        settings.hasSeenIntroPaywall = true
-        guard !hasPremium else { return }
-        Task {
-            try? await Task.sleep(for: .milliseconds(700))
-            presentPaywall(.intro)
-        }
     }
 
     // MARK: - Navigation
@@ -177,7 +177,7 @@ final class AppModel {
             settings: settings,
             hasPremium: { [weak self] in self?.hasPremium ?? false },
             requestPremium: { [weak self] look, before, after in
-                self?.presentPaywall(.lockedLook(look, before: before, after: after))
+                self?.presentPaywall(look.isPremium ? .lockedLook(look, before: before, after: after) : .upgrade)
             }
         )
     }

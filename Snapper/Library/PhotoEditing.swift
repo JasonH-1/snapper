@@ -11,7 +11,7 @@ enum PhotoEditing {
     static func apply(_ recipe: PhotoRecipe, look: Look, lut: CubeLUT?, seed: UInt64, to image: CIImage) -> CIImage {
         let framed = frame(image, with: recipe.crop)
         let graded = LookPipeline.apply(look, lut: lut, strength: Float(recipe.strength), seed: seed, to: framed)
-        return adjust(graded, with: recipe.adjustments, seed: seed)
+        return PhotoFinishing.apply(recipe.finish, to: adjust(graded, with: recipe.adjustments, seed: seed))
     }
 
     // MARK: - Framing
