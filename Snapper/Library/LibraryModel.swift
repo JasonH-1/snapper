@@ -354,7 +354,6 @@ final class LibraryModel: Identifiable {
         }
         settings.noteRecentlyUsed(look)
         show(String(localized: "Applied \(look.name) to \(Self.photoCount(chosen.count))"))
-        isSelecting = false
     }
 
     @discardableResult
@@ -365,7 +364,27 @@ final class LibraryModel: Identifiable {
         applyBatch(chosen) { preset.applying(to: $0.recipe) }
         if let look = looks.look(id: preset.lookID) { settings.noteRecentlyUsed(look) }
         show(String(localized: "Applied \(preset.name) to \(Self.photoCount(chosen.count)). Crops and finishing kept."))
-        isSelecting = false
+        return true
+    }
+
+    /// Snapshot-based application avoids overwriting changes made since preview opened.
+    @discardableResult
+    func applyFinishing(_ finish: BatchFinish, to snapshots: [CaptureRecord]) -> Bool {
+        guard hasPremium(), !isWorking, finish.hasChanges, !snapshots.isEmpty else { return false }
+        let unchanged = snapshots.compactMap { snapshot -> CaptureRecord? in
+            guard let current = captures.record(id: snapshot.id), current.recipe == snapshot.recipe else { return nil }
+            return current
+        }
+        guard !unchanged.isEmpty else {
+            show(String(localized: "These photos changed. Reopen the finishing preview to try again."))
+            return false
+        }
+        applyBatch(unchanged) { finish.applying(to: $0.recipe) }
+        isSelecting = true
+        selection = Set(unchanged.map(\.id))
+        let skipped = snapshots.count - unchanged.count
+        show(skipped == 0 ? String(localized: "Finishing applied. Your photo set is ready to save or share.")
+             : String(localized: "Finishing applied. \(skipped) changed or deleted photos were skipped."))
         return true
     }
 

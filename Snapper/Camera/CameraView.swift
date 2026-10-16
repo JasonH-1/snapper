@@ -15,6 +15,7 @@ struct CameraView: View {
     var onShowPaywall: () -> Void = {}
     var onOpenSettings: () -> Void = {}
     var onOpenLookPicker: () -> Void = {}
+    var onOpenPresets: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var orientation = DeviceOrientationObserver()
@@ -309,11 +310,20 @@ struct CameraView: View {
 
     private var bottomControls: some View {
         VStack(spacing: 18) {
-            Button(action: onOpenLookPicker) {
+            HStack(spacing: 12) {
+                Button(action: onOpenPresets) {
+                    Label(model.activePreset?.name ?? String(localized: "Presets"), systemImage: "slider.horizontal.3")
+                        .font(.subheadline.weight(.semibold)).lineLimit(1)
+                        .foregroundStyle(model.activePreset == nil ? Color.white : Theme.accent)
+                }
+                .accessibilityHint("Choose a saved style to shoot with")
+                Button(action: onOpenLookPicker) {
                 LookCaption(look: model.currentLook, collectionName: model.collectionName, isLocked: isLocked)
                     .animation(.easeInOut(duration: 0.2), value: model.currentLook)
             }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
 
             HStack {
                 libraryButton

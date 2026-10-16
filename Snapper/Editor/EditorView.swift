@@ -10,6 +10,7 @@ struct EditorView: View {
     @State private var showsPresets = false
     @State private var upgradeAfterPresets = false
     var onShowPaywall: () -> Void = {}
+    var onShootPreset: ((SavedPreset) -> Bool)?
 
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -44,7 +45,8 @@ struct EditorView: View {
         }) {
             PresetsView(store: model.settings.presets, looks: model.looks, hasPremium: model.hasPremiumNow,
                         currentRecipe: model.recipe, onApply: { model.applyPreset($0) },
-                        onUpgrade: { upgradeAfterPresets = true })
+                        onUpgrade: { upgradeAfterPresets = true }, onShoot: onShootPreset,
+                        samplePhotoURL: model.record.map { model.library.url(for: $0) })
         }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {

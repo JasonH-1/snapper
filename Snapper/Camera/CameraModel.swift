@@ -23,6 +23,10 @@ final class CameraModel {
     private(set) var capabilities = CameraCapabilities()
     private(set) var looks: [Look]
     private(set) var lookIndex = 0
+    private(set) var activePreset: SavedPreset?
+    var captureStyle: PhotoRecipe {
+        activePreset?.applying(to: PhotoRecipe(lookID: currentLook.id)) ?? PhotoRecipe(lookID: currentLook.id)
+    }
     /// Bumped whenever the look changes, to show the look's name briefly.
     private(set) var lookChangeCount = 0
     private(set) var zoom: CGFloat = 1
@@ -238,9 +242,24 @@ final class CameraModel {
 
     /// Jumps straight to a look (from the look picker).
     func select(_ look: Look) {
-        guard let index = looks.firstIndex(of: look), index != lookIndex else { return }
+        guard let index = looks.firstIndex(of: look) else { return }
+        activePreset = nil
+        swipeTarget = nil
         lookIndex = index
         renderer.show(lookState(for: look))
+        lookChangeCount += 1
+        onLookChange?(look)
+    }
+
+    func selectPreset(_ preset: SavedPreset) {
+        guard let look = library.look(id: preset.lookID), let index = looks.firstIndex(of: look) else { return }
+        activePreset = preset
+        swipeTarget = nil
+        lookIndex = index
+        var state = lookState(for: look)
+        state.strength = preset.strength
+        state.adjustments = preset.adjustments
+        renderer.show(state)
         lookChangeCount += 1
         onLookChange?(look)
     }
@@ -278,6 +297,7 @@ final class CameraModel {
         let commit = progress > 0.33 || flick
         renderer.finishSwipe(commit: commit)
         if commit {
+            activePreset = nil
             lookIndex = target
             lookChangeCount += 1
             onLookChange?(currentLook)
@@ -530,9 +550,10 @@ final class CameraModel {
     func capture(options: CaptureOptions = CaptureOptions()) {
         guard !isCapturing else { return }
         let look = currentLook
+        let style = captureStyle
         shutterCount += 1
         if status == .noCamera {
-            captureDemoPhoto(look: look, id: advanceFrame(), aspect: options.aspect)
+            captureDemoPhoto(look: look, id: advanceFrame(), aspect: options.aspect, style: style)
             return
         }
         guard status == .running else { return }
@@ -546,6 +567,7 @@ final class CameraModel {
                                                                   onShutter: {})
                 photo.id = frameID
                 photo.aspect = options.aspect
+                photo.style = style
                 onCapture?(photo, look)
             } catch {
                 Logger.camera.error("Capture failed: \(error.localizedDescription, privacy: .public)")
@@ -560,7 +582,7 @@ final class CameraModel {
 
     /// In the Simulator the shutter "captures" the demo image so the rest of
     /// the app (review, saving, paywall) can be exercised without a camera.
-    private func captureDemoPhoto(look: Look, id: UUID, aspect: AspectRatio) {
+    private func captureDemoPhoto(look: Look, id: UUID, aspect: AspectRatio, style: PhotoRecipe) {
         guard let url = DemoScene.url, var data = try? Data(contentsOf: url) else { return }
         // Bake the simulated settings in, as the camera would have.
         let adjustments = demoAdjustments
@@ -569,7 +591,7 @@ final class CameraModel {
            let adjusted = CIContext().jpegRepresentation(of: adjustments.apply(to: image), colorSpace: sRGB, options: [:]) {
             data = adjusted
         }
-        onCapture?(CapturedPhoto(data: data, isFrontCamera: false, aspect: aspect, id: id), look)
+        onCapture?(CapturedPhoto(data: data, isFrontCamera: false, aspect: aspect, id: id, style: style), look)
     }
 
     /// Returns the frame the preview is showing and moves on to a fresh one.

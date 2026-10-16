@@ -74,7 +74,10 @@ final class CaptureLibrary {
             try store.write(data, fileName: fileName)
         }.value
 
-        let recipe = PhotoRecipe(lookID: look.id, crop: PhotoCrop(shape: CropShape(cameraAspect: photo.aspect)))
+        var recipe = photo.style ?? PhotoRecipe(lookID: look.id)
+        recipe.lookID = look.id
+        recipe.crop = PhotoCrop(shape: CropShape(cameraAspect: photo.aspect))
+        recipe.finish = .none
         let record = CaptureRecord(id: id, fileName: fileName, source: .camera, isFrontCamera: photo.isFrontCamera,
                                    recipe: recipe)
         records.insert(record, at: 0)

@@ -98,7 +98,8 @@ final class PresetStore {
 
     private func validName(_ name: String) throws -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed.count <= 40 else { throw StoreError.invalidName }
+        guard !trimmed.isEmpty, trimmed.count <= 40,
+              !trimmed.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw StoreError.invalidName }
         return trimmed
     }
 

@@ -58,6 +58,8 @@ final class AppModel {
     var paywall: PaywallModel?
     var isShowingSettings = false
     var isShowingLookPicker = false
+    var isShowingCameraPresets = false
+    var upgradeAfterCameraPresets = false
     var toast: Toast?
 
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -87,6 +89,34 @@ final class AppModel {
         }
         camera.onLookChange = { [weak self] look in
             self?.settings.lastLookID = look.id
+            self?.settings.lastPresetID = self?.camera.activePreset?.id
+        }
+    }
+
+    @discardableResult
+    func shootWithPreset(_ preset: SavedPreset) -> Bool {
+        guard settings.presets.canUse(preset, hasPremium: hasPremium), library.look(id: preset.lookID) != nil else { return false }
+        camera.selectPreset(preset)
+        libraryScreen?.editor?.finish()
+        libraryScreen = nil
+        camera.setPreviewVisible(true)
+        return true
+    }
+
+    /// Keep the selected preset current after edits, deletion or entitlement changes.
+    func synchronizeCameraPreset() {
+        guard let id = settings.lastPresetID else { return }
+        guard let preset = settings.presets.presets.first(where: { $0.id == id }) else {
+            camera.select(camera.currentLook)
+            settings.lastPresetID = nil
+            return
+        }
+        if settings.presets.canUse(preset, hasPremium: hasPremium) {
+            if camera.activePreset != preset { camera.selectPreset(preset) }
+        } else if camera.activePreset != nil {
+            camera.select(camera.currentLook)
+            settings.lastPresetID = id
+            show(Toast(message: String(localized: "This preset needs Premium. Shooting with its base look."), symbol: "lock.fill"))
         }
     }
 

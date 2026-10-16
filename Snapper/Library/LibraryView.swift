@@ -8,11 +8,20 @@ struct LibraryView: View {
     @Bindable var model: LibraryModel
     var onClose: () -> Void
     var onShowPaywall: () -> Void
+    var onShootPreset: ((SavedPreset) -> Bool)?
 
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showDeleteConfirmation = false
     @State private var upgradeAfterPresets = false
+    @State private var finishing: FinishSelection?
+    @State private var upgradeAfterFinish = false
+    @State private var shareAfterFinish = false
+
+    private struct FinishSelection: Identifiable {
+        let id = UUID()
+        let records: [CaptureRecord]
+    }
     /// Photos grow into the editor from their grid cell and shrink back.
     @Namespace private var photoZoom
 
@@ -33,7 +42,7 @@ struct LibraryView: View {
                 .toolbar { toolbar }
                 .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
                 .navigationDestination(item: $model.editor) { editor in
-                    EditorView(model: editor, onShowPaywall: onShowPaywall)
+                    EditorView(model: editor, onShowPaywall: onShowPaywall, onShootPreset: onShootPreset)
                         .zoomTransition(from: editor.id, in: photoZoom)
                 }
         }
@@ -58,6 +67,14 @@ struct LibraryView: View {
             PresetsView(store: model.settings.presets, looks: model.looks, hasPremium: model.hasPremiumNow,
                         onApply: { model.applyPresetToSelection($0) },
                         onUpgrade: { upgradeAfterPresets = true })
+        }
+        .sheet(item: $finishing, onDismiss: {
+            if upgradeAfterFinish { upgradeAfterFinish = false; onShowPaywall() }
+            else if shareAfterFinish { shareAfterFinish = false; model.shareSelected() }
+        }) { selected in
+            BatchFinishView(model: model, records: selected.records,
+                            onUpgrade: { upgradeAfterFinish = true },
+                            onShareAfterDismiss: { shareAfterFinish = true })
         }
         .confirmationDialog(deleteTitle, isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
@@ -379,6 +396,9 @@ struct LibraryView: View {
             barButton("Share", systemImage: "square.and.arrow.up") { model.shareSelected() }
             barButton("Save", systemImage: "square.and.arrow.down") { model.saveSelected() }
             Menu {
+                Button("Finish Photo Set", systemImage: "rectangle.inset.filled") {
+                    finishing = FinishSelection(records: model.selectedRecords)
+                }
                 Button("Apply a Look", systemImage: "camera.filters") { model.prepareLookChoice() }
                 Button("Apply Personal Preset", systemImage: "slider.horizontal.3") {
                     if model.hasPremiumNow { model.isChoosingPreset = true }
