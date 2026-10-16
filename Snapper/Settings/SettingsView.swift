@@ -11,6 +11,8 @@ struct SettingsView: View {
     @State private var showManageSubscriptions = false
     @State private var isRestoring = false
     @State private var restoreMessage: RestoreMessage?
+    @State private var storageUsed: Int64?
+    @State private var showClearConfirmation = false
 
     private struct RestoreMessage: Identifiable {
         let id = UUID()
@@ -23,6 +25,7 @@ struct SettingsView: View {
             List {
                 premiumSection
                 photosSection
+                librarySection
                 cameraSection
                 looksSection
                 supportSection
@@ -110,7 +113,40 @@ struct SettingsView: View {
         } header: {
             Text("Photos")
         } footer: {
-            Text("New shots are always kept in Snapper so you can change the look later. Saving the original adds an unfiltered copy to your library too.")
+            Text("New shots are always kept in Snapper's Library so you can change the look later. Saving the original adds an unfiltered copy to your library too.")
+        }
+    }
+
+    private var librarySection: some View {
+        let savedCount = app.captures.alreadySavedIDs.count
+        return Section {
+            LabeledContent("Photos in Snapper") {
+                if let storageUsed {
+                    Text("\(LibraryModel.photoCount(app.captures.records.count)) · \(storageUsed.formatted(.byteCount(style: .file)))")
+                } else {
+                    Text(LibraryModel.photoCount(app.captures.records.count))
+                }
+            }
+            Button("Clear Photos Already Saved", role: .destructive) {
+                showClearConfirmation = true
+            }
+            .disabled(savedCount == 0)
+            .confirmationDialog(Text("Remove \(LibraryModel.photoCount(savedCount)) from Snapper?"),
+                                isPresented: $showClearConfirmation, titleVisibility: .visible) {
+                Button("Remove from Snapper", role: .destructive) {
+                    app.captures.deleteAlreadySaved()
+                    Task { storageUsed = await app.captures.storageUsed() }
+                }
+            } message: {
+                Text("Their current edits are already in your photo library. You won't be able to change their looks in Snapper afterwards.")
+            }
+        } header: {
+            Text("Library")
+        } footer: {
+            Text("Snapper keeps every photo you take or import until you delete it, so you can always change its look. Clearing frees space by removing photos already saved with their current edits.")
+        }
+        .task(id: app.captures.records.count) {
+            storageUsed = await app.captures.storageUsed()
         }
     }
 

@@ -92,7 +92,7 @@ final class CameraOptionsTests: XCTestCase {
 
     func testRendererCropMovesImageToOrigin() {
         let image = CIImage(color: .gray).cropped(to: CGRect(x: 0, y: 0, width: 300, height: 400))
-        let cropped = PhotoRenderer.cropped(image, to: .square)
+        let cropped = PhotoEditing.frame(image, with: PhotoCrop(shape: CropShape(cameraAspect: .square)))
         XCTAssertEqual(cropped.extent, CGRect(x: 0, y: 0, width: 300, height: 300))
     }
 

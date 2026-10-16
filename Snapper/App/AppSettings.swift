@@ -9,6 +9,7 @@ final class AppSettings {
         static let autoSave = "settings.autoSaveToPhotos"
         static let saveOriginal = "settings.alsoSaveOriginal"
         static let favorites = "settings.favoriteLookIDs"
+        static let recentLooks = "looks.recentLookIDs"
         static let onboardingDone = "app.hasCompletedOnboarding"
         static let introPaywallShown = "app.hasSeenIntroPaywall"
         static let lastLookID = "camera.lastLookID"
@@ -38,6 +39,14 @@ final class AppSettings {
     var favoriteLookIDs: [String] {
         didSet { defaults.set(favoriteLookIDs, forKey: Key.favorites) }
     }
+
+    /// Looks used most recently (shots and edits), newest first.
+    var recentLookIDs: [String] {
+        didSet { defaults.set(recentLookIDs, forKey: Key.recentLooks) }
+    }
+
+    /// How many looks the Recent category remembers.
+    static let maxRecentLooks = 10
 
     var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Key.onboardingDone) }
@@ -101,6 +110,7 @@ final class AppSettings {
         autoSaveToPhotos = defaults.object(forKey: Key.autoSave) as? Bool ?? true
         alsoSaveOriginal = defaults.bool(forKey: Key.saveOriginal)
         favoriteLookIDs = defaults.stringArray(forKey: Key.favorites) ?? []
+        recentLookIDs = defaults.stringArray(forKey: Key.recentLooks) ?? []
         hasCompletedOnboarding = defaults.bool(forKey: Key.onboardingDone)
         hasSeenIntroPaywall = defaults.bool(forKey: Key.introPaywallShown)
         lastLookID = defaults.string(forKey: Key.lastLookID)
@@ -125,6 +135,14 @@ final class AppSettings {
         } else {
             favoriteLookIDs.append(look.id)
         }
+    }
+
+    /// Moves `look` to the front of Recent (Original is never listed).
+    func noteRecentlyUsed(_ look: Look) {
+        guard !look.isOriginal, recentLookIDs.first != look.id else { return }
+        var ids = recentLookIDs.filter { $0 != look.id }
+        ids.insert(look.id, at: 0)
+        recentLookIDs = Array(ids.prefix(Self.maxRecentLooks))
     }
 
     /// The swipe order: Original, then favourites, then everything else in

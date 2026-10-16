@@ -9,7 +9,7 @@ struct CameraView: View {
     var hasPremium: Bool
     var lastCapture: UIImage?
     var isProcessingCapture: Bool
-    var onOpenLastCapture: () -> Void = {}
+    var onOpenLibrary: () -> Void = {}
     var onShowPaywall: () -> Void = {}
     var onOpenSettings: () -> Void = {}
     var onOpenLookPicker: () -> Void = {}
@@ -314,7 +314,7 @@ struct CameraView: View {
             .buttonStyle(.plain)
 
             HStack {
-                thumbnail
+                libraryButton
                 Spacer()
                 ShutterButton(isBusy: model.isCapturing, isCountingDown: model.countdown != nil) {
                     model.shutterPressed(options: settings.captureOptions)
@@ -342,32 +342,53 @@ struct CameraView: View {
         }
     }
 
-    private var thumbnail: some View {
-        Button(action: onOpenLastCapture) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(.white.opacity(0.1))
-                if let lastCapture {
-                    Image(uiImage: lastCapture)
-                        .resizable()
-                        .scaledToFill()
-                        .transition(.scale(scale: 0.6).combined(with: .opacity))
-                        .id(lastCapture)
+    /// The newest photo with a grid badge: opens the Library.
+    private var libraryButton: some View {
+        Button(action: onOpenLibrary) {
+            VStack(spacing: 5) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.white.opacity(0.1))
+                    if let lastCapture {
+                        Image(uiImage: lastCapture)
+                            .resizable()
+                            .scaledToFill()
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
+                            .id(lastCapture)
+                    } else {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    if isProcessingCapture {
+                        ProgressView()
+                            .tint(.white)
+                    }
                 }
-                if isProcessingCapture {
-                    ProgressView()
-                        .tint(.white)
+                .frame(width: 52, height: 52)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.3), lineWidth: 1))
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "square.grid.2x2.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 24, height: 24)
+                        .background(Theme.accent, in: Circle())
+                        .overlay(Circle().strokeBorder(.black, lineWidth: 2))
+                        .offset(x: 6, y: 6)
                 }
+                .rotationEffect(orientation.iconRotation)
+                .animation(.spring(response: 0.35, dampingFraction: 0.75), value: lastCapture)
+
+                Text("Library")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
             }
-            .frame(width: 52, height: 52)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.25), lineWidth: 1))
-            .rotationEffect(orientation.iconRotation)
-            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: lastCapture)
+            .frame(width: 64)
         }
         .buttonStyle(.plain)
-        .disabled(lastCapture == nil)
-        .accessibilityLabel(Text("Last photo"))
+        .accessibilityLabel(Text("Library"))
+        .accessibilityHint(Text("Your photos, to edit, share or import more"))
     }
 
     private func blinkShutter() {

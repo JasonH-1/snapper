@@ -30,7 +30,7 @@ struct RootView: View {
             hasPremium: app.hasPremium,
             lastCapture: app.captures.latestThumbnail,
             isProcessingCapture: app.captures.isProcessingCapture,
-            onOpenLastCapture: { app.openReview() },
+            onOpenLibrary: { app.openLibrary() },
             onShowPaywall: { app.presentPaywall(.upgrade) },
             onOpenSettings: { app.openSettings() },
             onOpenLookPicker: { app.openLookPicker() }
@@ -42,11 +42,11 @@ struct RootView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .fullScreenCover(item: $app.review, onDismiss: { app.reviewDismissed() }) { review in
-            ReviewView(model: review,
-                       onClose: { app.review = nil },
-                       onShowPaywall: { app.presentPaywall(.upgrade) })
-                .paywallHost(app, as: .review)
+        .fullScreenCover(item: $app.libraryScreen, onDismiss: { app.libraryDismissed() }) { library in
+            LibraryView(model: library,
+                        onClose: { app.libraryScreen = nil },
+                        onShowPaywall: { app.presentPaywall(.upgrade) })
+                .paywallHost(app, as: .library)
         }
         .paywallHost(app, as: .root)
         .sheet(isPresented: $app.isShowingSettings, onDismiss: { app.settingsDismissed() }) {

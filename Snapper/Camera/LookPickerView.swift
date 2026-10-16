@@ -1,51 +1,89 @@
 import SwiftUI
 
-/// Grid of every look, grouped by collection. Tap to switch the camera to a
-/// look; star to keep it near the front of the swipe order.
+/// Grid of every look, grouped like the editor's strip: Favorites, Recent,
+/// then each collection, with category chips pinned on top to jump between
+/// them. Tap to pick a look; star to keep it near the front of the camera's
+/// swipe order.
 struct LookPickerView: View {
     let library: LookLibrary
     let selectedID: String
     let hasPremium: Bool
     @Bindable var settings: AppSettings
     let thumbnails: LookThumbnails
+    var title: String = String(localized: "Looks")
     var onSelect: (Look) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var position: String?
+    @State private var activeCategory: LookCategory?
+    @State private var jumpingTo: LookCategory?
+    /// Recent looks when the sheet opened, so sections don't move while browsing.
+    @State private var recentIDs: [String]?
 
     private let columns = [GridItem(.adaptive(minimum: 98), spacing: 12)]
 
+    private var catalog: LookCatalog {
+        LookCatalog(library: library, favoriteIDs: settings.favoriteLookIDs, recentIDs: recentIDs ?? settings.recentLookIDs)
+    }
+
     var body: some View {
+        let catalog = self.catalog
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
-                    section(title: nil, tagline: nil, looks: [.original])
-                    if !favorites.isEmpty {
-                        section(title: String(localized: "Favorites"), tagline: nil, looks: favorites)
-                    }
-                    ForEach(library.collections) { collection in
-                        section(title: collection.name,
-                                tagline: collection.tagline,
-                                looks: library.looks.filter { $0.collectionID == collection.id })
+                    section(id: LookCatalog.originalEntryID, title: nil, tagline: nil, looks: [.original])
+                    ForEach(catalog.sections) { section in
+                        self.section(id: section.id, title: section.title, tagline: section.tagline, looks: section.looks)
                     }
                 }
+                .scrollTargetLayout()
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
-            .navigationTitle("Looks")
+            .scrollPosition(id: $position, anchor: .top)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                CategoryChips(catalog: catalog, active: activeCategory) { category in
+                    jump(to: category)
+                }
+                .padding(.vertical, 8)
+                .background(.bar)
+            }
+            .onChange(of: position) { _, id in
+                guard let id else { return }
+                let category = id == LookCatalog.originalEntryID
+                    ? catalog.sections.first?.category
+                    : catalog.sections.first { $0.id == id }?.category
+                if let jumpingTo {
+                    if category == jumpingTo { self.jumpingTo = nil }
+                    return
+                }
+                activeCategory = category
+            }
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
+            .onAppear {
+                if recentIDs == nil { recentIDs = settings.recentLookIDs }
+                if activeCategory == nil { activeCategory = catalog.sections.first?.category }
+            }
         }
     }
 
-    private var favorites: [Look] {
-        settings.favoriteLookIDs.compactMap(library.look(id:))
+    private func jump(to category: LookCategory) {
+        jumpingTo = category
+        activeCategory = category
+        withAnimation(.easeInOut(duration: 0.3)) { position = category.id }
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            if jumpingTo == category { jumpingTo = nil }
+        }
     }
 
-    private func section(title: String?, tagline: String?, looks: [Look]) -> some View {
+    private func section(id: String, title: String?, tagline: String?, looks: [Look]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if let title {
                 VStack(alignment: .leading, spacing: 2) {
@@ -54,6 +92,7 @@ struct LookPickerView: View {
                         Text(tagline).font(.footnote).foregroundStyle(.secondary)
                     }
                 }
+                .accessibilityAddTraits(.isHeader)
             }
             LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(looks) { look in
@@ -70,6 +109,7 @@ struct LookPickerView: View {
                 }
             }
         }
+        .id(id)
     }
 }
 

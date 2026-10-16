@@ -48,10 +48,11 @@ final class AppModel {
 
     /// Which screen presents the paywall: always the one on top.
     enum PaywallHost {
-        case root, review, settings
+        case root, library, settings
     }
 
-    var review: ReviewModel?
+    /// The Library screen, when open.
+    var libraryScreen: LibraryModel?
     var paywall: PaywallModel?
     var isShowingSettings = false
     var isShowingLookPicker = false
@@ -91,6 +92,7 @@ final class AppModel {
 
     private func handleCapture(_ photo: CapturedPhoto, look: Look) {
         settings.lastLookID = look.id
+        settings.noteRecentlyUsed(look)
         Task {
             do {
                 let record = try await captures.add(photo, look: look)
@@ -165,24 +167,22 @@ final class AppModel {
         isShowingLookPicker = true
     }
 
-    func openReview(id: UUID? = nil) {
-        guard !captures.records.isEmpty else { return }
+    func openLibrary() {
         camera.setPreviewVisible(false)
-        review = ReviewModel(
-            library: captures,
-            looks: library.looks,
-            startAt: id,
+        libraryScreen = LibraryModel(
+            captures: captures,
+            looks: library,
+            settings: settings,
             hasPremium: { [weak self] in self?.hasPremium ?? false },
-            alsoSaveOriginal: { [weak self] in self?.settings.alsoSaveOriginal ?? false },
-            saveFormat: { [weak self] in self?.settings.photoFormat ?? .heic },
             requestPremium: { [weak self] look, before, after in
                 self?.presentPaywall(.lockedLook(look, before: before, after: after))
             }
         )
     }
 
-    func reviewDismissed() {
-        review = nil
+    func libraryDismissed() {
+        libraryScreen?.editor?.finish()
+        libraryScreen = nil
         updateCameraVisibility()
     }
 
@@ -206,7 +206,7 @@ final class AppModel {
     }
 
     private var paywallHost: PaywallHost {
-        if review != nil { return .review }
+        if libraryScreen != nil { return .library }
         if isShowingSettings { return .settings }
         return .root
     }
@@ -243,6 +243,6 @@ final class AppModel {
     }
 
     private func updateCameraVisibility() {
-        camera.setPreviewVisible(review == nil && paywall == nil && !isShowingSettings)
+        camera.setPreviewVisible(libraryScreen == nil && paywall == nil && !isShowingSettings)
     }
 }

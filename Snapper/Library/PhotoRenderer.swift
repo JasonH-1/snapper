@@ -4,11 +4,11 @@ import OSLog
 import UIKit
 import UniformTypeIdentifiers
 
-/// Renders captured photos with a look: full-resolution exports, the review
-/// screen's working preview and small thumbnails.
+/// Renders Library photos with their recipe (look, sliders and crop):
+/// full-resolution exports, the editor's working preview and thumbnails.
 ///
-/// Everything goes through `LookPipeline`, the same code the live preview
-/// uses, so what you saw is what you get. Runs off the main actor.
+/// Looks go through `LookPipeline`, the same code the live preview uses, so
+/// what you saw is what you get. Runs off the main actor.
 actor PhotoRenderer {
     enum ExportFormat: String, CaseIterable, Sendable {
         case heic
@@ -42,20 +42,19 @@ actor PhotoRenderer {
 
     // MARK: - Export
 
-    /// Full-resolution render of `source` (camera file data) with `look`.
-    /// `seed` fixes the look's random effects (use the capture's id).
+    /// Full-resolution render of `source` (the original file's data) with
+    /// `recipe`, whose look is `look`. `seed` fixes the look's random effects
+    /// (use the photo's id).
     func export(source: Data,
                 look: Look,
-                strength: Float,
+                recipe: PhotoRecipe,
                 seed: UInt64 = 0,
-                aspect: AspectRatio = .fourThree,
                 watermark: Bool,
                 format: ExportFormat) throws -> Data {
-        guard let uncropped = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
+        guard let original = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
             throw RenderError.unreadableImage
         }
-        let original = Self.cropped(uncropped, to: aspect)
-        var image = render(look, strength: strength, seed: seed, to: original)
+        var image = render(look, recipe: recipe, seed: seed, to: original)
         if watermark {
             image = Watermark.apply(to: image)
         }
@@ -91,42 +90,46 @@ actor PhotoRenderer {
 
     // MARK: - Previews
 
-    /// A screen-sized render for the review screen.
-    func preview(id: UUID, sourceURL: URL, look: Look, strength: Float, aspect: AspectRatio = .fourThree,
-                 maxPixelSize: Int = 1800) -> UIImage? {
+    /// A screen-sized render for the editor. Large photos are edited at
+    /// this size; only exports work at full resolution.
+    func preview(id: UUID, sourceURL: URL, look: Look, recipe: PhotoRecipe, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(render(look, strength: strength, seed: id.effectsSeed, to: Self.cropped(proxy, to: aspect)))
+        return makeUIImage(render(look, recipe: recipe, seed: id.effectsSeed, to: proxy))
     }
 
-    /// The unfiltered original at preview size (for press-and-hold compare).
-    func original(id: UUID, sourceURL: URL, aspect: AspectRatio = .fourThree, maxPixelSize: Int = 1800) -> UIImage? {
+    /// The photo framed by `crop` but with no look or sliders (for
+    /// press-and-hold compare).
+    func original(id: UUID, sourceURL: URL, crop: PhotoCrop = .none, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(Self.cropped(proxy, to: aspect))
+        return makeUIImage(PhotoEditing.frame(proxy, with: crop))
     }
 
-    /// Small renders of one photo in many looks, for the look strip.
-    func thumbnails(sourceURL: URL, looks: [Look], maxPixelSize: Int = 220) -> [String: UIImage] {
+    /// The whole photo, unframed and unfiltered, at preview size (the crop
+    /// tab draws its own framing over it).
+    func uncropped(id: UUID, sourceURL: URL, maxPixelSize: Int = 1800) -> UIImage? {
+        guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
+        return makeUIImage(proxy)
+    }
+
+    /// Small renders of one photo in many looks, for the look strip: the
+    /// rest of `recipe` (sliders and crop) is kept, each look at full strength.
+    func thumbnails(sourceURL: URL, looks: [Look], recipe: PhotoRecipe = .untouched, seed: UInt64 = 0,
+                    maxPixelSize: Int = 220) -> [String: UIImage] {
         guard let small = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return [:] }
+        let framed = PhotoEditing.frame(small, with: recipe.crop)
         var result: [String: UIImage] = [:]
         for look in looks {
-            result[look.id] = makeUIImage(render(look, to: small))
+            let graded = render(look, seed: seed, to: framed)
+            result[look.id] = makeUIImage(PhotoEditing.adjust(graded, with: recipe.adjustments, seed: seed))
         }
         return result
     }
 
-    /// One small render (camera thumbnail, roll strip).
-    func thumbnail(sourceURL: URL, look: Look, strength: Float, seed: UInt64 = 0, aspect: AspectRatio = .fourThree,
+    /// One small render (camera button, Library grid).
+    func thumbnail(sourceURL: URL, look: Look, recipe: PhotoRecipe, seed: UInt64 = 0,
                    maxPixelSize: Int = 240) -> UIImage? {
         guard let small = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(render(look, strength: strength, seed: seed, to: Self.cropped(small, to: aspect)))
-    }
-
-    /// `image` cropped to `aspect` around its centre, moved back to the origin
-    /// so effects that measure the frame see a plain rectangle.
-    static func cropped(_ image: CIImage, to aspect: AspectRatio) -> CIImage {
-        guard aspect != .fourThree else { return image }
-        let rect = aspect.crop(image.extent)
-        return image.cropped(to: rect).transformed(by: CGAffineTransform(translationX: -rect.minX, y: -rect.minY))
+        return makeUIImage(render(look, recipe: recipe, seed: seed, to: small))
     }
 
     /// Renders a bundled showcase image (onboarding, paywall) in a look.
@@ -137,6 +140,10 @@ actor PhotoRenderer {
 
     private func render(_ look: Look, strength: Float = 1, seed: UInt64 = 0, to image: CIImage) -> CIImage {
         LookPipeline.apply(look, lut: lutStore.lut(for: look), strength: strength, seed: seed, to: image)
+    }
+
+    private func render(_ look: Look, recipe: PhotoRecipe, seed: UInt64, to image: CIImage) -> CIImage {
+        PhotoEditing.apply(recipe, look: look, lut: lutStore.lut(for: look), seed: seed, to: image)
     }
 
     func forget(id: UUID) {
