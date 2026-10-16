@@ -10,6 +10,8 @@ struct CameraView: View {
     var lastCapture: UIImage?
     var isProcessingCapture: Bool
     var onOpenLibrary: () -> Void = {}
+    /// The Library grows out of its button and shrinks back into it.
+    var libraryZoom: Namespace.ID?
     var onShowPaywall: () -> Void = {}
     var onOpenSettings: () -> Void = {}
     var onOpenLookPicker: () -> Void = {}
@@ -367,6 +369,7 @@ struct CameraView: View {
                 }
                 .frame(width: 52, height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .zoomSource(id: AppModel.libraryZoomID, in: libraryZoom)
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.3), lineWidth: 1))
                 .overlay(alignment: .bottomTrailing) {
                     Image(systemName: "square.grid.2x2.fill")

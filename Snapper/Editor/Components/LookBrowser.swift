@@ -16,9 +16,17 @@ struct LookBrowser: View {
     @State private var stripPosition: String?
     /// Set while a chip tap scrolls the strip, so the scroll doesn't re-pick the chip.
     @State private var jumpingTo: LookCategory?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// One line of look name at the current text size.
+    @ScaledMetric(relativeTo: .caption) private var nameLineHeight: CGFloat = 16
+
+    /// Names get two lines at accessibility text sizes rather than being cut off.
+    private var nameLines: Int { dynamicTypeSize.isAccessibilitySize ? 2 : 1 }
 
     var body: some View {
-        VStack(spacing: 12) {
+        // The chips carry their own 44 pt touch padding, so the gap stays small.
+        VStack(spacing: 2) {
             CategoryChips(catalog: catalog, active: activeCategory) { category in
                 jump(to: category)
             }
@@ -28,7 +36,8 @@ struct LookBrowser: View {
 
     private var strip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 10) {
+            // Top-aligned, so tiles stay level when names wrap to different heights.
+            LazyHStack(alignment: .top, spacing: 10) {
                 ForEach(catalog.entries) { entry in
                     Button {
                         select(entry.look)
@@ -37,9 +46,10 @@ struct LookBrowser: View {
                                       image: thumbnails[entry.look.id],
                                       isSelected: entry.look.id == selectedID,
                                       isLocked: lockedIDs.contains(entry.look.id),
-                                      isFavorite: favoriteIDs.contains(entry.look.id))
+                                      isFavorite: favoriteIDs.contains(entry.look.id),
+                                      nameLines: nameLines)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .contextMenu {
                         if !entry.look.isOriginal {
                             Button {
@@ -60,7 +70,7 @@ struct LookBrowser: View {
             .padding(.horizontal, 16)
         }
         .scrollPosition(id: $stripPosition, anchor: .leading)
-        .frame(height: 108)
+        .frame(height: 84 + 6 + nameLineHeight * CGFloat(nameLines) + 4)
         .onAppear {
             // Start with the photo's look in view, one look of context before it.
             guard stripPosition == nil, let id = catalog.entryID(forLook: selectedID),
@@ -87,7 +97,7 @@ struct LookBrowser: View {
         guard let id = catalog.firstEntryID(of: category) else { return }
         jumpingTo = category
         activeCategory = category
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.snapper(Motion.standard, reduceMotion: reduceMotion)) {
             stripPosition = id
         }
         // Without scroll phases (iOS 17), let the strip lead again once the jump is done.
@@ -105,17 +115,24 @@ struct CategoryChips: View {
     let active: LookCategory?
     var tap: (LookCategory) -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Counts taps, so the haptic marks a tap and not the highlight moving
+    /// while the strip scrolls.
+    @State private var taps = 0
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(catalog.sections) { section in
                         Button {
+                            taps += 1
                             tap(section.category)
                         } label: {
                             chip(section, isActive: section.category == active)
+                                .minimumTapTarget()
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         .id(section.id)
                     }
                 }
@@ -123,55 +140,49 @@ struct CategoryChips: View {
             }
             .onChange(of: active) { _, category in
                 guard let category else { return }
-                withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(category.id, anchor: .center) }
+                withAnimation(.snapper(Motion.standard, reduceMotion: reduceMotion)) {
+                    proxy.scrollTo(category.id, anchor: .center)
+                }
             }
         }
-        .sensoryFeedback(.selection, trigger: active)
+        .sensoryFeedback(.selection, trigger: taps)
     }
 
     private func chip(_ section: LookCatalog.Section, isActive: Bool) -> some View {
         HStack(spacing: 5) {
             if section.category == .favorites {
+                // The star stays yellow: it marks favourites everywhere.
                 Image(systemName: "star.fill")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(isActive ? Color.black : Theme.accent)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Theme.accent)
             } else if section.category == .recent {
                 Image(systemName: "clock")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.caption2.weight(.bold))
             }
             Text(section.title)
                 .font(.footnote.weight(isActive ? .bold : .semibold))
             if let count = section.count {
                 Text("\(count)")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(isActive ? Color.black.opacity(0.6) : Color.secondary)
+                    .foregroundStyle(isActive ? Color.black.opacity(0.55) : Color.secondary)
             }
         }
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .foregroundStyle(isActive ? Color.black : Color.white)
-        .background {
-            if isActive {
-                Capsule().fill(Theme.accent)
-            } else {
-                Capsule().fill(.white.opacity(0.13))
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 1))
-            }
-        }
-        .contentShape(Capsule())
+        .lineLimit(1)
+        .chip(isSelected: isActive)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 }
 
-/// One look in the strip: the photo in that look, its name, a lock for
-/// Premium looks.
+/// One look in the strip: the photo in that look, its name in the camera's
+/// serif, a lock for Premium looks.
 struct LookThumbnail: View {
     let look: Look
     let image: UIImage?
     let isSelected: Bool
     let isLocked: Bool
     var isFavorite = false
+    var nameLines = 1
 
     var body: some View {
         VStack(spacing: 6) {
@@ -190,7 +201,7 @@ struct LookThumbnail: View {
                 .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(isSelected ? Theme.accent : .clear, lineWidth: 2.5)
+                        .strokeBorder(isSelected ? Color.white : .clear, lineWidth: 2.5)
                 }
                 .overlay(alignment: .topTrailing) {
                     if isLocked {
@@ -211,9 +222,12 @@ struct LookThumbnail: View {
                     }
                 }
             Text(look.name)
-                .font(.caption.weight(isSelected ? .bold : .regular))
+                .font(Theme.lookName(.caption, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? .primary : .secondary)
-                .lineLimit(1)
+                .lineLimit(nameLines)
+                .multilineTextAlignment(.center)
+                // Shrink a long word rather than break it ("Lante / rn").
+                .minimumScaleFactor(0.6)
                 .frame(width: 70)
         }
         .accessibilityElement(children: .ignore)

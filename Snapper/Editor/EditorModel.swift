@@ -64,6 +64,12 @@ final class EditorModel: Identifiable, Hashable {
     private(set) var cropBase: UIImage?
     private(set) var lookThumbnails: [String: UIImage] = [:]
     var isShowingOriginal = false
+    /// The one-time note that edits stay in Snapper until saved.
+    private(set) var showsEditsKeptHint = false
+
+    /// Recipes to step back to, oldest first, and ones undone.
+    private(set) var undoStack: [PhotoRecipe] = []
+    private(set) var redoStack: [PhotoRecipe] = []
 
     var adjustTool: PhotoAdjustments.Kind = .brightness
     /// The chip that matches the look strip's scroll position.
@@ -88,6 +94,13 @@ final class EditorModel: Identifiable, Hashable {
     /// Recent looks as they were when the editor opened, so the strip doesn't
     /// reshuffle while browsing.
     @ObservationIgnored private let recentIDsAtOpen: [String]
+    /// True while a run of changes (one slider drag, one crop drag) is
+    /// collecting into a single undo step; closed when it is stored.
+    @ObservationIgnored private var isChangeGroupOpen = false
+    @ObservationIgnored private var hintTask: Task<Void, Never>?
+
+    /// Undo steps kept per editing session.
+    static let maxUndoSteps = 50
 
     private struct CropBaseKey: Equatable {
         var lookID: String
@@ -127,6 +140,17 @@ final class EditorModel: Identifiable, Hashable {
     var showsWatermarkNote: Bool { !hasPremium() && !currentLook.isPremium }
     var isImported: Bool { record?.isImported ?? false }
     var isEdited: Bool { record.map { recipe != $0.initialRecipe } ?? false }
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    /// What each per-part reset would go back to.
+    private var initialRecipe: PhotoRecipe { record?.initialRecipe ?? .untouched }
+    var isLookChanged: Bool { recipe.lookID != initialRecipe.lookID || recipe.strength != initialRecipe.strength }
+    var isLightChanged: Bool { recipe.adjustments != initialRecipe.adjustments }
+    var isCropChanged: Bool { recipe.crop != initialRecipe.crop }
+
+    var collectionName: String? { looks.collection(for: currentLook)?.name }
+    var isCurrentLookFavorite: Bool { settings.isFavorite(currentLook) }
     var isSaved: Bool { record?.savedRecipe == recipe }
 
     var catalog: LookCatalog {
@@ -162,7 +186,7 @@ final class EditorModel: Identifiable, Hashable {
 
     func select(_ look: Look) {
         guard recipe.lookID != look.id else { return }
-        update { $0.lookID = look.id }
+        step { $0.lookID = look.id }
     }
 
     var strength: Double {
@@ -185,7 +209,7 @@ final class EditorModel: Identifiable, Hashable {
     }
 
     func resetValue(of kind: PhotoAdjustments.Kind) {
-        setValue(0, for: kind)
+        step { $0.adjustments[kind] = 0 }
     }
 
     // MARK: - Crop
@@ -205,8 +229,23 @@ final class EditorModel: Identifiable, Hashable {
         CropBox.normalizedAspect(for: recipe.crop.shape, frameSize: frameSize)
     }
 
+    /// Shapes to offer: 4:3 is left out when it is the photo's own shape
+    /// (every Snapper shot), where it would only repeat Original.
+    var cropShapes: [CropShape] {
+        let size = frameSize
+        let long = max(size.width, size.height), short = max(min(size.width, size.height), 1)
+        let isFourThree = abs(long / short - 4.0 / 3.0) < 0.02
+        return isFourThree ? CropShape.allCases.filter { $0 != .fourThree } : CropShape.allCases
+    }
+
+    /// The shape chip to highlight.
+    var selectedShape: CropShape {
+        let shape = recipe.crop.shape
+        return shape == .fourThree && !cropShapes.contains(.fourThree) ? .original : shape
+    }
+
     func setShape(_ shape: CropShape) {
-        update {
+        step {
             $0.crop.shape = shape
             // Free keeps the current box; shapes start as the largest centred box.
             $0.crop.rect = shape == .free ? CropBox.resolvedRect(of: $0.crop, frameSize: frameSize) : nil
@@ -226,31 +265,102 @@ final class EditorModel: Identifiable, Hashable {
     }
 
     func rotate() {
-        update { $0.crop.rotateClockwise() }
+        step { $0.crop.rotateClockwise() }
     }
 
     func flip() {
-        update { $0.crop.flipHorizontally() }
+        step { $0.crop.flipHorizontally() }
     }
 
     // MARK: - Recipe
 
     /// Changes the working recipe, redraws and stores it shortly after.
+    /// Changes in quick succession (a drag) make one undo step.
     private func update(_ change: (inout PhotoRecipe) -> Void) {
         var next = recipe
         change(&next)
         guard next != recipe else { return }
+        if !isChangeGroupOpen {
+            undoStack.append(recipe)
+            if undoStack.count > Self.maxUndoSteps { undoStack.removeFirst() }
+            redoStack.removeAll()
+            isChangeGroupOpen = true
+        }
         recipe = next
         scheduleRender()
         scheduleCommit()
+        showEditsKeptHintIfNeeded()
     }
 
-    func reset() {
-        guard let record else { return }
-        recipe = record.initialRecipe
+    /// A single tap's change (a look, a shape, a turn, a reset): always its
+    /// own undo step, stored at once.
+    private func step(_ change: (inout PhotoRecipe) -> Void) {
+        if isChangeGroupOpen { commit() }
+        update(change)
+        commit()
+    }
+
+    func undo() {
+        commit()
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(recipe)
+        apply(previous)
+    }
+
+    func redo() {
+        commit()
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(recipe)
+        apply(next)
+    }
+
+    /// Jumps to a recipe from the undo history and stores it.
+    private func apply(_ recipe: PhotoRecipe) {
+        self.recipe = recipe
         scheduleRender()
         commit()
-        refreshLookThumbnails()
+        if tab == .looks { refreshLookThumbnails() }
+    }
+
+    /// Everything back to how the photo was taken or imported (undoable).
+    func reset() {
+        let initial = initialRecipe
+        step { $0 = initial }
+        if tab == .looks { refreshLookThumbnails() }
+    }
+
+    func resetLook() {
+        let initial = initialRecipe
+        step {
+            $0.lookID = initial.lookID
+            $0.strength = initial.strength
+        }
+    }
+
+    func resetLight() {
+        let initial = initialRecipe
+        step { $0.adjustments = initial.adjustments }
+    }
+
+    func resetCrop() {
+        let initial = initialRecipe
+        step { $0.crop = initial.crop }
+    }
+
+    private func showEditsKeptHintIfNeeded() {
+        guard !settings.hasSeenEditsKeptHint else { return }
+        settings.hasSeenEditsKeptHint = true
+        withAnimation(.easeOut(duration: 0.25)) { showsEditsKeptHint = true }
+        hintTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.3)) { showsEditsKeptHint = false }
+        }
+    }
+
+    func dismissEditsKeptHint() {
+        hintTask?.cancel()
+        withAnimation(.easeIn(duration: 0.2)) { showsEditsKeptHint = false }
     }
 
     private func scheduleCommit() {
@@ -262,10 +372,11 @@ final class EditorModel: Identifiable, Hashable {
         }
     }
 
-    /// Stores the working recipe on the photo now.
+    /// Stores the working recipe on the photo now, closing the current undo step.
     func commit() {
         commitTask?.cancel()
         commitTask = nil
+        isChangeGroupOpen = false
         library.updateRecipe(id: id, recipe)
     }
 

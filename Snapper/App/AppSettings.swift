@@ -10,6 +10,7 @@ final class AppSettings {
         static let saveOriginal = "settings.alsoSaveOriginal"
         static let favorites = "settings.favoriteLookIDs"
         static let recentLooks = "looks.recentLookIDs"
+        static let editsKeptHint = "editor.hasSeenEditsKeptHint"
         static let onboardingDone = "app.hasCompletedOnboarding"
         static let introPaywallShown = "app.hasSeenIntroPaywall"
         static let lastLookID = "camera.lastLookID"
@@ -43,6 +44,11 @@ final class AppSettings {
     /// Looks used most recently (shots and edits), newest first.
     var recentLookIDs: [String] {
         didSet { defaults.set(recentLookIDs, forKey: Key.recentLooks) }
+    }
+
+    /// The editor has said once that edits stay in Snapper until saved.
+    var hasSeenEditsKeptHint: Bool {
+        didSet { defaults.set(hasSeenEditsKeptHint, forKey: Key.editsKeptHint) }
     }
 
     /// How many looks the Recent category remembers.
@@ -111,6 +117,7 @@ final class AppSettings {
         alsoSaveOriginal = defaults.bool(forKey: Key.saveOriginal)
         favoriteLookIDs = defaults.stringArray(forKey: Key.favorites) ?? []
         recentLookIDs = defaults.stringArray(forKey: Key.recentLooks) ?? []
+        hasSeenEditsKeptHint = defaults.bool(forKey: Key.editsKeptHint)
         hasCompletedOnboarding = defaults.bool(forKey: Key.onboardingDone)
         hasSeenIntroPaywall = defaults.bool(forKey: Key.introPaywallShown)
         lastLookID = defaults.string(forKey: Key.lastLookID)

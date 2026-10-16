@@ -53,6 +53,8 @@ final class AppModel {
 
     /// The Library screen, when open.
     var libraryScreen: LibraryModel?
+    /// Ties the Library's zoom transition to the camera's Library button.
+    static let libraryZoomID = "library"
     var paywall: PaywallModel?
     var isShowingSettings = false
     var isShowingLookPicker = false

@@ -15,6 +15,9 @@ struct CropCanvas: View {
 
     @State private var dragStart: CGRect?
     @State private var isDragging = false
+    /// How far the box is stretched past the photo's edge while moving it, in points.
+    @State private var stretch: CGSize = .zero
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let handleLength: CGFloat = 20
     private static let handleHitSize: CGFloat = 44
@@ -22,8 +25,8 @@ struct CropCanvas: View {
     var body: some View {
         GeometryReader { geometry in
             let frame = fittedFrame(in: geometry.size)
-            let box = CGRect(x: frame.minX + rect.minX * frame.width,
-                             y: frame.minY + rect.minY * frame.height,
+            let box = CGRect(x: frame.minX + rect.minX * frame.width + stretch.width,
+                             y: frame.minY + rect.minY * frame.height + stretch.height,
                              width: rect.width * frame.width,
                              height: rect.height * frame.height)
             ZStack(alignment: .topLeading) {
@@ -156,11 +159,19 @@ struct CropCanvas: View {
                 let start = dragStart ?? rect
                 dragStart = start
                 isDragging = true
-                onChange(CropBox.moved(start, by: normalized(value.translation, in: frame)))
+                let delta = normalized(value.translation, in: frame)
+                let moved = CropBox.moved(start, by: delta)
+                // Past the edge the box follows the finger less and less.
+                let overshoot = CGSize(width: (start.minX + delta.width - moved.minX) * frame.width,
+                                       height: (start.minY + delta.height - moved.minY) * frame.height)
+                stretch = CGSize(width: Motion.rubberBand(overshoot.width, dimension: frame.width),
+                                 height: Motion.rubberBand(overshoot.height, dimension: frame.height))
+                onChange(moved)
             }
             .onEnded { _ in
                 dragStart = nil
                 isDragging = false
+                withAnimation(.snapper(Motion.standard, reduceMotion: reduceMotion)) { stretch = .zero }
             }
     }
 

@@ -137,7 +137,7 @@ private struct LookTile: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 3)
+                        .strokeBorder(isSelected ? Color.white : .clear, lineWidth: 3)
                 }
 
                 if let toggleFavorite {
@@ -159,7 +159,7 @@ private struct LookTile: View {
                         .foregroundStyle(Theme.accent)
                 }
                 Text(look.name)
-                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                    .font(Theme.lookName(.subheadline, weight: isSelected ? .semibold : .regular))
                     .lineLimit(1)
             }
         }

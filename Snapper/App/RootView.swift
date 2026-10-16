@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     @Bindable var app: AppModel
     @Environment(\.openURL) private var openURL
+    @Namespace private var libraryZoom
 
     var body: some View {
         Group {
@@ -31,6 +32,7 @@ struct RootView: View {
             lastCapture: app.captures.latestThumbnail,
             isProcessingCapture: app.captures.isProcessingCapture,
             onOpenLibrary: { app.openLibrary() },
+            libraryZoom: libraryZoom,
             onShowPaywall: { app.presentPaywall(.upgrade) },
             onOpenSettings: { app.openSettings() },
             onOpenLookPicker: { app.openLookPicker() }
@@ -47,6 +49,7 @@ struct RootView: View {
                         onClose: { app.libraryScreen = nil },
                         onShowPaywall: { app.presentPaywall(.upgrade) })
                 .paywallHost(app, as: .library)
+                .zoomTransition(from: AppModel.libraryZoomID, in: libraryZoom)
         }
         .paywallHost(app, as: .root)
         .sheet(isPresented: $app.isShowingSettings, onDismiss: { app.settingsDismissed() }) {

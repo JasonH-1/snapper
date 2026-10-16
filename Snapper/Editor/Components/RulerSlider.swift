@@ -2,7 +2,8 @@ import SwiftUI
 
 /// A tick ruler that slides under a fixed yellow pointer, like Photos'
 /// adjustment dials. Ticks between zero and the pointer light up; double-tap
-/// returns to zero.
+/// returns to zero. Dragging past either end stretches a little and settles
+/// back, instead of stopping dead.
 struct RulerSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -13,9 +14,41 @@ struct RulerSlider: View {
     var spacing: CGFloat = 9
     var onEditingChanged: (Bool) -> Void = { _ in }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragStartValue: Double?
+    /// How far the ruler is stretched past an end, in points.
+    @State private var stretch: CGFloat = 0
 
     var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                ticks
+                    .offset(x: stretch)
+                // The pointer stays put while the ruler moves under it.
+                Capsule()
+                    .fill(Theme.accent)
+                    .frame(width: 3)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Rectangle())
+            .gesture(drag(width: geometry.size.width))
+        }
+        .onTapGesture(count: 2) {
+            withAnimation(.snapper(Motion.standard, reduceMotion: reduceMotion)) { value = 0 }
+            onEditingChanged(false)
+        }
+        .sensoryFeedback(.selection, trigger: isAtZero) { _, atZero in atZero }
+        .sensoryFeedback(.impact(weight: .light), trigger: isAtEnd) { _, atEnd in atEnd }
+        .accessibilityElement()
+        .accessibilityValue(Text(value, format: .number.precision(.fractionLength(0...1))))
+        .accessibilityAdjustableAction { direction in
+            let delta = tickStep * (direction == .increment ? 1 : -1)
+            value = min(max(value + delta, range.lowerBound), range.upperBound)
+            onEditingChanged(false)
+        }
+    }
+
+    private var ticks: some View {
         Canvas { context, size in
             let midX = size.width / 2
             let midY = size.height / 2
@@ -37,25 +70,6 @@ struct RulerSlider: View {
                                     cornerSize: CGSize(width: 1, height: 1))
                 context.fill(tick, with: .color(color.opacity(fade)))
             }
-            var pointer = Path()
-            pointer.addRoundedRect(in: CGRect(x: midX - 1.5, y: 0, width: 3, height: size.height),
-                                   cornerSize: CGSize(width: 1.5, height: 1.5))
-            context.fill(pointer, with: .color(Theme.accent))
-        }
-        .contentShape(Rectangle())
-        .gesture(drag)
-        .onTapGesture(count: 2) {
-            withAnimation(.easeOut(duration: 0.2)) { value = 0 }
-            onEditingChanged(false)
-        }
-        .sensoryFeedback(.selection, trigger: isAtZero) { _, atZero in atZero }
-        .sensoryFeedback(.impact(weight: .light), trigger: isAtEnd) { _, atEnd in atEnd }
-        .accessibilityElement()
-        .accessibilityValue(Text(value, format: .number.precision(.fractionLength(0...1))))
-        .accessibilityAdjustableAction { direction in
-            let delta = tickStep * (direction == .increment ? 1 : -1)
-            value = min(max(value + delta, range.lowerBound), range.upperBound)
-            onEditingChanged(false)
         }
     }
 
@@ -67,7 +81,7 @@ struct RulerSlider: View {
         return tick >= low - 1e-9 && tick <= high + 1e-9 && abs(value) >= tickStep / 2
     }
 
-    private var drag: some Gesture {
+    private func drag(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 2)
             .onChanged { gesture in
                 if dragStartValue == nil {
@@ -79,10 +93,15 @@ struct RulerSlider: View {
                 var next = start - Double(gesture.translation.width / spacing) * tickStep
                 // A little stickiness at zero.
                 if abs(next) < tickStep * 0.4 { next = 0 }
-                value = min(max(next, range.lowerBound), range.upperBound)
+                let clamped = min(max(next, range.lowerBound), range.upperBound)
+                // Past an end, the ruler follows the finger less and less.
+                let overshoot = CGFloat((clamped - next) / tickStep) * spacing
+                stretch = Motion.rubberBand(overshoot, dimension: width)
+                value = clamped
             }
             .onEnded { _ in
                 dragStartValue = nil
+                withAnimation(.snapper(Motion.standard, reduceMotion: reduceMotion)) { stretch = 0 }
                 onEditingChanged(false)
             }
     }

@@ -2,19 +2,28 @@ import SwiftUI
 
 /// Edits one Library photo: Looks, Adjust and Crop tabs over the photo, with
 /// Share and Save at the bottom. Pushed from the Library.
+///
+/// Every change can be undone; Reset (by part or all at once) is undoable
+/// too, so it needs no confirmation.
 struct EditorView: View {
     @Bindable var model: EditorModel
     var onShowPaywall: () -> Void = {}
 
     @Environment(\.openURL) private var openURL
-    @State private var showResetConfirmation = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(spacing: 12) {
             canvas
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            TabSwitcher(selection: $model.tab)
-                .padding(.horizontal, 16)
+            Picker("Edit", selection: $model.tab) {
+                ForEach(EditorModel.Tab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
             panel
             actions
         }
@@ -22,31 +31,7 @@ struct EditorView: View {
         .padding(.bottom, 8)
         .background(Color.black.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 1) {
-                    Text(model.title)
-                        .font(.subheadline.weight(.semibold))
-                    Text(model.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Reset") { showResetConfirmation = true }
-                    .disabled(!model.isEdited)
-            }
-        }
-        .confirmationDialog("Reset all edits?", isPresented: $showResetConfirmation, titleVisibility: .visible) {
-            Button("Reset Edits", role: .destructive) {
-                withAnimation(.easeInOut(duration: 0.2)) { model.reset() }
-            }
-        } message: {
-            Text(model.isImported
-                 ? "The look, light and colour, and crop go back to how the photo was imported."
-                 : "The look, light and colour, and crop go back to how the photo was taken.")
-        }
+        .toolbar { toolbar }
         .sheet(item: $model.shareItem) { item in
             ShareSheet(items: [item.url])
                 .presentationDetents([.medium, .large])
@@ -71,8 +56,11 @@ struct EditorView: View {
             }
         }
         .sensoryFeedback(.success, trigger: model.savedCount)
+        .sensoryFeedback(.selection, trigger: model.tab)
         .onDisappear { model.finish() }
     }
+
+    private var animation: Animation? { .snapper(Motion.standard, reduceMotion: reduceMotion) }
 
     private var alertTitle: Text {
         switch model.alert {
@@ -84,6 +72,66 @@ struct EditorView: View {
 
     private var alertBinding: Binding<Bool> {
         Binding(get: { model.alert != nil }, set: { if !$0 { model.alert = nil } })
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            VStack(spacing: 1) {
+                Text(model.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(model.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .accessibilityElement(children: .combine)
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button {
+                withAnimation(animation) { model.undo() }
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+            }
+            .disabled(!model.canUndo)
+            .accessibilityLabel(Text("Undo"))
+
+            Button {
+                withAnimation(animation) { model.redo() }
+            } label: {
+                Image(systemName: "arrow.uturn.forward")
+            }
+            .disabled(!model.canRedo)
+            .accessibilityLabel(Text("Redo"))
+        }
+        if #available(iOS 26, *) {
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Button("Reset Look", systemImage: "camera.filters") {
+                    withAnimation(animation) { model.resetLook() }
+                }
+                .disabled(!model.isLookChanged)
+                Button("Reset Light & Color", systemImage: "slider.horizontal.3") {
+                    withAnimation(animation) { model.resetLight() }
+                }
+                .disabled(!model.isLightChanged)
+                Button("Reset Crop", systemImage: "crop") {
+                    withAnimation(animation) { model.resetCrop() }
+                }
+                .disabled(!model.isCropChanged)
+                Divider()
+                Button("Reset All Edits", systemImage: "arrow.counterclockwise", role: .destructive) {
+                    withAnimation(animation) { model.reset() }
+                }
+            } label: {
+                Text("Reset")
+            }
+            .disabled(!model.isEdited)
+        }
     }
 
     // MARK: - Canvas
@@ -100,35 +148,81 @@ struct EditorView: View {
                 ProgressView()
             }
         } else {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 if let image = model.displayImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        // On the photo only, so pressing the compare button doesn't also count.
+                        .contentShape(Rectangle())
+                        .onLongPressGesture(minimumDuration: 0.15, maximumDistance: 40, perform: {}, onPressingChanged: { pressing in
+                            model.isShowingOriginal = pressing
+                        })
+                        .overlay(alignment: .top) {
+                            if model.isShowingOriginal {
+                                Text("Original")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .glassSurface(in: Capsule(), tint: .black.opacity(0.4))
+                                    .padding(.top, 10)
+                                    .transition(.opacity)
+                            }
+                        }
+                        // Compare sits on the photo it compares.
+                        .overlay(alignment: .bottomTrailing) { compareButton }
                         .padding(.horizontal, 16)
                         .accessibilityLabel(Text("Photo in \(model.currentLook.name)"))
+                        .accessibilityHint(Text("Touch and hold to compare with the original."))
                 } else {
                     ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                if model.isShowingOriginal {
-                    VStack {
-                        Text("Original")
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .glassSurface(in: Capsule())
-                            .padding(.top, 10)
-                        Spacer()
+
+                if model.showsEditsKeptHint {
+                    Button {
+                        model.dismissEditsKeptHint()
+                    } label: {
+                        Label("Edits stay in Snapper. Save to add them to Photos.", systemImage: "info.circle")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .glassSurface(in: Capsule(), tint: .black.opacity(0.55))
                     }
+                    .buttonStyle(PressableButtonStyle())
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 12)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
+                    .accessibilityHint(Text("Dismisses this note"))
                 }
             }
-            .contentShape(Rectangle())
-            .onLongPressGesture(minimumDuration: 0.15, maximumDistance: 40, perform: {}, onPressingChanged: { pressing in
-                model.isShowingOriginal = pressing
-            })
-            .accessibilityHint(Text("Touch and hold to compare with the original."))
+            .animation(animation, value: model.showsEditsKeptHint)
+            .animation(.snapper(Motion.quick, reduceMotion: reduceMotion), value: model.isShowingOriginal)
         }
+    }
+
+    private var compareButton: some View {
+        Button {
+            model.isShowingOriginal.toggle()
+        } label: {
+            Image(systemName: "square.split.2x1")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(model.isShowingOriginal ? Color.black : Color.white)
+                .frame(width: 36, height: 36)
+                .background {
+                    if model.isShowingOriginal {
+                        Circle().fill(.white)
+                    }
+                }
+                .glassSurface(in: Circle(), tint: model.isShowingOriginal ? nil : .black.opacity(0.35))
+                .minimumTapTarget()
+        }
+        .buttonStyle(PressableButtonStyle())
+        .padding(6)
+        .accessibilityLabel(Text("Compare with original"))
+        .accessibilityValue(model.isShowingOriginal ? Text("Showing original") : Text("Showing edit"))
     }
 
     // MARK: - Panels
@@ -143,55 +237,115 @@ struct EditorView: View {
     }
 
     private var looksPanel: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
+            lookCaption
             LookBrowser(catalog: model.catalog,
                         selectedID: model.currentLook.id,
                         thumbnails: model.lookThumbnails,
                         lockedIDs: model.lockedLookIDs,
                         favoriteIDs: Set(model.settings.favoriteLookIDs),
                         activeCategory: $model.activeCategory,
-                        select: { model.select($0) },
+                        select: { look in withAnimation(animation) { model.select(look) } },
                         toggleFavorite: { model.toggleFavorite($0) })
 
             HStack(spacing: 12) {
                 Text("Strength")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Slider(value: $model.strength, in: 0...1)
                     .disabled(model.currentLook.isOriginal)
                 Text("\(Int((model.strength * 100).rounded()))")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .frame(width: 34, alignment: .trailing)
+                    .fixedSize()
+                    .frame(minWidth: 34, alignment: .trailing)
             }
             .padding(.horizontal, 16)
             .opacity(model.currentLook.isOriginal ? 0.4 : 1)
         }
     }
 
+    /// The current look's name in the camera's serif, with its collection and
+    /// a star to keep it in Favorites.
+    private var lookCaption: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if model.isLocked {
+                Image(systemName: "lock.fill")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Theme.accent)
+                    .accessibilityLabel(Text("Premium look"))
+            }
+            Text(model.currentLook.name)
+                .font(Theme.lookName(.title3))
+                .tracking(-0.2)
+                .layoutPriority(1)
+                .minimumScaleFactor(0.7)
+                .contentTransition(.opacity)
+            // The collection is the first thing to go when space runs out.
+            if let collection = model.collectionName, !dynamicTypeSize.isAccessibilitySize {
+                Text(collection)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            if !model.currentLook.isOriginal {
+                Button {
+                    model.toggleFavorite(model.currentLook)
+                } label: {
+                    Image(systemName: model.isCurrentLookFavorite ? "star.fill" : "star")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(model.isCurrentLookFavorite ? Theme.accent : .white)
+                        .contentTransition(.symbolEffect(.replace))
+                        .minimumTapTarget()
+                }
+                .buttonStyle(PressableButtonStyle())
+                .sensoryFeedback(.selection, trigger: model.isCurrentLookFavorite)
+                .accessibilityLabel(model.isCurrentLookFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
+            }
+        }
+        .lineLimit(1)
+        .frame(minHeight: 44)
+        .padding(.horizontal, 16)
+        .animation(animation, value: model.currentLook)
+    }
+
     private var adjustPanel: some View {
-        VStack(spacing: 14) {
+        let kind = model.adjustTool
+        let value = model.value(of: kind)
+        let isChanged = abs(value) > 0.004
+        return VStack(spacing: 10) {
             HStack(spacing: 4) {
-                ForEach(PhotoAdjustments.Kind.allCases) { kind in
-                    AdjustToolButton(kind: kind, isSelected: model.adjustTool == kind,
-                                     isChanged: abs(model.value(of: kind)) > 0.004) {
-                        model.adjustTool = kind
+                ForEach(PhotoAdjustments.Kind.allCases) { tool in
+                    AdjustToolButton(kind: tool, isSelected: model.adjustTool == tool,
+                                     isChanged: abs(model.value(of: tool)) > 0.004,
+                                     showsTitle: !dynamicTypeSize.isAccessibilitySize) {
+                        model.adjustTool = tool
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, 12)
+            .sensoryFeedback(.selection, trigger: model.adjustTool)
 
-            let kind = model.adjustTool
             VStack(spacing: 6) {
+                // Names the slider being moved; tap to put it back to zero.
                 Button {
-                    withAnimation(.easeOut(duration: 0.2)) { model.resetValue(of: kind) }
+                    withAnimation(animation) { model.resetValue(of: kind) }
                 } label: {
-                    Text(Self.formatAdjustment(model.value(of: kind)))
-                        .font(.subheadline.weight(.bold).monospacedDigit())
-                        .foregroundStyle(abs(model.value(of: kind)) > 0.004 ? Theme.accent : .white)
-                        .frame(minWidth: 60)
+                    HStack(spacing: 6) {
+                        Text(kind.title)
+                            .foregroundStyle(.secondary)
+                        Text(Self.formatAdjustment(value))
+                            .foregroundStyle(isChanged ? Theme.accent : .white)
+                            .monospacedDigit()
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumTapTarget()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
+                .disabled(!isChanged)
                 .accessibilityLabel(Text("Reset \(String(localized: kind.title))"))
 
                 RulerSlider(value: Binding(get: { model.value(of: kind) }, set: { model.setValue($0, for: kind) }),
@@ -202,39 +356,32 @@ struct EditorView: View {
                     .accessibilityLabel(Text(kind.title))
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 2)
     }
 
     private var cropPanel: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 6) {
-                ForEach(CropShape.allCases) { shape in
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.setShape(shape) }
-                    } label: {
-                        Text(shape.title)
-                            .font(.footnote.weight(model.recipe.crop.shape == shape ? .bold : .semibold))
+        VStack(spacing: 4) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    ForEach(model.cropShapes) { shape in
+                        shapeChip(shape)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 34)
-                            .foregroundStyle(model.recipe.crop.shape == shape ? Color.black : Color.white)
-                            .background {
-                                if model.recipe.crop.shape == shape {
-                                    Capsule().fill(Theme.accent)
-                                } else {
-                                    Capsule().fill(.white.opacity(0.13))
-                                        .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 1))
-                                }
-                            }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(model.recipe.crop.shape == shape ? .isSelected : [])
+                }
+                .padding(.horizontal, 16)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(model.cropShapes) { shape in
+                            shapeChip(shape)
+                        }
+                    }
+                    .padding(.horizontal, 16)
                 }
             }
-            .padding(.horizontal, 16)
 
             HStack(spacing: 10) {
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { model.rotate() }
+                    withAnimation(.snapper(Motion.turn, reduceMotion: reduceMotion)) { model.rotate() }
                 } label: {
                     Image(systemName: "rotate.right")
                 }
@@ -243,20 +390,22 @@ struct EditorView: View {
 
                 VStack(spacing: 5) {
                     Button {
-                        withAnimation(.easeOut(duration: 0.2)) { model.straighten = 0 }
+                        withAnimation(animation) { model.straighten = 0 }
                     } label: {
                         Text("\(Self.formatDegrees(model.straighten)) Straighten")
                             .font(.footnote.weight(.bold).monospacedDigit())
                             .foregroundStyle(abs(model.straighten) > 0.05 ? Theme.accent : .white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     RulerSlider(value: $model.straighten, range: PhotoCrop.straightenRange, tickStep: 1, spacing: 8)
                         .frame(height: 24)
                         .accessibilityLabel(Text("Straighten"))
                 }
 
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { model.flip() }
+                    withAnimation(animation) { model.flip() }
                 } label: {
                     Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
                 }
@@ -265,7 +414,26 @@ struct EditorView: View {
             }
             .padding(.horizontal, 16)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
+    }
+
+    private func shapeChip(_ shape: CropShape) -> some View {
+        let isSelected = model.selectedShape == shape
+        return Button {
+            withAnimation(animation) { model.setShape(shape) }
+        } label: {
+            Text(shape.title)
+                .font(.footnote.weight(isSelected ? .bold : .semibold))
+                .lineLimit(1)
+                // Never cut a label short: if they don't all fit, the row scrolls instead.
+                .fixedSize()
+                .frame(maxWidth: .infinity)
+                .chip(isSelected: isSelected, horizontalPadding: 10)
+                .minimumTapTarget()
+        }
+        .buttonStyle(PressableButtonStyle())
+        .sensoryFeedback(.selection, trigger: isSelected) { _, selected in selected }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Actions
@@ -276,18 +444,20 @@ struct EditorView: View {
                 Button {
                     model.share()
                 } label: {
-                    Label {
-                        Text("Share")
-                    } icon: {
-                        if model.isPreparingShare {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
+                    // The word goes when there's no room for it at large text sizes.
+                    ViewThatFits(in: .horizontal) {
+                        Label {
+                            Text("Share")
+                        } icon: {
+                            shareIcon
                         }
+                        .lineLimit(1)
+                        shareIcon
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle(isProminent: false))
                 .frame(width: 120)
+                .accessibilityLabel(Text("Share"))
 
                 Button {
                     model.save()
@@ -301,6 +471,8 @@ struct EditorView: View {
                             Image(systemName: "checkmark")
                         }
                         Text(model.saveTitle)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -317,10 +489,21 @@ struct EditorView: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: model.isSaved)
-        .animation(.easeInOut(duration: 0.2), value: model.isLocked)
+        .animation(animation, value: model.isSaved)
+        .animation(animation, value: model.isLocked)
+    }
+
+    @ViewBuilder
+    private var shareIcon: some View {
+        if model.isPreparingShare {
+            ProgressView()
+        } else {
+            Image(systemName: "square.and.arrow.up")
+        }
     }
 
     // MARK: - Formatting
@@ -342,46 +525,13 @@ struct EditorView: View {
     }
 }
 
-/// The Looks | Adjust | Crop switch.
-private struct TabSwitcher: View {
-    @Binding var selection: EditorModel.Tab
-    @Namespace private var namespace
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(EditorModel.Tab.allCases) { tab in
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { selection = tab }
-                } label: {
-                    Text(tab.title)
-                        .font(.subheadline.weight(selection == tab ? .bold : .semibold))
-                        .foregroundStyle(selection == tab ? Color.black : Color.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 34)
-                        .background {
-                            if selection == tab {
-                                Capsule().fill(Theme.accent)
-                                    .matchedGeometryEffect(id: "tab", in: namespace)
-                            }
-                        }
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selection == tab ? .isSelected : [])
-            }
-        }
-        .padding(3)
-        .glassSurface(in: Capsule())
-        .sensoryFeedback(.selection, trigger: selection)
-    }
-}
-
-/// One slider in the Adjust tab: a round icon and its name, with a dot when
-/// it has been moved.
+/// One slider in the Adjust tab: a round icon and its name, with a yellow
+/// dot when it has been moved.
 private struct AdjustToolButton: View {
     let kind: PhotoAdjustments.Kind
     let isSelected: Bool
     let isChanged: Bool
+    var showsTitle = true
     var action: () -> Void
 
     var body: some View {
@@ -393,14 +543,14 @@ private struct AdjustToolButton: View {
                     .frame(width: 44, height: 44)
                     .background {
                         if isSelected {
-                            Circle().fill(Theme.accent)
+                            Circle().fill(.white)
                         } else {
                             Circle().fill(.white.opacity(0.13))
                                 .overlay(Circle().strokeBorder(.white.opacity(0.16), lineWidth: 1))
                         }
                     }
                     .overlay(alignment: .topTrailing) {
-                        if isChanged && !isSelected {
+                        if isChanged {
                             Circle()
                                 .fill(Theme.accent)
                                 .frame(width: 9, height: 9)
@@ -408,14 +558,16 @@ private struct AdjustToolButton: View {
                                 .offset(x: 1, y: -1)
                         }
                     }
-                Text(kind.title)
-                    .font(.caption2.weight(isSelected ? .bold : .regular))
-                    .foregroundStyle(isSelected ? .white : .secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if showsTitle {
+                    Text(kind.title)
+                        .font(.caption2.weight(isSelected ? .bold : .regular))
+                        .foregroundStyle(isSelected ? .white : .secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(Text(kind.title))
         .accessibilityValue(isChanged ? Text("Changed") : Text(""))
         .accessibilityAddTraits(isSelected ? .isSelected : [])

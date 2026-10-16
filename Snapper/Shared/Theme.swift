@@ -11,6 +11,11 @@ enum Theme {
         .system(size: size, weight: .medium, design: .serif)
     }
 
+    /// A look name in the serif at a text style, so it follows Dynamic Type.
+    static func lookName(_ style: Font.TextStyle, weight: Font.Weight = .medium) -> Font {
+        .system(style, design: .serif, weight: weight)
+    }
+
     /// Signal yellow (the AccentColor asset). Fills carry black content; as a
     /// text or icon colour it needs a dark surface, which is why the app is
     /// dark-only.
@@ -83,5 +88,92 @@ struct PrimaryButtonStyle: ButtonStyle {
 
     private var background: Color {
         isEnabled && isProminent ? Theme.accent : Color(.systemGray5)
+    }
+}
+
+extension View {
+    /// The pill for filter, category and shape chips. Selected is solid
+    /// white; yellow is kept for primary actions so it always means "do it".
+    /// The pill grows with the text size (padding, not a fixed height).
+    func chip(isSelected: Bool, horizontalPadding: CGFloat = 12) -> some View {
+        self
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, 7)
+            .foregroundStyle(isSelected ? Color.black : Color.white)
+            .background {
+                if isSelected {
+                    Capsule().fill(.white)
+                } else {
+                    Capsule().fill(.white.opacity(0.13))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 1))
+                }
+            }
+    }
+
+    /// Pads a small control's tappable area out to Apple's 44 pt minimum
+    /// without changing how it looks.
+    func minimumTapTarget() -> some View {
+        frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+    }
+}
+
+extension Animation {
+    /// `animation`, or none when Reduce Motion is on (state still changes,
+    /// just without movement).
+    static func snapper(_ animation: Animation, reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : animation
+    }
+}
+
+/// Motion tokens, after Apple's spring guidance: critically damped (no
+/// overshoot) for UI changes; a little bounce only where a turn implies
+/// momentum.
+enum Motion {
+    /// Most UI: tabs, chips, panels, the crop box settling.
+    static let standard = Animation.smooth(duration: 0.35)
+    static let quick = Animation.smooth(duration: 0.2)
+    /// A quarter turn: Apple's rotation spring (damping 0.8, response 0.4).
+    static let turn = Animation.spring(response: 0.4, dampingFraction: 0.8)
+
+    /// How far a drag past an edge actually moves: the further past, the less
+    /// it follows, like stretching something real.
+    static func rubberBand(_ overshoot: CGFloat, dimension: CGFloat, constant: CGFloat = 0.55) -> CGFloat {
+        guard dimension > 0 else { return 0 }
+        return (overshoot * dimension * constant) / (dimension + constant * abs(overshoot))
+    }
+}
+
+/// Feedback the instant a finger lands: a slight press-in, released when
+/// the finger lifts or slides off.
+struct PressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .animation(Motion.quick, value: configuration.isPressed)
+    }
+}
+
+extension View {
+    /// Marks this view as where a zoom transition starts and ends (iOS 18+).
+    @ViewBuilder
+    func zoomSource(id: some Hashable, in namespace: Namespace.ID?) -> some View {
+        if #available(iOS 18, *), let namespace {
+            matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    /// Presents this view growing out of (and shrinking back into) its
+    /// source, which also lets it be swiped down to close (iOS 18+).
+    @ViewBuilder
+    func zoomTransition(from id: some Hashable, in namespace: Namespace.ID?) -> some View {
+        if #available(iOS 18, *), let namespace {
+            navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
+        }
     }
 }
