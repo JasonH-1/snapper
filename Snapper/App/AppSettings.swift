@@ -12,6 +12,14 @@ final class AppSettings {
         static let onboardingDone = "app.hasCompletedOnboarding"
         static let introPaywallShown = "app.hasSeenIntroPaywall"
         static let lastLookID = "camera.lastLookID"
+        static let showGrid = "camera.showGrid"
+        static let selfTimer = "camera.selfTimer"
+        static let showLevel = "camera.showLevel"
+        static let aspectRatio = "camera.aspectRatio"
+        static let mirrorFront = "camera.mirrorFrontCamera"
+        static let volumeShutter = "camera.volumeButtonShutter"
+        static let megapixels = "camera.photoMegapixels"
+        static let photoFormat = "photos.format"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -43,6 +51,51 @@ final class AppSettings {
         didSet { defaults.set(lastLookID, forKey: Key.lastLookID) }
     }
 
+    /// Rule-of-thirds lines over the camera preview.
+    var showGrid: Bool {
+        didSet { defaults.set(showGrid, forKey: Key.showGrid) }
+    }
+
+    /// Countdown before the shutter fires.
+    var selfTimer: SelfTimer {
+        didSet { defaults.set(selfTimer.rawValue, forKey: Key.selfTimer) }
+    }
+
+    /// A horizon line over the preview.
+    var showLevel: Bool {
+        didSet { defaults.set(showLevel, forKey: Key.showLevel) }
+    }
+
+    /// Photo shape for new shots.
+    var aspectRatio: AspectRatio {
+        didSet { defaults.set(aspectRatio.rawValue, forKey: Key.aspectRatio) }
+    }
+
+    /// Save selfies as seen in the preview (mirrored), like a mirror.
+    var mirrorFrontCamera: Bool {
+        didSet { defaults.set(mirrorFrontCamera, forKey: Key.mirrorFront) }
+    }
+
+    /// The volume buttons (and Camera Control) take the photo.
+    var volumeButtonShutter: Bool {
+        didSet { defaults.set(volumeButtonShutter, forKey: Key.volumeShutter) }
+    }
+
+    /// Photo Size, in megapixels.
+    var photoMegapixels: Int {
+        didSet { defaults.set(photoMegapixels, forKey: Key.megapixels) }
+    }
+
+    /// The file format photos are saved to the photo library in.
+    var photoFormat: PhotoRenderer.ExportFormat {
+        didSet { defaults.set(photoFormat.rawValue, forKey: Key.photoFormat) }
+    }
+
+    /// What the camera needs to know when the shutter is pressed.
+    var captureOptions: CaptureOptions {
+        CaptureOptions(timer: selfTimer, aspect: aspectRatio, mirrorFrontCamera: mirrorFrontCamera)
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         autoSaveToPhotos = defaults.object(forKey: Key.autoSave) as? Bool ?? true
@@ -51,6 +104,14 @@ final class AppSettings {
         hasCompletedOnboarding = defaults.bool(forKey: Key.onboardingDone)
         hasSeenIntroPaywall = defaults.bool(forKey: Key.introPaywallShown)
         lastLookID = defaults.string(forKey: Key.lastLookID)
+        showGrid = defaults.bool(forKey: Key.showGrid)
+        selfTimer = SelfTimer(rawValue: defaults.integer(forKey: Key.selfTimer)) ?? .off
+        showLevel = defaults.bool(forKey: Key.showLevel)
+        aspectRatio = defaults.string(forKey: Key.aspectRatio).flatMap(AspectRatio.init(rawValue:)) ?? .fourThree
+        mirrorFrontCamera = defaults.object(forKey: Key.mirrorFront) as? Bool ?? true
+        volumeButtonShutter = defaults.object(forKey: Key.volumeShutter) as? Bool ?? true
+        photoMegapixels = defaults.object(forKey: Key.megapixels) as? Int ?? 24
+        photoFormat = defaults.string(forKey: Key.photoFormat).flatMap(PhotoRenderer.ExportFormat.init(rawValue:)) ?? .heic
     }
 
     func isFavorite(_ look: Look) -> Bool {

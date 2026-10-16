@@ -17,7 +17,31 @@ enum Theme {
     static let accent = Color.accentColor
 }
 
-/// A round, translucent button used for camera controls.
+extension View {
+    /// Liquid Glass behind this view on iOS 26 and later; a frosted material
+    /// (or a solid tint) on earlier versions. `tint` colours the glass, for
+    /// selected controls.
+    @ViewBuilder
+    func glassSurface<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
+        if #available(iOS 26, *) {
+            self.glassEffect(Self.glass(tint: tint, interactive: interactive), in: shape)
+        } else if let tint {
+            self.background(tint, in: shape)
+        } else {
+            self.background(.ultraThinMaterial, in: shape)
+        }
+    }
+
+    @available(iOS 26, *)
+    private static func glass(tint: Color?, interactive: Bool) -> Glass {
+        var glass = Glass.regular
+        if let tint { glass = glass.tint(tint) }
+        if interactive { glass = glass.interactive() }
+        return glass
+    }
+}
+
+/// A round glass button used for camera controls.
 struct CameraIconButtonStyle: ButtonStyle {
     var size: CGFloat = Theme.controlSize
 
@@ -26,7 +50,7 @@ struct CameraIconButtonStyle: ButtonStyle {
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(.white.opacity(configuration.isPressed ? 0.22 : 0.12), in: Circle())
+            .glassSurface(in: Circle(), interactive: true)
             .scaleEffect(configuration.isPressed ? 0.92 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
             .contentShape(Circle())

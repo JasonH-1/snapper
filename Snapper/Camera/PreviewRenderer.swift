@@ -56,6 +56,7 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
     // Render-queue confined.
     private var demoTimer: DispatchSourceTimer?
     private var demoImage: CIImage?
+    private var demoAdjustments = DemoAdjustments()
 
     override init() {
         let device = MTLCreateSystemDefaultDevice()
@@ -136,11 +137,16 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
             timer.schedule(deadline: .now(), repeating: .milliseconds(33))
             timer.setEventHandler { [weak self] in
                 guard let self, let image = self.demoImage else { return }
-                self.render(image)
+                self.render(self.demoAdjustments.apply(to: image))
             }
             timer.resume()
             demoTimer = timer
         }
+    }
+
+    /// What the demo feed should look like under the current camera settings.
+    func setDemoAdjustments(_ adjustments: DemoAdjustments) {
+        renderQueue.async { [self] in demoAdjustments = adjustments }
     }
 
     func stopDemo() {
@@ -226,5 +232,40 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
             .concatenating(CGAffineTransform(scaleX: scale, y: scale))
             .concatenating(CGAffineTransform(translationX: (size.width - scaledWidth) / 2, y: (size.height - scaledHeight) / 2))
         return image.transformed(by: transform).cropped(to: CGRect(origin: .zero, size: size))
+    }
+}
+
+/// Stands in for camera settings on the Simulator's demo photo, so exposure,
+/// white balance and focus can be tried without a camera.
+struct DemoAdjustments: Sendable, Equatable {
+    /// Brightness change in stops (exposure compensation, or manual ISO and
+    /// shutter relative to what auto would pick).
+    var exposure: Float = 0
+    /// Colour temperature the "camera" is locked to (nil = auto).
+    var temperature: Float?
+    /// 0 = sharp, 1 = far out of focus.
+    var defocus: Float = 0
+
+    func apply(to image: CIImage) -> CIImage {
+        var output = image
+        if exposure != 0 {
+            output = output.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: exposure])
+        }
+        if let temperature {
+            // A camera set to a lower temperature than the light turns the
+            // picture blue (and a higher one orange); the demo scene is daylight.
+            output = output.applyingFilter("CITemperatureAndTint", parameters: [
+                "inputNeutral": CIVector(x: CGFloat(temperature), y: 0),
+                "inputTargetNeutral": CIVector(x: 5500, y: 0),
+            ])
+        }
+        if defocus > 0.01 {
+            let extent = image.extent
+            let radius = Double(defocus) * min(extent.width, extent.height) * 0.02
+            output = output.clampedToExtent()
+                .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius])
+                .cropped(to: extent)
+        }
+        return output
     }
 }

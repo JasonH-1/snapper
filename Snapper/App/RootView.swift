@@ -26,6 +26,7 @@ struct RootView: View {
     private var camera: some View {
         CameraView(
             model: app.camera,
+            settings: app.settings,
             hasPremium: app.hasPremium,
             lastCapture: app.captures.latestThumbnail,
             isProcessingCapture: app.captures.isProcessingCapture,

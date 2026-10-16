@@ -11,6 +11,9 @@ struct CaptureRecord: Codable, Identifiable, Hashable, Sendable {
     var lookID: String
     var strength: Double
     let isFrontCamera: Bool
+    /// The shape chosen when shooting (nil = the full 4:3 frame). Part of the
+    /// recipe: the stored original is never cropped.
+    var aspect: AspectRatio?
     /// The recipe last saved to Photos, if any (to show "Saved").
     var savedLookID: String?
     var savedStrength: Double?

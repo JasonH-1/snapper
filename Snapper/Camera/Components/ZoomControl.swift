@@ -22,7 +22,7 @@ struct ZoomControl: View {
                         .font(.system(size: isActive ? 13 : 11, weight: .semibold).monospacedDigit())
                         .foregroundStyle(isActive ? Theme.accent : .white)
                         .frame(width: isActive ? 38 : 30, height: isActive ? 38 : 30)
-                        .background(.black.opacity(0.45), in: Circle())
+                        .glassSurface(in: Circle(), interactive: true)
                         .rotationEffect(iconRotation)
                 }
                 .buttonStyle(.plain)
@@ -30,7 +30,7 @@ struct ZoomControl: View {
             }
         }
         .padding(4)
-        .background(.black.opacity(0.25), in: Capsule())
+        .glassSurface(in: Capsule())
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: activePreset)
     }
 

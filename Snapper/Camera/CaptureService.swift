@@ -34,6 +34,14 @@ actor CaptureService {
     /// Multiplier from the device's zoom factor to the factor shown to people.
     /// On devices with an ultra-wide lens the device's 1.0 is shown as 0.5×.
     private var displayZoomMultiplier: CGFloat = 1
+    /// Exposure compensation in stops, kept across camera switches.
+    private var exposureBias: Float = 0
+    /// While locked, focus and exposure stay put when the scene changes.
+    private var isFocusLocked = false
+    /// Manual ISO and shutter speed are set; taps then only move focus.
+    private var isManualExposure = false
+    /// A manual lens position is set; taps return focus to auto.
+    private var isManualFocus = false
 
     init(renderer: PreviewRenderer) {
         self.renderer = renderer
@@ -150,6 +158,13 @@ actor CaptureService {
                 device.automaticallyEnablesLowLightBoostWhenAvailable = true
             }
             device.isSubjectAreaChangeMonitoringEnabled = true
+            isFocusLocked = false
+            isManualExposure = false
+            isManualFocus = false
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+            device.setExposureTargetBias(Self.clamp(exposureBias, for: device), completionHandler: nil)
             // Start on the main (1×) lens of multi-lens cameras.
             let standard = 1 / displayZoomMultiplier
             device.videoZoomFactor = min(max(standard, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
@@ -203,6 +218,127 @@ actor CaptureService {
     /// Focuses and meters at a point in device coordinates (0…1, landscape
     /// sensor orientation), the convention AVFoundation uses.
     func focus(at devicePoint: CGPoint) {
+        isFocusLocked = false
+        meter(at: devicePoint)
+    }
+
+    /// Focuses and meters at a point, then holds both (AE/AF lock) until the
+    /// next tap, reset or camera switch, even if the scene changes.
+    func lockFocusAndExposure(at devicePoint: CGPoint) {
+        isFocusLocked = true
+        meter(at: devicePoint)
+        if let device = deviceInput?.device, (try? device.lockForConfiguration()) != nil {
+            device.isSubjectAreaChangeMonitoringEnabled = false
+            device.unlockForConfiguration()
+        }
+    }
+
+    /// Sets exposure compensation in stops. Returns the value applied after
+    /// clamping to what the device supports.
+    @discardableResult
+    func setExposureBias(_ bias: Float) -> Float {
+        exposureBias = bias
+        guard let device = deviceInput?.device else { return bias }
+        let clamped = Self.clamp(bias, for: device)
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            device.setExposureTargetBias(clamped, completionHandler: nil)
+        } catch {
+            Logger.camera.error("Exposure bias failed: \(error.localizedDescription, privacy: .public)")
+        }
+        return clamped
+    }
+
+    /// Locks white balance to a preset's colour temperature, or returns to auto.
+    func setWhiteBalance(_ preset: WhiteBalancePreset) {
+        guard let device = deviceInput?.device else { return }
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            guard let kelvin = preset.temperature, device.isWhiteBalanceModeSupported(.locked) else {
+                if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                    device.whiteBalanceMode = .continuousAutoWhiteBalance
+                }
+                return
+            }
+            let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
+            var gains = device.deviceWhiteBalanceGains(for: values)
+            let maxGain = device.maxWhiteBalanceGain
+            gains.redGain = min(max(gains.redGain, 1), maxGain)
+            gains.greenGain = min(max(gains.greenGain, 1), maxGain)
+            gains.blueGain = min(max(gains.blueGain, 1), maxGain)
+            device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+        } catch {
+            Logger.camera.error("White balance failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Holds the lens at `position` (0 = nearest, 1 = farthest), or returns
+    /// to continuous auto focus when `position` is nil.
+    func setLensPosition(_ position: Float?) {
+        guard let device = deviceInput?.device else { return }
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            if let position, device.isLockingFocusWithCustomLensPositionSupported {
+                isManualFocus = true
+                device.setFocusModeLocked(lensPosition: min(max(position, 0), 1), completionHandler: nil)
+            } else {
+                isManualFocus = false
+                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+            }
+        } catch {
+            Logger.camera.error("Lens position failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Sets ISO and shutter speed (seconds) by hand, clamped to the device's
+    /// range, or returns to auto exposure when `manual` is nil.
+    func setManualExposure(_ manual: (iso: Float, shutter: Double)?) {
+        guard let device = deviceInput?.device else { return }
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            if let manual, device.isExposureModeSupported(.custom) {
+                isManualExposure = true
+                let format = device.activeFormat
+                let iso = min(max(manual.iso, format.minISO), format.maxISO)
+                let shortest = format.minExposureDuration.seconds, longest = format.maxExposureDuration.seconds
+                let shutter = min(max(manual.shutter, shortest), longest)
+                device.setExposureModeCustom(duration: CMTime(seconds: shutter, preferredTimescale: 1_000_000),
+                                             iso: iso, completionHandler: nil)
+            } else {
+                isManualExposure = false
+                if device.isExposureModeSupported(.continuousAutoExposure) {
+                    device.exposureMode = .continuousAutoExposure
+                }
+                device.setExposureTargetBias(Self.clamp(exposureBias, for: device), completionHandler: nil)
+            }
+        } catch {
+            Logger.camera.error("Manual exposure failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// What auto exposure has chosen right now, as a starting point for manual.
+    func currentExposure() -> (iso: Float, shutter: Double)? {
+        guard let device = deviceInput?.device else { return nil }
+        return (device.iso, device.exposureDuration.seconds)
+    }
+
+    /// The Photo Size setting, in megapixels.
+    func setMaxMegapixels(_ megapixels: Int) {
+        photoCapture.maxMegapixels = megapixels
+        if let device = deviceInput?.device {
+            photoCapture.configure(for: device)
+        }
+    }
+
+    private static func clamp(_ bias: Float, for device: AVCaptureDevice) -> Float {
+        min(max(bias, device.minExposureTargetBias), device.maxExposureTargetBias)
+    }
+
+    private func meter(at devicePoint: CGPoint) {
         guard let device = deviceInput?.device else { return }
         do {
             try device.lockForConfiguration()
@@ -211,11 +347,12 @@ actor CaptureService {
                 device.focusPointOfInterest = devicePoint
                 device.focusMode = .autoFocus
             }
-            if device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.autoExpose) {
+            if !isManualExposure, device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.autoExpose) {
                 device.exposurePointOfInterest = devicePoint
                 device.exposureMode = .autoExpose
             }
-            device.isSubjectAreaChangeMonitoringEnabled = true
+            isManualFocus = false
+            device.isSubjectAreaChangeMonitoringEnabled = !isFocusLocked
         } catch {
             Logger.camera.error("Focus failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -223,6 +360,7 @@ actor CaptureService {
 
     /// Returns to continuous auto focus and exposure at the centre.
     func resetFocus() {
+        isFocusLocked = false
         guard let device = deviceInput?.device else { return }
         let center = CGPoint(x: 0.5, y: 0.5)
         do {
@@ -230,8 +368,12 @@ actor CaptureService {
             defer { device.unlockForConfiguration() }
             if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = center }
             if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
-            if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = center }
-            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            if !isManualExposure {
+                if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = center }
+                if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            }
+            isManualFocus = false
+            device.isSubjectAreaChangeMonitoringEnabled = true
         } catch {
             Logger.camera.error("Focus reset failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -263,13 +405,14 @@ actor CaptureService {
     /// Takes a full-resolution photo. The returned data is the camera's
     /// HEIF/JPEG file with orientation (and front-camera mirroring) recorded in
     /// its metadata, matching how the live preview is shown.
-    func capturePhoto(flash: FlashMode, onShutter: @escaping @Sendable () -> Void) async throws -> CapturedPhoto {
+    func capturePhoto(flash: FlashMode, mirrorFront: Bool = true,
+                      onShutter: @escaping @Sendable () -> Void) async throws -> CapturedPhoto {
         guard isConfigured, session.isRunning else { throw CameraError.notRunning }
         let isFront = position == .front
         var captureID: Int64 = 0
         defer { photoCapture.release(captureID) }
         let data: Data = try await withCheckedThrowingContinuation { continuation in
-            captureID = photoCapture.capture(flash: flash, mirrored: isFront, onShutter: onShutter) { result in
+            captureID = photoCapture.capture(flash: flash, mirrored: isFront && mirrorFront, onShutter: onShutter) { result in
                 continuation.resume(with: result)
             }
         }
@@ -288,6 +431,17 @@ actor CaptureService {
         caps.maxZoom = min(device.maxAvailableVideoZoomFactor * multiplier, Self.maxDisplayZoom(for: device))
         caps.zoom = device.videoZoomFactor * multiplier
         caps.zoomPresets = Self.zoomPresets(for: device, multiplier: multiplier, maxZoom: caps.maxZoom)
+        caps.minExposureBias = device.minExposureTargetBias
+        caps.maxExposureBias = device.maxExposureTargetBias
+        caps.supportsManualExposure = device.isExposureModeSupported(.custom)
+        caps.minISO = device.activeFormat.minISO
+        caps.maxISO = device.activeFormat.maxISO
+        caps.minShutter = device.activeFormat.minExposureDuration.seconds
+        // Long exposures blur hand-held shots; cap the slider at half a second.
+        caps.maxShutter = min(device.activeFormat.maxExposureDuration.seconds, 0.5)
+        caps.supportsManualFocus = device.isLockingFocusWithCustomLensPositionSupported
+        caps.supportsWhiteBalance = device.isWhiteBalanceModeSupported(.locked)
+        caps.photoMegapixels = PhotoCapture.megapixelOptions(for: device)
         return caps
     }
 
@@ -395,6 +549,7 @@ actor CaptureService {
     }
 
     private func handleSubjectAreaChange() {
+        guard !isFocusLocked, !isManualFocus else { return }
         resetFocus()
         eventContinuation.yield(.subjectAreaChanged)
     }

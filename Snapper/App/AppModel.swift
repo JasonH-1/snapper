@@ -105,7 +105,8 @@ final class AppModel {
                     warnAboutPhotosAccess()
                     return
                 }
-                try await captures.saveToPhotos(record, watermark: !hasPremium, includeOriginal: settings.alsoSaveOriginal)
+                try await captures.saveToPhotos(record, watermark: !hasPremium, includeOriginal: settings.alsoSaveOriginal,
+                                                format: settings.photoFormat)
             } catch PhotoLibrarySaver.SaveError.notAuthorized {
                 warnAboutPhotosAccess()
             } catch {
@@ -173,6 +174,7 @@ final class AppModel {
             startAt: id,
             hasPremium: { [weak self] in self?.hasPremium ?? false },
             alsoSaveOriginal: { [weak self] in self?.settings.alsoSaveOriginal ?? false },
+            saveFormat: { [weak self] in self?.settings.photoFormat ?? .heic },
             requestPremium: { [weak self] look, before, after in
                 self?.presentPaywall(.lockedLook(look, before: before, after: after))
             }

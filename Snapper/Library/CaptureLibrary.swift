@@ -72,7 +72,9 @@ final class CaptureLibrary {
         }.value
 
         let record = CaptureRecord(id: id, createdAt: Date(), fileName: fileName, lookID: look.id, strength: 1,
-                                   isFrontCamera: photo.isFrontCamera, savedLookID: nil, savedStrength: nil)
+                                   isFrontCamera: photo.isFrontCamera,
+                                   aspect: photo.aspect == .fourThree ? nil : photo.aspect,
+                                   savedLookID: nil, savedStrength: nil)
         records.insert(record, at: 0)
         await refreshThumbnail(for: record)
         persist()
@@ -120,12 +122,15 @@ final class CaptureLibrary {
         let url = store.url(for: record)
         let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
         return try await renderer.export(source: data, look: look(for: record), strength: Float(record.strength),
-                                         seed: record.id.effectsSeed, watermark: watermark, format: format)
+                                         seed: record.id.effectsSeed, aspect: record.aspect ?? .fourThree,
+                                         watermark: watermark, format: format)
     }
 
-    /// Saves a capture to the photo library with its current recipe.
-    func saveToPhotos(_ record: CaptureRecord, watermark: Bool, includeOriginal: Bool) async throws {
-        let rendered = try await export(record, watermark: watermark, format: .heic)
+    /// Saves a capture to the photo library with its current recipe, as HEIF
+    /// or JPEG (the Format setting).
+    func saveToPhotos(_ record: CaptureRecord, watermark: Bool, includeOriginal: Bool,
+                      format: PhotoRenderer.ExportFormat = .heic) async throws {
+        let rendered = try await export(record, watermark: watermark, format: format)
         var original: Data?
         if includeOriginal {
             let url = store.url(for: record)
@@ -155,7 +160,8 @@ final class CaptureLibrary {
 
     func refreshThumbnail(for record: CaptureRecord) async {
         let image = await renderer.thumbnail(sourceURL: store.url(for: record), look: look(for: record),
-                                             strength: Float(record.strength), seed: record.id.effectsSeed)
+                                             strength: Float(record.strength), seed: record.id.effectsSeed,
+                                             aspect: record.aspect ?? .fourThree)
         if let image {
             thumbnails[record.id] = image
         }

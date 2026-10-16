@@ -3,6 +3,8 @@ import SwiftUI
 /// The camera screen: live filtered preview, swipe to change looks, shutter.
 struct CameraView: View {
     @Bindable var model: CameraModel
+    /// Camera preferences: grid, level, timer, aspect ratio and more.
+    @Bindable var settings: AppSettings
     /// Whether the person has Snapper Premium (premium looks unlocked).
     var hasPremium: Bool
     var lastCapture: UIImage?
@@ -18,6 +20,19 @@ struct CameraView: View {
     @State private var bannerTask: Task<Void, Never>?
     @State private var zoomAtGestureStart: CGFloat?
     @State private var shutterBlink = false
+    @State private var showOptions = false
+    @State private var optionsTab: CameraOptionsPanel.Tab = .exposure
+    @State private var level = LevelObserver()
+
+    /// Any option changed from its default, to tint the options button.
+    private var optionsActive: Bool {
+        model.exposureBias != 0 || model.isFocusLocked || model.whiteBalance != .auto
+            || model.lensPosition != nil || model.manualExposure != nil
+            || settings.showGrid || settings.showLevel || settings.selfTimer != .off
+            || settings.aspectRatio != .fourThree
+    }
+
+    private var canShoot: Bool { model.status == .running || model.status == .noCamera }
 
     private var isLocked: Bool { model.currentLook.isPremium && !hasPremium }
 
@@ -65,28 +80,55 @@ struct CameraView: View {
         .sensoryFeedback(.selection, trigger: model.lookChangeCount)
         .sensoryFeedback(.impact(weight: .medium), trigger: model.shutterCount)
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: model.focusCount)
+        .sensoryFeedback(.impact(weight: .light), trigger: model.countdown)
+        .onChange(of: model.shutterCount) { _, _ in blinkShutter() }
+        .task(id: settings.photoMegapixels) { model.setPhotoMegapixels(settings.photoMegapixels) }
+        .task(id: settings.showLevel) {
+            if settings.showLevel { level.start() } else { level.stop() }
+        }
+        .volumeButtonShutter(enabled: settings.volumeButtonShutter && canShoot) {
+            model.shutterPressed(options: settings.captureOptions)
+        }
     }
 
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack {
-            if model.capabilities.hasFlash {
+        ZStack {
+            HStack(spacing: 10) {
+                if model.capabilities.hasFlash {
+                    Button {
+                        model.cycleFlash()
+                    } label: {
+                        Image(systemName: model.flashMode.symbolName)
+                            .foregroundStyle(model.flashMode == .off ? Color.white : Theme.accent)
+                            .contentTransition(.symbolEffect(.replace))
+                            .rotationEffect(orientation.iconRotation)
+                    }
+                    .buttonStyle(CameraIconButtonStyle(size: 40))
+                    .accessibilityLabel(Text(model.flashMode.accessibilityLabel))
+                }
+
                 Button {
-                    model.cycleFlash()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showOptions.toggle() }
                 } label: {
-                    Image(systemName: model.flashMode.symbolName)
-                        .foregroundStyle(model.flashMode == .off ? Color.white : Theme.accent)
+                    Image(systemName: showOptions ? "chevron.up" : "slider.horizontal.3")
+                        .foregroundStyle(optionsActive || showOptions ? Theme.accent : .white)
                         .contentTransition(.symbolEffect(.replace))
                         .rotationEffect(orientation.iconRotation)
                 }
                 .buttonStyle(CameraIconButtonStyle(size: 40))
-                .accessibilityLabel(Text(model.flashMode.accessibilityLabel))
-            } else {
-                Color.clear.frame(width: 40, height: 40)
-            }
+                .accessibilityLabel(showOptions ? Text("Hide camera options") : Text("Camera options"))
 
-            Spacer()
+                Spacer()
+
+                Button(action: onOpenSettings) {
+                    Image(systemName: "gearshape.fill")
+                        .rotationEffect(orientation.iconRotation)
+                }
+                .buttonStyle(CameraIconButtonStyle(size: 40))
+                .accessibilityLabel(Text("Settings"))
+            }
 
             if isLocked {
                 Button(action: onShowPaywall) {
@@ -103,15 +145,6 @@ struct CameraView: View {
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                 .accessibilityHint(Text("Shows Snapper Premium"))
             }
-
-            Spacer()
-
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape.fill")
-                    .rotationEffect(orientation.iconRotation)
-            }
-            .buttonStyle(CameraIconButtonStyle(size: 40))
-            .accessibilityLabel(Text("Settings"))
         }
         .padding(.horizontal, 16)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isLocked)
@@ -123,6 +156,19 @@ struct CameraView: View {
     private func preview(size: CGSize, bottomInset: CGFloat) -> some View {
         ZStack {
             CameraPreviewView(renderer: model.renderer)
+
+            AspectRatioMask(aspect: settings.aspectRatio)
+
+            if settings.showGrid {
+                let crop = settings.aspectRatio.crop(CGRect(origin: .zero, size: size))
+                CameraGrid()
+                    .frame(width: crop.width, height: crop.height)
+                    .position(x: crop.midX, y: crop.midY)
+            }
+
+            if settings.showLevel {
+                LevelIndicator(observer: level)
+            }
 
             if let point = model.focusPoint {
                 FocusReticle()
@@ -137,22 +183,51 @@ struct CameraView: View {
                     .allowsHitTesting(false)
             }
 
-            if model.status == .noCamera {
-                VStack {
+            VStack(spacing: 8) {
+                if model.status == .noCamera {
                     Text("Simulator — demo image")
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(.black.opacity(0.5), in: Capsule())
+                        .glassSurface(in: Capsule())
                         .foregroundStyle(.white.opacity(0.85))
-                        .padding(.top, 12)
-                    Spacer()
                 }
-                .allowsHitTesting(false)
+                if model.isFocusLocked {
+                    Text("AE/AF LOCK")
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .foregroundStyle(.black)
+                        .transition(.opacity)
+                }
+                Spacer()
+            }
+            .padding(.top, 12)
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.2), value: model.isFocusLocked)
+
+            if let countdown = model.countdown, countdown > 0 {
+                Text("\(countdown)")
+                    .font(.system(size: 96, weight: .thin).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.5), radius: 12)
+                    .contentTransition(.numericText(countsDown: true))
+                    .rotationEffect(orientation.iconRotation)
+                    .allowsHitTesting(false)
+                    .accessibilityLabel(Text("Taking photo in \(countdown) seconds"))
             }
 
-            VStack {
+            VStack(spacing: 12) {
                 Spacer()
+                if showOptions {
+                    CameraOptionsPanel(model: model, settings: settings, tab: $optionsTab,
+                                       iconRotation: orientation.iconRotation)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, model.capabilities.zoomPresets.count > 1 ? 0 : 14 + bottomInset)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 if model.capabilities.zoomPresets.count > 1 {
                     ZoomControl(presets: model.capabilities.zoomPresets,
                                 zoom: model.zoom,
@@ -241,11 +316,10 @@ struct CameraView: View {
             HStack {
                 thumbnail
                 Spacer()
-                ShutterButton(isBusy: model.isCapturing) {
-                    blinkShutter()
-                    model.capture()
+                ShutterButton(isBusy: model.isCapturing, isCountingDown: model.countdown != nil) {
+                    model.shutterPressed(options: settings.captureOptions)
                 }
-                .disabled(!(model.status == .running || model.status == .noCamera))
+                .disabled(!canShoot)
                 Spacer()
                 Button {
                     model.switchCamera()

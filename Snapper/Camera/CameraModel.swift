@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 import OSLog
 import SwiftUI
 
@@ -31,6 +32,30 @@ final class CameraModel {
     private(set) var shutterCount = 0
     private(set) var isCapturing = false
     var flashMode: FlashMode = .off
+    /// Exposure compensation in stops (the brightness slider).
+    private(set) var exposureBias: Float = 0
+    /// Focus and exposure held at the last point (AE/AF lock).
+    private(set) var isFocusLocked = false
+    /// Seconds left on the self-timer, while it runs.
+    private(set) var countdown: Int?
+    private(set) var whiteBalance: WhiteBalancePreset = .auto
+    /// Manual lens position (0 near … 1 far); nil = auto focus.
+    private(set) var lensPosition: Float?
+    /// Manual ISO and shutter speed; nil = auto exposure.
+    private(set) var manualExposure: ManualExposure?
+
+    struct ManualExposure: Equatable, Sendable {
+        var iso: Float
+        /// Seconds.
+        var shutter: Double
+    }
+
+    /// The slider's range: ±2 stops, within what the device supports.
+    var exposureRange: ClosedRange<Float> {
+        let lower = max(-2, capabilities.minExposureBias)
+        let upper = min(2, capabilities.maxExposureBias)
+        return lower <= upper ? lower...upper : 0...0
+    }
 
     var currentLook: Look { looks.indices.contains(lookIndex) ? looks[lookIndex] : .original }
     var collectionName: String? { library.collection(for: currentLook)?.name }
@@ -42,6 +67,13 @@ final class CameraModel {
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var zoomTask: Task<Void, Never>?
     @ObservationIgnored private var pendingZoom: (value: CGFloat, animated: Bool)?
+    @ObservationIgnored private var exposureTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingExposure: Float?
+    @ObservationIgnored private var countdownTask: Task<Void, Never>?
+    @ObservationIgnored private var manualExposureTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingManualExposure: ManualExposure?
+    /// The last metering point, in device coordinates (centre until a tap).
+    @ObservationIgnored private var meteringPoint = CGPoint(x: 0.5, y: 0.5)
     @ObservationIgnored private var swipeTarget: Int?
     @ObservationIgnored private var isPreviewVisible = true
     @ObservationIgnored private var isAppActive = true
@@ -117,8 +149,13 @@ final class CameraModel {
         if let url = DemoScene.url {
             renderer.startDemo(imageURL: url)
         }
-        capabilities = CameraCapabilities(position: .back, hasFlash: false, canSwitchCamera: false,
-                                          zoomPresets: [1], minZoom: 1, maxZoom: 1, zoom: 1)
+        var demo = CameraCapabilities(position: .back, hasFlash: false, canSwitchCamera: false,
+                                      zoomPresets: [1], minZoom: 1, maxZoom: 1, zoom: 1)
+        demo.supportsManualExposure = true
+        demo.supportsManualFocus = true
+        demo.supportsWhiteBalance = true
+        demo.photoMegapixels = [12, 24, 48]
+        capabilities = demo
     }
 
     /// Pause the camera while another full-screen view covers it.
@@ -166,6 +203,12 @@ final class CameraModel {
             capabilities = caps
             zoom = caps.zoom
             if !caps.hasFlash { flashMode = .off }
+            // A new device starts automatic; the bias carries over, clamped.
+            isFocusLocked = false
+            whiteBalance = .auto
+            lensPosition = nil
+            manualExposure = nil
+            exposureBias = min(max(exposureBias, exposureRange.lowerBound), exposureRange.upperBound)
         case .running(let running):
             if running {
                 status = .running
@@ -183,7 +226,7 @@ final class CameraModel {
         case .captureOrientation:
             break
         case .subjectAreaChanged:
-            focusPoint = nil
+            if !isFocusLocked { focusPoint = nil }
         }
     }
 
@@ -275,17 +318,61 @@ final class CameraModel {
         }
     }
 
-    /// Focus and exposure at a tap. `point` is in the preview's coordinates.
+    /// Focus and exposure at a tap (and release an AE/AF lock). `point` is in
+    /// the preview's coordinates.
     func focus(at point: CGPoint, in size: CGSize) {
-        guard status == .running, size.width > 0, size.height > 0 else { return }
+        guard status == .running || status == .noCamera, size.width > 0, size.height > 0 else { return }
         let x = min(max(point.x / size.width, 0), 1)
         let y = min(max(point.y / size.height, 0), 1)
         // Preview frames are rotated to portrait (and mirrored for the front
         // camera); device points of interest use the unrotated sensor frame.
         let devicePoint = capabilities.position == .front ? CGPoint(x: y, y: x) : CGPoint(x: y, y: 1 - x)
+        meteringPoint = devicePoint
         focusPoint = point
         focusCount += 1
+        isFocusLocked = false
+        if lensPosition != nil {
+            lensPosition = nil
+            updateDemo()
+        }
+        guard status == .running else { return }
         Task { await captureService.focus(at: devicePoint) }
+    }
+
+    /// Locks focus and exposure at the last tapped point (or the centre), or
+    /// releases the lock.
+    func toggleFocusLock() {
+        guard status == .running || status == .noCamera else { return }
+        isFocusLocked.toggle()
+        focusCount += 1
+        guard status == .running else { return }
+        let point = meteringPoint
+        if isFocusLocked {
+            Task { await captureService.lockFocusAndExposure(at: point) }
+        } else {
+            focusPoint = nil
+            Task { await captureService.resetFocus() }
+        }
+    }
+
+    /// Exposure compensation in stops, clamped to `exposureRange`.
+    func setExposureBias(_ stops: Float) {
+        let clamped = min(max(stops, exposureRange.lowerBound), exposureRange.upperBound)
+        guard clamped != exposureBias else { return }
+        exposureBias = clamped
+        if status == .noCamera {
+            updateDemo()
+            return
+        }
+        pendingExposure = clamped
+        guard exposureTask == nil else { return }
+        exposureTask = Task {
+            while let next = pendingExposure {
+                pendingExposure = nil
+                await captureService.setExposureBias(next)
+            }
+            exposureTask = nil
+        }
     }
 
     func setZoom(_ value: CGFloat, animated: Bool = false) {
@@ -302,14 +389,150 @@ final class CameraModel {
         }
     }
 
+    func setWhiteBalance(_ preset: WhiteBalancePreset) {
+        guard preset != whiteBalance else { return }
+        whiteBalance = preset
+        if status == .noCamera { return updateDemo() }
+        Task { await captureService.setWhiteBalance(preset) }
+    }
+
+    /// Switches between auto focus and a manual lens position.
+    func setManualFocus(_ manual: Bool) {
+        guard manual != (lensPosition != nil) else { return }
+        if manual {
+            focusPoint = nil
+            isFocusLocked = false
+            setLensPosition(1)
+        } else {
+            lensPosition = nil
+            if status == .noCamera { return updateDemo() }
+            Task { await captureService.setLensPosition(nil) }
+        }
+    }
+
+    /// Lens position, 0 (nearest) … 1 (farthest).
+    func setLensPosition(_ position: Float) {
+        let clamped = min(max(position, 0), 1)
+        lensPosition = clamped
+        if status == .noCamera { return updateDemo() }
+        Task { await captureService.setLensPosition(clamped) }
+    }
+
+    /// Switches between auto exposure and manual ISO and shutter speed,
+    /// starting from whatever auto exposure had chosen.
+    func setManualExposure(_ manual: Bool) {
+        guard manual != (manualExposure != nil) else { return }
+        guard manual else {
+            manualExposure = nil
+            if status == .noCamera { return updateDemo() }
+            Task { await captureService.setManualExposure(nil) }
+            return
+        }
+        isFocusLocked = false
+        if status == .noCamera {
+            manualExposure = Self.demoAutoExposure
+            return updateDemo()
+        }
+        Task {
+            let current = await captureService.currentExposure()
+            let start = current.map { ManualExposure(iso: $0.iso, shutter: $0.shutter) } ?? Self.demoAutoExposure
+            applyManualExposure(start)
+        }
+    }
+
+    func setISO(_ iso: Float) {
+        guard var manual = manualExposure else { return }
+        manual.iso = min(max(iso, capabilities.minISO), capabilities.maxISO)
+        applyManualExposure(manual)
+    }
+
+    func setShutter(_ seconds: Double) {
+        guard var manual = manualExposure else { return }
+        manual.shutter = min(max(seconds, capabilities.minShutter), capabilities.maxShutter)
+        applyManualExposure(manual)
+    }
+
+    private func applyManualExposure(_ manual: ManualExposure) {
+        manualExposure = manual
+        if status == .noCamera { return updateDemo() }
+        pendingManualExposure = manual
+        guard manualExposureTask == nil else { return }
+        manualExposureTask = Task {
+            while let next = pendingManualExposure {
+                pendingManualExposure = nil
+                await captureService.setManualExposure((next.iso, next.shutter))
+            }
+            manualExposureTask = nil
+        }
+    }
+
+    /// The Photo Size setting.
+    func setPhotoMegapixels(_ megapixels: Int) {
+        Task { await captureService.setMaxMegapixels(megapixels) }
+    }
+
+    // MARK: - Simulator stand-in
+
+    /// What auto exposure "picks" for the demo scene.
+    private static let demoAutoExposure = ManualExposure(iso: 200, shutter: 1.0 / 60)
+
+    /// The demo feed's look under the current settings.
+    private var demoAdjustments: DemoAdjustments {
+        var adjustments = DemoAdjustments()
+        if let manual = manualExposure {
+            let auto = Self.demoAutoExposure
+            adjustments.exposure = Float(log2(Double(manual.iso / auto.iso)) + log2(manual.shutter / auto.shutter))
+        } else {
+            adjustments.exposure = exposureBias
+        }
+        adjustments.temperature = whiteBalance.temperature
+        // The demo scene is far away: sharp at the far end of the lens.
+        adjustments.defocus = lensPosition.map { max(0, 0.9 - $0) / 0.9 } ?? 0
+        return adjustments
+    }
+
+    private func updateDemo() {
+        renderer.setDemoAdjustments(demoAdjustments)
+    }
+
     // MARK: - Capture
 
-    func capture() {
+    /// The shutter button: shoots now, starts the self-timer, or cancels a
+    /// running countdown.
+    func shutterPressed(options: CaptureOptions) {
+        if countdown != nil {
+            cancelCountdown()
+            return
+        }
+        guard options.timer != .off, status == .running || status == .noCamera else {
+            capture(options: options)
+            return
+        }
+        countdown = options.timer.rawValue
+        countdownTask = Task {
+            while let left = countdown, left > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                countdown = left - 1
+            }
+            countdown = nil
+            countdownTask = nil
+            capture(options: options)
+        }
+    }
+
+    func cancelCountdown() {
+        countdownTask?.cancel()
+        countdownTask = nil
+        countdown = nil
+    }
+
+    func capture(options: CaptureOptions = CaptureOptions()) {
         guard !isCapturing else { return }
         let look = currentLook
         shutterCount += 1
         if status == .noCamera {
-            captureDemoPhoto(look: look, id: advanceFrame())
+            captureDemoPhoto(look: look, id: advanceFrame(), aspect: options.aspect)
             return
         }
         guard status == .running else { return }
@@ -319,8 +542,10 @@ final class CameraModel {
         Task {
             defer { isCapturing = false }
             do {
-                var photo = try await captureService.capturePhoto(flash: flash, onShutter: {})
+                var photo = try await captureService.capturePhoto(flash: flash, mirrorFront: options.mirrorFrontCamera,
+                                                                  onShutter: {})
                 photo.id = frameID
+                photo.aspect = options.aspect
                 onCapture?(photo, look)
             } catch {
                 Logger.camera.error("Capture failed: \(error.localizedDescription, privacy: .public)")
@@ -335,9 +560,16 @@ final class CameraModel {
 
     /// In the Simulator the shutter "captures" the demo image so the rest of
     /// the app (review, saving, paywall) can be exercised without a camera.
-    private func captureDemoPhoto(look: Look, id: UUID) {
-        guard let url = DemoScene.url, let data = try? Data(contentsOf: url) else { return }
-        onCapture?(CapturedPhoto(data: data, isFrontCamera: false, id: id), look)
+    private func captureDemoPhoto(look: Look, id: UUID, aspect: AspectRatio) {
+        guard let url = DemoScene.url, var data = try? Data(contentsOf: url) else { return }
+        // Bake the simulated settings in, as the camera would have.
+        let adjustments = demoAdjustments
+        if adjustments != DemoAdjustments(), let image = CIImage(data: data, options: [.applyOrientationProperty: true]),
+           let sRGB = CGColorSpace(name: CGColorSpace.sRGB),
+           let adjusted = CIContext().jpegRepresentation(of: adjustments.apply(to: image), colorSpace: sRGB, options: [:]) {
+            data = adjusted
+        }
+        onCapture?(CapturedPhoto(data: data, isFrontCamera: false, aspect: aspect, id: id), look)
     }
 
     /// Returns the frame the preview is showing and moves on to a fresh one.

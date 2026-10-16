@@ -23,6 +23,7 @@ struct SettingsView: View {
             List {
                 premiumSection
                 photosSection
+                cameraSection
                 looksSection
                 supportSection
                 aboutSection
@@ -111,6 +112,32 @@ struct SettingsView: View {
         } footer: {
             Text("New shots are always kept in Snapper so you can change the look later. Saving the original adds an unfiltered copy to your library too.")
         }
+    }
+
+    private var cameraSection: some View {
+        Section {
+            Picker("Photo Size", selection: Bindable(app.settings).photoMegapixels) {
+                ForEach(megapixelOptions, id: \.self) { megapixels in
+                    Text("\(megapixels) MP").tag(megapixels)
+                }
+            }
+            Picker("Format", selection: Bindable(app.settings).photoFormat) {
+                Text("HEIF").tag(PhotoRenderer.ExportFormat.heic)
+                Text("JPEG").tag(PhotoRenderer.ExportFormat.jpeg)
+            }
+            Toggle("Mirror Front Camera", isOn: Bindable(app.settings).mirrorFrontCamera)
+            Toggle("Volume Buttons Take Photos", isOn: Bindable(app.settings).volumeButtonShutter)
+        } header: {
+            Text("Camera")
+        } footer: {
+            Text("HEIF files are about half the size; JPEG opens everywhere. Shared photos are always JPEG. Mirror Front Camera saves selfies the way the preview shows them. The volume buttons need iOS 18 or later and also work with Camera Control.")
+        }
+    }
+
+    /// The sizes this camera offers, plus the current choice so the picker
+    /// always has a selection.
+    private var megapixelOptions: [Int] {
+        Array(Set(app.camera.capabilities.photoMegapixels + [app.settings.photoMegapixels])).sorted()
     }
 
     private var looksSection: some View {

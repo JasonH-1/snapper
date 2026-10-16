@@ -51,6 +51,7 @@ final class ReviewModel: Identifiable {
     @ObservationIgnored private let hasPremium: () -> Bool
     @ObservationIgnored private let requestPremium: (Look, UIImage?, UIImage?) -> Void
     @ObservationIgnored private let alsoSaveOriginal: () -> Bool
+    @ObservationIgnored private let saveFormat: () -> PhotoRenderer.ExportFormat
     @ObservationIgnored private var thumbnailsForID: UUID?
     @ObservationIgnored private var pendingRender: (id: UUID, look: Look, strength: Float)?
     @ObservationIgnored private var renderTask: Task<Void, Never>?
@@ -60,11 +61,13 @@ final class ReviewModel: Identifiable {
          startAt id: UUID?,
          hasPremium: @escaping () -> Bool,
          alsoSaveOriginal: @escaping () -> Bool,
+         saveFormat: @escaping () -> PhotoRenderer.ExportFormat = { .heic },
          requestPremium: @escaping (Look, UIImage?, UIImage?) -> Void) {
         self.library = library
         self.looks = looks
         self.hasPremium = hasPremium
         self.alsoSaveOriginal = alsoSaveOriginal
+        self.saveFormat = saveFormat
         self.requestPremium = requestPremium
         self.currentID = id ?? library.latest?.id
         loadCurrent()
@@ -121,7 +124,7 @@ final class ReviewModel: Identifiable {
         let renderer = library.renderer
         if originals[record.id] == nil {
             Task {
-                if let original = await renderer.original(id: record.id, sourceURL: url) {
+                if let original = await renderer.original(id: record.id, sourceURL: url, aspect: record.aspect ?? .fourThree) {
                     originals[record.id] = original
                 }
             }
@@ -147,7 +150,8 @@ final class ReviewModel: Identifiable {
                 pendingRender = nil
                 guard let record = library.record(id: next.id) else { continue }
                 let image = await library.renderer.preview(id: next.id, sourceURL: library.url(for: record),
-                                                           look: next.look, strength: next.strength)
+                                                           look: next.look, strength: next.strength,
+                                                           aspect: record.aspect ?? .fourThree)
                 if let image {
                     previews[next.id] = image
                 }
@@ -172,7 +176,8 @@ final class ReviewModel: Identifiable {
         Task {
             defer { isSaving = false }
             do {
-                try await library.saveToPhotos(record, watermark: watermark, includeOriginal: includeOriginal)
+                try await library.saveToPhotos(record, watermark: watermark, includeOriginal: includeOriginal,
+                                               format: saveFormat())
                 savedCount += 1
             } catch PhotoLibrarySaver.SaveError.notAuthorized {
                 alert = .photosAccessDenied

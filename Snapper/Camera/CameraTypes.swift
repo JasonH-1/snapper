@@ -37,6 +37,108 @@ enum FlashMode: String, CaseIterable, Sendable {
     }
 }
 
+/// The self-timer: off, or a countdown before the shot.
+enum SelfTimer: Int, CaseIterable, Sendable {
+    case off = 0
+    case three = 3
+    case ten = 10
+
+    var next: SelfTimer {
+        switch self {
+        case .off: .three
+        case .three: .ten
+        case .ten: .off
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .off: String(localized: "Off")
+        case .three: String(localized: "3s")
+        case .ten: String(localized: "10s")
+        }
+    }
+}
+
+/// White balance presets. Auto lets the camera decide; the others lock the
+/// camera to a colour temperature.
+enum WhiteBalancePreset: String, CaseIterable, Sendable {
+    case auto, daylight, cloudy, tungsten, fluorescent
+
+    /// Kelvin the camera locks to (nil = auto).
+    var temperature: Float? {
+        switch self {
+        case .auto: nil
+        case .daylight: 5500
+        case .cloudy: 6500
+        case .tungsten: 3200
+        case .fluorescent: 4000
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .auto: String(localized: "Auto")
+        case .daylight: String(localized: "Daylight")
+        case .cloudy: String(localized: "Cloudy")
+        case .tungsten: String(localized: "Tungsten")
+        case .fluorescent: String(localized: "Fluorescent")
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .auto: "a.circle"
+        case .daylight: "sun.max"
+        case .cloudy: "cloud"
+        case .tungsten: "lightbulb"
+        case .fluorescent: "light.panel"
+        }
+    }
+}
+
+/// Photo shape. 4:3 is the sensor's own; the others crop it.
+enum AspectRatio: String, CaseIterable, Codable, Sendable {
+    case fourThree = "4:3"
+    case square = "1:1"
+    case sixteenNine = "16:9"
+
+    /// Long side over short side.
+    var longOverShort: CGFloat {
+        switch self {
+        case .fourThree: 4.0 / 3.0
+        case .square: 1
+        case .sixteenNine: 16.0 / 9.0
+        }
+    }
+
+    /// The centred crop of `rect` with this shape, along whichever side is
+    /// longer, so it works for portrait and landscape photos alike.
+    func crop(_ rect: CGRect) -> CGRect {
+        guard self != .fourThree, rect.width > 0, rect.height > 0 else { return rect }
+        let long = max(rect.width, rect.height), short = min(rect.width, rect.height)
+        var size = rect.size
+        if long / short < longOverShort {
+            // Too square: trim the short side.
+            let newShort = (long / longOverShort).rounded()
+            if rect.width < rect.height { size.width = newShort } else { size.height = newShort }
+        } else {
+            let newLong = (short * longOverShort).rounded()
+            if rect.width >= rect.height { size.width = newLong } else { size.height = newLong }
+        }
+        return CGRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2,
+                      width: size.width, height: size.height).integral
+    }
+}
+
+/// Everything about a shot decided when the shutter is pressed.
+struct CaptureOptions: Sendable, Equatable {
+    var timer: SelfTimer = .off
+    var aspect: AspectRatio = .fourThree
+    /// Save front-camera photos as seen in the preview (mirrored).
+    var mirrorFrontCamera = true
+}
+
 enum CameraPosition: Sendable {
     case back, front
 
@@ -71,6 +173,19 @@ struct CameraCapabilities: Sendable, Equatable {
     var minZoom: CGFloat = 1
     var maxZoom: CGFloat = 1
     var zoom: CGFloat = 1
+    /// Exposure compensation the device supports, in stops (EV).
+    var minExposureBias: Float = -2
+    var maxExposureBias: Float = 2
+    /// Manual exposure limits (ISO, and shutter speed in seconds).
+    var supportsManualExposure = false
+    var minISO: Float = 25
+    var maxISO: Float = 3200
+    var minShutter: Double = 1.0 / 8000
+    var maxShutter: Double = 0.5
+    var supportsManualFocus = false
+    var supportsWhiteBalance = false
+    /// Photo sizes the camera can take, in megapixels (e.g. 12, 24, 48).
+    var photoMegapixels: [Int] = [12]
 }
 
 /// Events the capture service reports back to the camera model.

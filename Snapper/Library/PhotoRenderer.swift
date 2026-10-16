@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 /// Everything goes through `LookPipeline`, the same code the live preview
 /// uses, so what you saw is what you get. Runs off the main actor.
 actor PhotoRenderer {
-    enum ExportFormat: Sendable {
+    enum ExportFormat: String, CaseIterable, Sendable {
         case heic
         case jpeg
 
@@ -48,11 +48,13 @@ actor PhotoRenderer {
                 look: Look,
                 strength: Float,
                 seed: UInt64 = 0,
+                aspect: AspectRatio = .fourThree,
                 watermark: Bool,
                 format: ExportFormat) throws -> Data {
-        guard let original = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
+        guard let uncropped = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
             throw RenderError.unreadableImage
         }
+        let original = Self.cropped(uncropped, to: aspect)
         var image = render(look, strength: strength, seed: seed, to: original)
         if watermark {
             image = Watermark.apply(to: image)
@@ -90,15 +92,16 @@ actor PhotoRenderer {
     // MARK: - Previews
 
     /// A screen-sized render for the review screen.
-    func preview(id: UUID, sourceURL: URL, look: Look, strength: Float, maxPixelSize: Int = 1800) -> UIImage? {
+    func preview(id: UUID, sourceURL: URL, look: Look, strength: Float, aspect: AspectRatio = .fourThree,
+                 maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(render(look, strength: strength, seed: id.effectsSeed, to: proxy))
+        return makeUIImage(render(look, strength: strength, seed: id.effectsSeed, to: Self.cropped(proxy, to: aspect)))
     }
 
     /// The unfiltered original at preview size (for press-and-hold compare).
-    func original(id: UUID, sourceURL: URL, maxPixelSize: Int = 1800) -> UIImage? {
+    func original(id: UUID, sourceURL: URL, aspect: AspectRatio = .fourThree, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(proxy)
+        return makeUIImage(Self.cropped(proxy, to: aspect))
     }
 
     /// Small renders of one photo in many looks, for the look strip.
@@ -112,9 +115,18 @@ actor PhotoRenderer {
     }
 
     /// One small render (camera thumbnail, roll strip).
-    func thumbnail(sourceURL: URL, look: Look, strength: Float, seed: UInt64 = 0, maxPixelSize: Int = 240) -> UIImage? {
+    func thumbnail(sourceURL: URL, look: Look, strength: Float, seed: UInt64 = 0, aspect: AspectRatio = .fourThree,
+                   maxPixelSize: Int = 240) -> UIImage? {
         guard let small = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(render(look, strength: strength, seed: seed, to: small))
+        return makeUIImage(render(look, strength: strength, seed: seed, to: Self.cropped(small, to: aspect)))
+    }
+
+    /// `image` cropped to `aspect` around its centre, moved back to the origin
+    /// so effects that measure the frame see a plain rectangle.
+    static func cropped(_ image: CIImage, to aspect: AspectRatio) -> CIImage {
+        guard aspect != .fourThree else { return image }
+        let rect = aspect.crop(image.extent)
+        return image.cropped(to: rect).transformed(by: CGAffineTransform(translationX: -rect.minX, y: -rect.minY))
     }
 
     /// Renders a bundled showcase image (onboarding, paywall) in a look.

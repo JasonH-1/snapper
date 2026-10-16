@@ -6,6 +6,9 @@ struct CapturedPhoto: Sendable {
     /// HEIF (or JPEG) file data with orientation in its metadata.
     let data: Data
     let isFrontCamera: Bool
+    /// The shape to crop to; kept as part of the recipe, so the file itself
+    /// stays the full 4:3 frame.
+    var aspect: AspectRatio = .fourThree
     /// Becomes the capture's id. The camera sets it to the frame the live
     /// preview showed, whose seed placed the look's grain and leaks.
     var id = UUID()
@@ -15,10 +18,9 @@ struct CapturedPhoto: Sendable {
 /// is confined to the capture actor.
 final class PhotoCapture {
     /// Photos are captured at the largest size the active format offers up to
-    /// this many megapixels. 24 MP matches the system camera's default on
-    /// 48 MP sensors; raise it to 48 for maximum resolution at the cost of
-    /// slower captures and larger files.
-    static let maxMegapixels: Double = 24.5
+    /// this many megapixels (the Photo Size setting). 24 MP matches the
+    /// system camera's default on 48 MP sensors.
+    var maxMegapixels: Int = 24
 
     let output = AVCapturePhotoOutput()
     var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
@@ -37,7 +39,7 @@ final class PhotoCapture {
 
     /// Picks the photo size and the fast-capture options for `device`.
     func configure(for device: AVCaptureDevice) {
-        let limit = Self.maxMegapixels * 1_000_000
+        let limit = (Double(maxMegapixels) + 0.5) * 1_000_000
         let sizes = device.activeFormat.supportedMaxPhotoDimensions
         let area = { (d: CMVideoDimensions) in Double(d.width) * Double(d.height) }
         let withinLimit = sizes.filter { area($0) <= limit }
@@ -53,6 +55,14 @@ final class PhotoCapture {
         if output.isFastCapturePrioritizationSupported, !output.isFastCapturePrioritizationEnabled {
             output.isFastCapturePrioritizationEnabled = true
         }
+    }
+
+    /// The photo sizes `device` offers, rounded to whole megapixels.
+    static func megapixelOptions(for device: AVCaptureDevice) -> [Int] {
+        let options = device.activeFormat.supportedMaxPhotoDimensions.map {
+            Int((Double($0.width) * Double($0.height) / 1_000_000).rounded())
+        }
+        return Array(Set(options)).sorted()
     }
 
     /// Starts a capture and returns its id; call `release(_:)` with it once the
