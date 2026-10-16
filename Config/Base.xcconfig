@@ -1,0 +1,14 @@
+// Shared build settings for every configuration.
+//
+// To run on your own iPhone, either edit the two values below or (better, so
+// they stay out of git) create Config/Local.xcconfig with your own values:
+//
+//     APP_BUNDLE_ID = com.yourname.snapper
+//     DEVELOPMENT_TEAM = ABCDE12345
+//
+// Local.xcconfig is git-ignored and overrides anything set here.
+
+APP_BUNDLE_ID = com.example.snapper
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

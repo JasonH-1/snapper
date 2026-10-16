@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  luts:
+    name: LUTs match looks.toml and pass quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r tools/lutgen/requirements.txt
+      - name: Verify LUTs
+        run: python3 tools/lutgen/lutgen.py verify
+
+  ios:
+    name: Build & test (iOS Simulator)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode
+        run: scripts/select-xcode.sh
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Pick simulator
+        id: sim
+        run: echo "udid=$(scripts/simulator-id.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          scripts/xcb.sh build/xcodebuild.log build-for-testing \
+            -project Snapper.xcodeproj \
+            -scheme Snapper \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Fail on warnings
+        run: scripts/check-warnings.sh build/xcodebuild.log
+
+      - name: Unit tests
+        env:
+          # StoreKit's test daemon can't be configured on hosted runners
+          # (SKTestSession fails with SKInternalErrorDomain 3), so the StoreKit
+          # integration tests skip here and run when you test from Xcode.
+          TEST_RUNNER_SNAPPER_SKIP_STOREKIT_INTEGRATION: "1"
+        run: |
+          scripts/xcb.sh build/test.log test-without-building \
+            -project Snapper.xcodeproj \
+            -scheme Snapper \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath build/DerivedData \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: xcodebuild-logs
+          path: |
+            build/xcodebuild.log
+            build/test.log
+          if-no-files-found: ignore

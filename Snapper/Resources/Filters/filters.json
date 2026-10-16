@@ -1,0 +1,490 @@
+{
+  "version": 1,
+  "collections": [
+    {
+      "id": "disposable",
+      "name": "Disposable",
+      "tagline": "Sun-faded, warm and a little overexposed, like a 90s throwaway camera."
+    },
+    {
+      "id": "neon",
+      "name": "Neon Nights",
+      "tagline": "Teal shadows, warm skin and glowing signs for the city after dark."
+    },
+    {
+      "id": "soft",
+      "name": "Soft Portrait",
+      "tagline": "Gentle contrast, creamy highlights and skin that looks like skin."
+    },
+    {
+      "id": "overclock",
+      "name": "Overclock",
+      "tagline": "Neon glow, broken signals and chrome-edged colour from a future that never happened."
+    },
+    {
+      "id": "darkroom",
+      "name": "Darkroom",
+      "tagline": "Grain, halation and faded colour from old film and shoebox prints."
+    }
+  ],
+  "looks": [
+    {
+      "id": "boardwalk",
+      "name": "Boardwalk",
+      "collection": "disposable",
+      "lut": "boardwalk.cube",
+      "tier": "free"
+    },
+    {
+      "id": "postcard",
+      "name": "Postcard",
+      "collection": "disposable",
+      "lut": "postcard.cube",
+      "tier": "free"
+    },
+    {
+      "id": "flashbulb",
+      "name": "Flashbulb",
+      "collection": "disposable",
+      "lut": "flashbulb.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "sunburn",
+      "name": "Sunburn",
+      "collection": "disposable",
+      "lut": "sunburn.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "backyard",
+      "name": "Backyard",
+      "collection": "disposable",
+      "lut": "backyard.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "roadtrip",
+      "name": "Road Trip",
+      "collection": "disposable",
+      "lut": "roadtrip.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "poolparty",
+      "name": "Pool Party",
+      "collection": "disposable",
+      "lut": "poolparty.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "cornershop",
+      "name": "Corner Shop",
+      "collection": "disposable",
+      "lut": "cornershop.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "expired",
+      "name": "Expired",
+      "collection": "disposable",
+      "lut": "expired.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "mixtape",
+      "name": "Mixtape",
+      "collection": "disposable",
+      "lut": "mixtape.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "afterglow",
+      "name": "Afterglow",
+      "collection": "neon",
+      "lut": "afterglow.cube",
+      "tier": "free"
+    },
+    {
+      "id": "lasttrain",
+      "name": "Last Train",
+      "collection": "neon",
+      "lut": "lasttrain.cube",
+      "tier": "free"
+    },
+    {
+      "id": "neon",
+      "name": "Neon",
+      "collection": "neon",
+      "lut": "neon.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "midnight",
+      "name": "Midnight",
+      "collection": "neon",
+      "lut": "midnight.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "lantern",
+      "name": "Lantern",
+      "collection": "neon",
+      "lut": "lantern.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "arcade",
+      "name": "Arcade",
+      "collection": "neon",
+      "lut": "arcade.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "bluehour",
+      "name": "Blue Hour",
+      "collection": "neon",
+      "lut": "bluehour.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "downpour",
+      "name": "Downpour",
+      "collection": "neon",
+      "lut": "downpour.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "taxi",
+      "name": "Taxi",
+      "collection": "neon",
+      "lut": "taxi.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "vapor",
+      "name": "Vapor",
+      "collection": "neon",
+      "lut": "vapor.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "cream",
+      "name": "Cream",
+      "collection": "soft",
+      "lut": "cream.cube",
+      "tier": "free"
+    },
+    {
+      "id": "silver",
+      "name": "Silver",
+      "collection": "soft",
+      "lut": "silver.cube",
+      "tier": "free"
+    },
+    {
+      "id": "studio",
+      "name": "Studio",
+      "collection": "soft",
+      "lut": "studio.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "peach",
+      "name": "Peach",
+      "collection": "soft",
+      "lut": "peach.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "linen",
+      "name": "Linen",
+      "collection": "soft",
+      "lut": "linen.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "honey",
+      "name": "Honey",
+      "collection": "soft",
+      "lut": "honey.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "silk",
+      "name": "Silk",
+      "collection": "soft",
+      "lut": "silk.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "porcelain",
+      "name": "Porcelain",
+      "collection": "soft",
+      "lut": "porcelain.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "petal",
+      "name": "Petal",
+      "collection": "soft",
+      "lut": "petal.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "matte",
+      "name": "Matte",
+      "collection": "soft",
+      "lut": "matte.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "overdrive",
+      "name": "Overdrive",
+      "collection": "overclock",
+      "lut": "overdrive.cube",
+      "tier": "premium",
+      "effects": {
+        "glow": {
+          "threshold": 0.68,
+          "radius": 0.03,
+          "intensity": 0.65,
+          "saturation": 1.6,
+          "tint_hue": 0.0,
+          "tint": 0.0
+        },
+        "chromatic_aberration": {
+          "amount": 0.0025
+        },
+        "vignette": {
+          "intensity": 0.6,
+          "radius": 0.85
+        }
+      }
+    },
+    {
+      "id": "redline",
+      "name": "Redline",
+      "collection": "overclock",
+      "lut": "redline.cube",
+      "tier": "premium",
+      "effects": {
+        "gradient": {
+          "size": 0.5,
+          "exposure": 0.6,
+          "tint_hue": 240.0,
+          "tint": 0.0
+        },
+        "glow": {
+          "threshold": 0.45,
+          "radius": 0.06,
+          "intensity": 0.8,
+          "saturation": 1.5,
+          "tint_hue": 190.0,
+          "tint": 0.5
+        },
+        "vignette": {
+          "intensity": 0.55,
+          "radius": 0.75
+        }
+      }
+    },
+    {
+      "id": "signal",
+      "name": "Signal",
+      "collection": "overclock",
+      "lut": "signal.cube",
+      "tier": "premium",
+      "effects": {
+        "chromatic_aberration": {
+          "amount": 0.0015
+        },
+        "chroma_bleed": {
+          "radius": 0.012
+        },
+        "scanlines": {
+          "spacing": 0.006,
+          "intensity": 0.25
+        },
+        "noise": {
+          "amount": 0.14,
+          "size": 0.0015
+        }
+      }
+    },
+    {
+      "id": "chrome",
+      "name": "Chrome",
+      "collection": "overclock",
+      "lut": "chrome.cube",
+      "tier": "premium",
+      "effects": {
+        "glow": {
+          "threshold": 0.75,
+          "radius": 0.02,
+          "intensity": 0.4,
+          "saturation": 1.0,
+          "tint_hue": 0.0,
+          "tint": 0.0
+        },
+        "chromatic_aberration": {
+          "amount": 0.004
+        },
+        "vignette": {
+          "intensity": 0.7,
+          "radius": 0.8
+        }
+      }
+    },
+    {
+      "id": "hologram",
+      "name": "Hologram",
+      "collection": "overclock",
+      "lut": "hologram.cube",
+      "tier": "premium",
+      "effects": {
+        "glow": {
+          "threshold": 0.6,
+          "radius": 0.025,
+          "intensity": 0.6,
+          "saturation": 1.2,
+          "tint_hue": 0.0,
+          "tint": 0.0
+        },
+        "scanlines": {
+          "spacing": 0.004,
+          "intensity": 0.3
+        },
+        "noise": {
+          "amount": 0.06,
+          "size": 0.0012
+        }
+      }
+    },
+    {
+      "id": "halo",
+      "name": "Halo",
+      "collection": "darkroom",
+      "lut": "halo.cube",
+      "tier": "premium",
+      "effects": {
+        "halation": {
+          "threshold": 0.65,
+          "radius": 0.014,
+          "intensity": 0.8
+        },
+        "grain": {
+          "amount": 0.18,
+          "size": 0.0012,
+          "roughness": 0.4,
+          "color": 0.15
+        },
+        "vignette": {
+          "intensity": 0.35,
+          "radius": 0.85
+        }
+      }
+    },
+    {
+      "id": "crossroad",
+      "name": "Crossroad",
+      "collection": "darkroom",
+      "lut": "crossroad.cube",
+      "tier": "premium",
+      "effects": {
+        "grain": {
+          "amount": 0.2,
+          "size": 0.0012,
+          "roughness": 0.5,
+          "color": 0.15
+        },
+        "vignette": {
+          "intensity": 0.4,
+          "radius": 0.8
+        }
+      }
+    },
+    {
+      "id": "instant",
+      "name": "Instant",
+      "collection": "darkroom",
+      "lut": "instant.cube",
+      "tier": "premium",
+      "effects": {
+        "halation": {
+          "threshold": 0.8,
+          "radius": 0.008,
+          "intensity": 0.3
+        },
+        "grain": {
+          "amount": 0.1,
+          "size": 0.0015,
+          "roughness": 0.3,
+          "color": 0.3
+        },
+        "vignette": {
+          "intensity": 0.5,
+          "radius": 0.75
+        }
+      }
+    },
+    {
+      "id": "leak",
+      "name": "Leak",
+      "collection": "darkroom",
+      "lut": "leak.cube",
+      "tier": "premium",
+      "effects": {
+        "light_leak": {
+          "intensity": 1.5,
+          "size": 0.6,
+          "tint_hue": 40.0
+        },
+        "grain": {
+          "amount": 0.22,
+          "size": 0.0012,
+          "roughness": 0.5,
+          "color": 0.15
+        }
+      }
+    },
+    {
+      "id": "grit",
+      "name": "Grit",
+      "collection": "darkroom",
+      "lut": "grit.cube",
+      "tier": "premium",
+      "effects": {
+        "grain": {
+          "amount": 0.35,
+          "size": 0.0016,
+          "roughness": 0.8,
+          "color": 0.0
+        },
+        "vignette": {
+          "intensity": 0.4,
+          "radius": 0.8
+        }
+      }
+    },
+    {
+      "id": "heirloom",
+      "name": "Heirloom",
+      "collection": "darkroom",
+      "lut": "heirloom.cube",
+      "tier": "premium",
+      "effects": {
+        "grain": {
+          "amount": 0.15,
+          "size": 0.0014,
+          "roughness": 0.6,
+          "color": 0.0
+        },
+        "vignette": {
+          "intensity": 0.7,
+          "radius": 0.7
+        }
+      }
+    }
+  ]
+}
