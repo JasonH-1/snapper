@@ -11,7 +11,9 @@ struct LibraryView: View {
 
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showDeleteConfirmation = false
+    /// Photos waiting on the delete confirmation: the selection, or the one
+    /// photo whose context menu was used (kept apart from the selection).
+    @State private var deleteTarget: Set<UUID>?
     /// Photos grow into the editor from their grid cell and shrink back.
     @Namespace private var photoZoom
 
@@ -51,12 +53,14 @@ struct LibraryView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .confirmationDialog(deleteTitle, isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .confirmationDialog(deleteTitle, isPresented: deleteBinding, titleVisibility: .visible, presenting: deleteTarget) { ids in
             Button("Delete", role: .destructive) {
-                withAnimation { model.deleteSelected() }
+                withAnimation(animation) { model.delete(ids) }
             }
-        } message: {
-            Text("They will be removed from Snapper. Copies already saved to your photo library are not affected.")
+        } message: { ids in
+            Text(ids.count == 1
+                 ? "It will be removed from Snapper. Copies already saved to your photo library are not affected."
+                 : "They will be removed from Snapper. Copies already saved to your photo library are not affected.")
         }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {
@@ -83,7 +87,11 @@ struct LibraryView: View {
     }
 
     private var deleteTitle: Text {
-        Text("Delete \(LibraryModel.photoCount(model.selection.count))?")
+        Text("Delete \(LibraryModel.photoCount(deleteTarget?.count ?? 0))?")
+    }
+
+    private var deleteBinding: Binding<Bool> {
+        Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } })
     }
 
     private var alertTitle: Text {
@@ -270,8 +278,7 @@ struct LibraryView: View {
                     Label("Edit", systemImage: "slider.horizontal.3")
                 }
                 Button(role: .destructive) {
-                    model.selection = [record.id]
-                    showDeleteConfirmation = true
+                    deleteTarget = [record.id]
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
@@ -367,7 +374,7 @@ struct LibraryView: View {
                 model.prepareLookChoice()
             }
             barButton("Delete", systemImage: "trash", tint: Color(red: 1, green: 0.41, blue: 0.38)) {
-                showDeleteConfirmation = true
+                deleteTarget = model.selection
             }
         }
         .frame(minHeight: 70)

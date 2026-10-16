@@ -169,6 +169,21 @@ actor PhotoRenderer {
         return UIImage(cgImage: cgImage)
     }
 
+    /// The photo's size in pixels once its orientation is applied (portrait
+    /// photos come out taller than wide), read from the file's header only.
+    static func orientedPixelSize(url: URL) -> CGSize? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              width > 0, height > 0 else { return nil }
+        // EXIF orientations 5–8 turn the picture on its side.
+        let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1
+        return (5...8).contains(orientation)
+            ? CGSize(width: height, height: width)
+            : CGSize(width: width, height: height)
+    }
+
     /// Fast, memory-friendly decode at a reduced size with orientation applied.
     static func downsampled(url: URL, maxPixelSize: Int) -> CIImage? {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary

@@ -120,13 +120,6 @@ final class CaptureLibrary {
         records.first { $0.id == id }
     }
 
-    func updateRecipe(id: UUID, lookID: String, strength: Double) {
-        guard var recipe = record(id: id)?.recipe else { return }
-        recipe.lookID = lookID
-        recipe.strength = strength
-        updateRecipe(id: id, recipe)
-    }
-
     /// Stores a new recipe for a photo and redraws its thumbnail.
     func updateRecipe(id: UUID, _ recipe: PhotoRecipe) {
         guard let index = records.firstIndex(where: { $0.id == id }), records[index].recipe != recipe else { return }
@@ -249,8 +242,8 @@ final class CaptureLibrary {
     func refreshThumbnail(for record: CaptureRecord) async {
         let image = await renderer.thumbnail(sourceURL: store.url(for: record), look: look(for: record),
                                              recipe: record.recipe, seed: record.id.effectsSeed)
-        // Skip photos deleted while drawing.
-        guard let image, self.record(id: record.id) != nil else { return }
+        // Skip photos deleted while drawing, and drawings overtaken by a newer edit.
+        guard let image, self.record(id: record.id)?.recipe == record.recipe else { return }
         thumbnails[record.id] = image
         thumbnailOrder.removeAll { $0 == record.id }
         thumbnailOrder.append(record.id)

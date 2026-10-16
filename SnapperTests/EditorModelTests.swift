@@ -110,6 +110,39 @@ final class EditorModelTests: XCTestCase {
         XCTAssertFalse(again.showsEditsKeptHint)
     }
 
+    /// However long a finger pauses mid-drag, lifting it ends one undo step.
+    func testAPausedDragIsStillOneUndoStep() async throws {
+        let (editor, _, _) = try await makeEditor()
+        editor.interaction(began: true)
+        editor.setValue(0.1, for: .contrast)
+        try await Task.sleep(for: .milliseconds(600)) // longer than the store delay
+        editor.setValue(0.4, for: .contrast)
+        editor.interaction(began: false)
+
+        editor.undo()
+        XCTAssertEqual(editor.value(of: .contrast), 0, "both halves of the drag undo together")
+    }
+
+    func testEditingTurnsCompareOff() async throws {
+        let (editor, _, _) = try await makeEditor()
+        editor.isShowingOriginal = true
+        editor.setValue(0.2, for: .warmth)
+        XCTAssertFalse(editor.isShowingOriginal)
+        editor.isShowingOriginal = true
+        editor.tab = .adjust
+        XCTAssertFalse(editor.isShowingOriginal)
+    }
+
+    /// Crop shapes come from the uncropped photo, not the cropped preview.
+    func testCropShapesUseTheWholePhoto() async throws {
+        let (editor, _, _) = try await makeEditor(width: 64, height: 48)
+        editor.setShape(.square)
+        XCTAssertFalse(editor.cropShapes.contains(.fourThree), "still a 4:3 photo underneath the square crop")
+        XCTAssertEqual(editor.frameSize, CGSize(width: 64, height: 48))
+        editor.rotate()
+        XCTAssertEqual(editor.frameSize, CGSize(width: 48, height: 64), "a quarter turn swaps the frame")
+    }
+
     func testFourThreeOnlyWhenItDiffersFromOriginal() async throws {
         let (fourThree, _, _) = try await makeEditor(width: 64, height: 48)
         XCTAssertFalse(fourThree.cropShapes.contains(.fourThree), "4:3 would repeat Original")
