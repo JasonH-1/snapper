@@ -31,6 +31,7 @@ struct LookPickerView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
+                    featuredGuidance
                     section(id: LookCatalog.originalEntryID, title: nil, tagline: nil, looks: [.original])
                     ForEach(catalog.sections) { section in
                         self.section(id: section.id, title: section.title, tagline: section.tagline, looks: section.looks)
@@ -71,6 +72,41 @@ struct LookPickerView: View {
                 if activeCategory == nil { activeCategory = catalog.sections.first?.category }
             }
         }
+    }
+
+    private var featuredGuidance: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Start with a Signature Look").font(.headline)
+            Text("Choose for the light you're in. Tap a sample to try it.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            ForEach(LookGuide.featured) { guide in
+                if let look = library.look(id: guide.id) {
+                    Button {
+                        onSelect(look)
+                        dismiss()
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            if let image = thumbnails.images[look.id] {
+                                Image(uiImage: image).resizable().scaledToFill()
+                                    .frame(width: 64, height: 80).clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(look.name).font(.headline)
+                                Text(guide.bestFor).font(.subheadline)
+                                Text(guide.tip).font(.caption).foregroundStyle(.secondary)
+                                if look.isPremium && !hasPremium {
+                                    Text("Preview free · Premium to save").font(.caption).foregroundStyle(Theme.accent)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .id("signature-guidance")
     }
 
     private func jump(to category: LookCategory) {

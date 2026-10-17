@@ -12,6 +12,16 @@ Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6
 
 ---
 
+## Release workflow features
+
+- **Personal presets:** Looks › Presets saves the look, strength and light/colour adjustments. Rename, duplicate or delete from each preset's menu. One preset is free; Premium unlocks unlimited presets. After expiry all presets remain stored, and the user can choose which one is their free preset.
+- **Batch styling:** Library › Select › Style applies a look or a complete personal preset (Premium). Crops, frames and date stamps are preserved. Undo Last Batch skips photos edited again since the batch.
+- **Finish:** adjustable white, cream, black or instant-photo borders; a confirmed date stamp; fitted square, portrait-post and story canvases. Preview free; export requires Premium. Originals remain untouched and the same renderer powers previews and exports. Finished canvases are capped at 8192 pixels on the longest edge.
+- **Featured looks:** the look picker includes sample thumbnails and shooting guidance for Boardwalk, Flashbulb, Cream, Afterglow and Halo. This does not replace real-device photographic approval.
+- **Free experience:** all allowed exports are watermark-free. Onboarding no longer opens a paywall. The first automatic save may show an optional upgrade toast, and the editor offers an upgrade after saving.
+
+See [the release checklist](docs/release-checklist.md) for owner-supplied details, photographic acceptance, StoreKit tests and device checks still needed before public release.
+
 ## Run it on your iPhone
 
 1. Install XcodeGen: `brew install xcodegen`
@@ -26,7 +36,7 @@ Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6
    xcodegen generate
    open Snapper.xcodeproj
    ```
-4. Pick your iPhone and press Run. First launch shows onboarding, the camera and Photos permissions, then the paywall once (close it to continue).
+4. Pick your iPhone and press Run. First launch shows onboarding, the camera and Photos permissions, then the camera. A non-blocking upgrade offer follows the first successful automatic save; premium tools also have explicit upgrade entry points.
 
 Run `xcodegen generate` again whenever you add, remove or rename files. The `.xcodeproj` is generated and not committed.
 
@@ -111,7 +121,7 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 - [ ] Replace `Snapper/Resources/Showcase/*.jpg` with your own high-resolution photos (1600 px or more) shot with consent. They appear in onboarding, on the paywall, and in the Simulator. The current ones are small public-domain stand-ins.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
-- [ ] App Review notes: "The paywall appears once after onboarding and can be closed with the × button. Premium looks can be previewed for free; saving or sharing them requires Premium. Use a sandbox account to test the subscription."
+- [ ] App Review notes: "Onboarding opens the camera immediately. Six looks and one personal preset are free, with watermark-free exports. Premium looks and finishing can be previewed free; saving or sharing them requires Premium. Presets are under Looks › Presets; batch presets are under Library › Select › Style; frames and layouts are in Finish. The paywall has an × close button. Use a sandbox account to test the subscription."
 
 ## How it's built
 

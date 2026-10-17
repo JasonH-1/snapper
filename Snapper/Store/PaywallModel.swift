@@ -76,7 +76,7 @@ final class PaywallModel: Identifiable {
         case .lockedLook(let look, _, _):
             String(localized: "Keep \(look.name) with Premium")
         case .intro, .upgrade:
-            String(localized: "Every look, unlocked")
+            String(localized: "Your style, in every photo")
         }
     }
 

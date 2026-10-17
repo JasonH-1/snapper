@@ -52,7 +52,7 @@ struct OnboardingView: View {
             .padding(.horizontal, 24)
 
             pageText(title: Text("Film looks, live"),
-                     detail: Text("See your scene through each look before you take the shot. What you see is exactly what you save."))
+                     detail: Text("See your scene through each look before you take the shot. Start with six free looks and save without a watermark."))
         }
         .padding(.top, 24)
     }
@@ -118,7 +118,7 @@ struct OnboardingView: View {
                           action: { requestCamera() })
             permissionRow(symbol: "photo.on.rectangle",
                           title: Text("Photos"),
-                          detail: Text("To save your shots to your library. Snapper can only add photos, never read them."),
+                          detail: Text("To save your shots to your library. Importing only opens photos you choose."),
                           state: photosState,
                           action: { requestPhotos() })
             Text("You can change these anytime in the Settings app.")

@@ -173,6 +173,7 @@ struct PhotoRecipe: Hashable, Sendable {
     var strength = 1.0
     var adjustments = PhotoAdjustments.none
     var crop = PhotoCrop.none
+    var finish = PhotoFinish.none
 
     /// A photo with no look and no edits.
     static let untouched = PhotoRecipe(lookID: Look.original.id)
@@ -216,7 +217,7 @@ extension PhotoCrop: Codable {
 
 extension PhotoRecipe: Codable {
     private enum CodingKeys: String, CodingKey {
-        case lookID, strength, adjustments, crop
+        case lookID, strength, adjustments, crop, finish
     }
 
     init(from decoder: Decoder) throws {
@@ -225,5 +226,6 @@ extension PhotoRecipe: Codable {
         strength = try container.decodeIfPresent(Double.self, forKey: .strength) ?? 1
         adjustments = try container.decodeIfPresent(PhotoAdjustments.self, forKey: .adjustments) ?? .none
         crop = try container.decodeIfPresent(PhotoCrop.self, forKey: .crop) ?? .none
+        finish = try container.decodeIfPresent(PhotoFinish.self, forKey: .finish) ?? .none
     }
 }

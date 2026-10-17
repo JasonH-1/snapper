@@ -24,6 +24,8 @@ final class AppSettings {
         static let photoFormat = "photos.format"
     }
 
+    let presets: PresetStore
+
     @ObservationIgnored private let defaults: UserDefaults
 
     /// Save each new photo to the photo library right away (when its look is unlocked).
@@ -113,6 +115,7 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        self.presets = PresetStore(defaults: defaults)
         autoSaveToPhotos = defaults.object(forKey: Key.autoSave) as? Bool ?? true
         alsoSaveOriginal = defaults.bool(forKey: Key.saveOriginal)
         favoriteLookIDs = defaults.stringArray(forKey: Key.favorites) ?? []
