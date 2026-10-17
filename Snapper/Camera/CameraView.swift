@@ -41,7 +41,7 @@ struct CameraView: View {
 
     private static let topBarHeight: CGFloat = 52
     /// Approximate height of the look caption + shutter row.
-    private static let controlsHeight: CGFloat = 166
+    private static let controlsHeight: CGFloat = 186
 
     var body: some View {
         GeometryReader { geometry in
@@ -108,7 +108,7 @@ struct CameraView: View {
                             .contentTransition(.symbolEffect(.replace))
                             .rotationEffect(orientation.iconRotation)
                     }
-                    .buttonStyle(CameraIconButtonStyle(size: 40))
+                    .buttonStyle(CameraIconButtonStyle(size: 44))
                     .accessibilityLabel(Text(model.flashMode.accessibilityLabel))
                 }
 
@@ -120,7 +120,7 @@ struct CameraView: View {
                         .contentTransition(.symbolEffect(.replace))
                         .rotationEffect(orientation.iconRotation)
                 }
-                .buttonStyle(CameraIconButtonStyle(size: 40))
+                .buttonStyle(CameraIconButtonStyle(size: 44))
                 .accessibilityLabel(showOptions ? Text("Hide camera options") : Text("Camera options"))
 
                 Spacer()
@@ -129,7 +129,7 @@ struct CameraView: View {
                     Image(systemName: "gearshape.fill")
                         .rotationEffect(orientation.iconRotation)
                 }
-                .buttonStyle(CameraIconButtonStyle(size: 40))
+                .buttonStyle(CameraIconButtonStyle(size: 44))
                 .accessibilityLabel(Text("Settings"))
             }
 
@@ -309,22 +309,36 @@ struct CameraView: View {
     // MARK: - Bottom controls
 
     private var bottomControls: some View {
-        VStack(spacing: 18) {
-            HStack(spacing: 12) {
-                Button(action: onOpenPresets) {
-                    Label(model.activePreset?.name ?? String(localized: "Presets"), systemImage: "slider.horizontal.3")
-                        .font(.subheadline.weight(.semibold)).lineLimit(1)
-                        .foregroundStyle(model.activePreset == nil ? Color.white : Theme.accent)
-                }
-                .accessibilityHint("Choose a saved style to shoot with")
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Button(action: onOpenLookPicker) {
-                    LookCaption(look: model.currentLook, collectionName: model.collectionName, isLocked: isLocked)
-                        .animation(.easeInOut(duration: 0.2), value: model.currentLook)
+                    HStack(spacing: 10) {
+                        Image(systemName: "camera.filters").foregroundStyle(Theme.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("LOOKS").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                            Text(model.currentLook.name).font(Theme.lookName(.headline)).lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    }
+                    .padding(12).frame(maxWidth: .infinity, minHeight: 58)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
                 }
-                .buttonStyle(.plain)
+                .accessibilityLabel("Browse looks. Current look: \(model.currentLook.name)")
+                Button(action: onOpenPresets) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("MY STYLES", systemImage: "square.stack").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                        Text(model.activePreset?.name ?? String(localized: "Presets"))
+                            .font(.subheadline.weight(.semibold)).lineLimit(1)
+                            .foregroundStyle(model.activePreset == nil ? Color.white : Theme.accent)
+                    }
+                    .padding(12).frame(minHeight: 58)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                }
+                .accessibilityHint("Choose or save a personal style")
             }
+            .buttonStyle(PressableButtonStyle())
             .padding(.horizontal, 16)
-
             HStack {
                 libraryButton
                 Spacer()
@@ -336,10 +350,15 @@ struct CameraView: View {
                 Button {
                     model.switchCamera()
                 } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .rotationEffect(orientation.iconRotation)
+                    VStack(spacing: 5) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .frame(width: 52, height: 52)
+                            .glassSurface(in: Circle(), interactive: true)
+                        Text("Flip").font(.caption.weight(.semibold))
+                    }
+                    .rotationEffect(orientation.iconRotation)
                 }
-                .buttonStyle(CameraIconButtonStyle(size: 52))
+                .buttonStyle(.plain)
                 .disabled(!model.capabilities.canSwitchCamera)
                 .opacity(model.capabilities.canSwitchCamera ? 1 : 0.35)
                 .accessibilityLabel(Text("Switch camera"))

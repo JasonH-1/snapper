@@ -12,6 +12,15 @@ final class EditorModel: Identifiable, Hashable {
 
         var id: String { rawValue }
 
+        var symbol: String {
+            switch self {
+            case .looks: "camera.filters"
+            case .adjust: "slider.horizontal.3"
+            case .crop: "crop.rotate"
+            case .finish: "rectangle.inset.filled"
+            }
+        }
+
         var title: LocalizedStringResource {
             switch self {
             case .looks: "Looks"
