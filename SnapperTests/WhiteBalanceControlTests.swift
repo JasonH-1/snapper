@@ -3,30 +3,26 @@ import XCTest
 @testable import Snapper
 
 final class WhiteBalanceControlTests: XCTestCase {
-    func testModernVirtualCameraUsesTemperatureForEveryPreset() {
+    func testCameraWithoutCustomGainsRejectsEveryManualPreset() {
+        // OS API availability cannot override this hardware restriction.
         for preset in WhiteBalancePreset.allCases where preset != .auto {
             XCTAssertEqual(WhiteBalanceControl.route(preset: preset, supportsLocked: true,
-                                                    supportsCustomGains: false, supportsTemperature: true), .temperature)
+                                                    supportsCustomGains: false), .unsupported)
         }
     }
 
-    func testOlderCameraWithoutCustomGainsNeverUsesGainAPI() {
+    func testSupportedCameraAcceptsEveryManualPreset() {
         for preset in WhiteBalancePreset.allCases where preset != .auto {
             XCTAssertEqual(WhiteBalanceControl.route(preset: preset, supportsLocked: true,
-                                                    supportsCustomGains: false, supportsTemperature: false), .unsupported)
+                                                    supportsCustomGains: true), .deviceGains)
         }
-    }
-
-    func testOlderCameraWithCustomGainsUsesGuardedFallback() {
-        XCTAssertEqual(WhiteBalanceControl.route(preset: .daylight, supportsLocked: true,
-                                                supportsCustomGains: true, supportsTemperature: false), .deviceGains)
     }
 
     func testAutoAndUnsupportedLockedModes() {
         XCTAssertEqual(WhiteBalanceControl.route(preset: .auto, supportsLocked: false,
-                                                supportsCustomGains: false, supportsTemperature: false), .automatic)
+                                                supportsCustomGains: false), .automatic)
         XCTAssertEqual(WhiteBalanceControl.route(preset: .daylight, supportsLocked: false,
-                                                supportsCustomGains: true, supportsTemperature: true), .unsupported)
+                                                supportsCustomGains: true), .unsupported)
     }
 
     func testGainFallbackClampsEachChannel() throws {
