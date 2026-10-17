@@ -219,6 +219,8 @@ final class CameraModel {
             lensPosition = nil
             manualExposure = nil
             exposureBias = min(max(exposureBias, exposureRange.lowerBound), exposureRange.upperBound)
+        case .whiteBalanceChanged(let preset):
+            whiteBalance = preset
         case .running(let running):
             if running {
                 status = .running
@@ -419,9 +421,13 @@ final class CameraModel {
     }
 
     func setWhiteBalance(_ preset: WhiteBalancePreset) {
-        guard preset != whiteBalance else { return }
-        whiteBalance = preset
-        if status == .noCamera { return updateDemo() }
+        guard preset == .auto || capabilities.supportsWhiteBalance else { return }
+        if status == .noCamera {
+            whiteBalance = preset
+            return updateDemo()
+        }
+        // Publish the selection only after the device accepts it. Queue Auto
+        // even if it is still selected while a previous preset is pending.
         Task { await captureService.setWhiteBalance(preset) }
     }
 

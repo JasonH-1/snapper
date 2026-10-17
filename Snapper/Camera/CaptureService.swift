@@ -250,28 +250,45 @@ actor CaptureService {
         return clamped
     }
 
-    /// Locks white balance to a preset's colour temperature, or returns to auto.
+    /// Uses temperature/tint on iOS 26, including virtual multi-lens cameras.
+    /// Older systems may only use custom gains when the device explicitly supports them.
     func setWhiteBalance(_ preset: WhiteBalancePreset) {
         guard let device = deviceInput?.device else { return }
+        let route = WhiteBalanceControl.route(
+            preset: preset,
+            supportsLocked: device.isWhiteBalanceModeSupported(.locked),
+            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
+            supportsTemperature: Self.supportsTemperatureWhiteBalance)
+        guard route != .unsupported else { return }
         do {
             try device.lockForConfiguration()
             defer { device.unlockForConfiguration() }
-            guard let kelvin = preset.temperature, device.isWhiteBalanceModeSupported(.locked) else {
-                if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
-                    device.whiteBalanceMode = .continuousAutoWhiteBalance
-                }
+            switch route {
+            case .automatic:
+                guard device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) else { return }
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            case .temperature:
+                guard #available(iOS 26.0, *), let kelvin = preset.temperature else { return }
+                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
+                device.setWhiteBalanceModeLocked(whiteBalanceTemperatureAndTintValues: values, handler: nil)
+            case .deviceGains:
+                guard let kelvin = preset.temperature else { return }
+                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
+                let proposed = device.deviceWhiteBalanceGains(for: values)
+                guard let gains = WhiteBalanceControl.validatedGains(proposed, maximum: device.maxWhiteBalanceGain) else { return }
+                device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+            case .unsupported:
                 return
             }
-            let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
-            var gains = device.deviceWhiteBalanceGains(for: values)
-            let maxGain = device.maxWhiteBalanceGain
-            gains.redGain = min(max(gains.redGain, 1), maxGain)
-            gains.greenGain = min(max(gains.greenGain, 1), maxGain)
-            gains.blueGain = min(max(gains.blueGain, 1), maxGain)
-            device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+            eventContinuation.yield(.whiteBalanceChanged(preset))
         } catch {
             Logger.camera.error("White balance failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private static var supportsTemperatureWhiteBalance: Bool {
+        if #available(iOS 26.0, *) { return true }
+        return false
     }
 
     /// Holds the lens at `position` (0 = nearest, 1 = farthest), or returns
@@ -440,7 +457,10 @@ actor CaptureService {
         // Long exposures blur hand-held shots; cap the slider at half a second.
         caps.maxShutter = min(device.activeFormat.maxExposureDuration.seconds, 0.5)
         caps.supportsManualFocus = device.isLockingFocusWithCustomLensPositionSupported
-        caps.supportsWhiteBalance = device.isWhiteBalanceModeSupported(.locked)
+        caps.supportsWhiteBalance = WhiteBalanceControl.route(
+            preset: .daylight, supportsLocked: device.isWhiteBalanceModeSupported(.locked),
+            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
+            supportsTemperature: Self.supportsTemperatureWhiteBalance) != .unsupported
         caps.photoMegapixels = PhotoCapture.megapixelOptions(for: device)
         return caps
     }
