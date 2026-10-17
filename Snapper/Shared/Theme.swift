@@ -5,6 +5,8 @@ enum Theme {
     static let previewCornerRadius: CGFloat = 18
     static let cardCornerRadius: CGFloat = 20
     static let controlSize: CGFloat = 44
+    static let canvas = Color(red: 0.065, green: 0.066, blue: 0.073)
+    static let surface = Color(red: 0.115, green: 0.117, blue: 0.13)
 
     /// Look names are set in the serif face for a printed, editorial feel.
     static func lookTitle(size: CGFloat) -> Font {

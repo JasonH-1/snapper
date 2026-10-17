@@ -94,6 +94,8 @@ final class LibraryModel: Identifiable {
     var shareItems: ShareItems?
     var isChoosingLook = false
     var isChoosingPreset = false
+    /// Session-only color clipboard; never includes crop, frame, or date.
+    private(set) var copiedStyle: SavedPreset?
     /// Last batch only; skip any photos individually edited afterwards.
     private(set) var batchUndo: [UUID: (before: PhotoRecipe, after: PhotoRecipe)] = [:]
     var canUndoBatch: Bool { !batchUndo.isEmpty }
@@ -146,9 +148,9 @@ final class LibraryModel: Identifiable {
 
     var emptyMessage: (title: LocalizedStringResource, detail: LocalizedStringResource) {
         switch filter {
-        case .all: ("No photos yet", "Photos you take in Snapper show up here. Tap + to bring in photos from your library.")
+        case .all: ("No photos yet", "Photos you take in Snapper show up here. Tap Import Photos to bring in photos from your library.")
         case .camera: ("No Snapper shots yet", "Photos you take with Snapper's camera show up here.")
-        case .imported: ("Nothing imported", "Tap + to pick photos from your library. Snapper edits its own copy.")
+        case .imported: ("Nothing imported", "Tap Import Photos to pick photos from your library. Snapper edits its own copy.")
         case .edited: ("No edited photos", "Photos you change after taking or importing them show up here.")
         case .notSaved: ("Everything is saved", "Every photo here is already in your photo library.")
         }
@@ -364,6 +366,28 @@ final class LibraryModel: Identifiable {
         applyBatch(chosen) { preset.applying(to: $0.recipe) }
         if let look = looks.look(id: preset.lookID) { settings.noteRecentlyUsed(look) }
         show(String(localized: "Applied \(preset.name) to \(Self.photoCount(chosen.count)). Crops and finishing kept."))
+        return true
+    }
+
+    func copyStyle(from record: CaptureRecord) {
+        guard let current = captures.record(id: record.id) else { return }
+        let name = captures.look(for: current).name
+        copiedStyle = SavedPreset(name: name, recipe: current.recipe)
+        show(String(localized: "Copied \(name). Choose another photo or select a set to paste."))
+    }
+
+    @discardableResult
+    func pasteStyle(to ids: Set<UUID>) -> Bool {
+        guard !isWorking, let style = copiedStyle, let look = looks.look(id: style.lookID) else { return false }
+        let chosen = records.filter { ids.contains($0.id) }
+        guard !chosen.isEmpty else { return false }
+        if chosen.count > 1 && !hasPremium() {
+            requestPremium(look, nil, nil)
+            return false
+        }
+        applyBatch(chosen) { style.applying(to: $0.recipe) }
+        settings.noteRecentlyUsed(look)
+        show(String(localized: "Pasted style to \(Self.photoCount(chosen.count)). Crops and finishing kept."))
         return true
     }
 

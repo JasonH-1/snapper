@@ -20,19 +20,13 @@ struct EditorView: View {
         VStack(spacing: 12) {
             canvas
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Picker("Edit", selection: $model.tab) {
-                ForEach(EditorModel.Tab.allCases) { tab in
-                    Text(tab.title).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
+            toolNavigation
             panel
             actions
         }
         .padding(.top, 4)
         .padding(.bottom, 8)
-        .background(Color.black.ignoresSafeArea())
+        .background(Theme.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .sheet(item: $model.shareItem) { item in
@@ -69,6 +63,31 @@ struct EditorView: View {
         .sensoryFeedback(.success, trigger: model.savedCount)
         .sensoryFeedback(.selection, trigger: model.tab)
         .onDisappear { model.finish() }
+    }
+
+    private var toolNavigation: some View {
+        HStack(spacing: 4) {
+            ForEach(EditorModel.Tab.allCases) { tab in
+                Button {
+                    withAnimation(animation) { model.tab = tab }
+                } label: {
+                    VStack(spacing: 6) {
+                        Image(systemName: tab.symbol).font(.body.weight(.semibold))
+                        Text(tab.title).font(.caption.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 58)
+                    .foregroundStyle(model.tab == tab ? Color.black : Color.primary)
+                    .background(model.tab == tab ? Theme.accent : .clear, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
+            }
+        }
+        .padding(5)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 19))
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Editing tools")
     }
 
     private var animation: Animation? { .snapper(Motion.standard, reduceMotion: reduceMotion) }
