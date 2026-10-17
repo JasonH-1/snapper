@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The camera screen: live filtered preview, swipe to change looks, shutter.
+/// Portrait camera controls stay aligned with their labels and hit targets.
+/// Captured-photo orientation is handled separately by CaptureService.
 struct CameraView: View {
     @Bindable var model: CameraModel
     /// Camera preferences: grid, level, timer, aspect ratio and more.
@@ -18,7 +19,6 @@ struct CameraView: View {
     var onOpenPresets: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
-    @State private var orientation = DeviceOrientationObserver()
     @State private var showBanner = false
     @State private var bannerTask: Task<Void, Never>?
     @State private var zoomAtGestureStart: CGFloat?
@@ -70,10 +70,8 @@ struct CameraView: View {
         // review screen still follow the system appearance.
         .environment(\.colorScheme, .dark)
         .task {
-            orientation.start()
             await model.start()
         }
-        .onDisappear { orientation.stop() }
         .onChange(of: scenePhase) { _, phase in
             model.scenePhaseChanged(phase)
         }
@@ -106,7 +104,6 @@ struct CameraView: View {
                         Image(systemName: model.flashMode.symbolName)
                             .foregroundStyle(model.flashMode == .off ? Color.white : Theme.accent)
                             .contentTransition(.symbolEffect(.replace))
-                            .rotationEffect(orientation.iconRotation)
                     }
                     .buttonStyle(CameraIconButtonStyle(size: 44))
                     .accessibilityLabel(Text(model.flashMode.accessibilityLabel))
@@ -118,7 +115,6 @@ struct CameraView: View {
                     Image(systemName: showOptions ? "chevron.up" : "slider.horizontal.3")
                         .foregroundStyle(optionsActive || showOptions ? Theme.accent : .white)
                         .contentTransition(.symbolEffect(.replace))
-                        .rotationEffect(orientation.iconRotation)
                 }
                 .buttonStyle(CameraIconButtonStyle(size: 44))
                 .accessibilityLabel(showOptions ? Text("Hide camera options") : Text("Camera options"))
@@ -127,7 +123,6 @@ struct CameraView: View {
 
                 Button(action: onOpenSettings) {
                     Image(systemName: "gearshape.fill")
-                        .rotationEffect(orientation.iconRotation)
                 }
                 .buttonStyle(CameraIconButtonStyle(size: 44))
                 .accessibilityLabel(Text("Settings"))
@@ -151,7 +146,6 @@ struct CameraView: View {
         }
         .padding(.horizontal, 16)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isLocked)
-        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: orientation.iconRotation)
     }
 
     // MARK: - Preview
@@ -181,7 +175,6 @@ struct CameraView: View {
 
             if showBanner {
                 LookBanner(look: model.currentLook, collectionName: model.collectionName, isLocked: isLocked)
-                    .rotationEffect(orientation.iconRotation)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .allowsHitTesting(false)
             }
@@ -217,7 +210,6 @@ struct CameraView: View {
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.5), radius: 12)
                     .contentTransition(.numericText(countsDown: true))
-                    .rotationEffect(orientation.iconRotation)
                     .allowsHitTesting(false)
                     .accessibilityLabel(Text("Taking photo in \(countdown) seconds"))
             }
@@ -225,16 +217,13 @@ struct CameraView: View {
             VStack(spacing: 12) {
                 Spacer()
                 if showOptions {
-                    CameraOptionsPanel(model: model, settings: settings, tab: $optionsTab,
-                                       iconRotation: orientation.iconRotation)
+                    CameraOptionsPanel(model: model, settings: settings, tab: $optionsTab)
                         .padding(.horizontal, 12)
                         .padding(.bottom, model.capabilities.zoomPresets.count > 1 ? 0 : 14 + bottomInset)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 if model.capabilities.zoomPresets.count > 1 {
-                    ZoomControl(presets: model.capabilities.zoomPresets,
-                                zoom: model.zoom,
-                                iconRotation: orientation.iconRotation) { preset in
+                    ZoomControl(presets: model.capabilities.zoomPresets, zoom: model.zoom) { preset in
                         model.setZoom(preset, animated: true)
                     }
                     .padding(.bottom, 14 + bottomInset)
@@ -356,7 +345,6 @@ struct CameraView: View {
                             .glassSurface(in: Circle(), interactive: true)
                         Text("Flip").font(.caption.weight(.semibold))
                     }
-                    .rotationEffect(orientation.iconRotation)
                 }
                 .buttonStyle(.plain)
                 .disabled(!model.capabilities.canSwitchCamera)
@@ -409,7 +397,6 @@ struct CameraView: View {
                         .overlay(Circle().strokeBorder(.black, lineWidth: 2))
                         .offset(x: 6, y: 6)
                 }
-                .rotationEffect(orientation.iconRotation)
                 .animation(.spring(response: 0.35, dampingFraction: 0.75), value: lastCapture)
 
                 Text("Library")

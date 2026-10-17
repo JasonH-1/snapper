@@ -191,6 +191,7 @@ struct CameraCapabilities: Sendable, Equatable {
 /// Events the capture service reports back to the camera model.
 enum CaptureEvent: Sendable {
     case configured(CameraCapabilities)
+    case whiteBalanceChanged(WhiteBalancePreset)
     case running(Bool)
     case interrupted(CameraInterruption?)
     case failed(String)

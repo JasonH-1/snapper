@@ -33,7 +33,6 @@ struct CameraOptionsPanel: View {
     @Bindable var model: CameraModel
     @Bindable var settings: AppSettings
     @Binding var tab: Tab
-    let iconRotation: Angle
 
     /// Exposure moves in ⅓-stop steps, like the iPhone camera.
     nonisolated private static let step: Float = 1 / 3
@@ -71,6 +70,9 @@ struct CameraOptionsPanel: View {
         .onAppear {
             if !tabs.contains(tab) { tab = .exposure }
         }
+        .onChange(of: tabs) { _, available in
+            if !available.contains(tab) { tab = .exposure }
+        }
     }
 
     // MARK: - Tabs
@@ -85,7 +87,6 @@ struct CameraOptionsPanel: View {
                     Image(systemName: item.symbolName)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(isSelected ? .black : (isActive(item) ? Theme.accent : .white))
-                        .rotationEffect(iconRotation)
                         .frame(maxWidth: .infinity, minHeight: 38)
                         .glassSurface(in: Capsule(), tint: isSelected ? Theme.accent : nil, interactive: true)
                 }
@@ -186,7 +187,6 @@ struct CameraOptionsPanel: View {
                         VStack(spacing: 3) {
                             Image(systemName: preset.symbolName)
                                 .font(.system(size: 15, weight: .semibold))
-                                .rotationEffect(iconRotation)
                             Text(preset.label)
                                 .font(.caption2.weight(.semibold))
                                 .lineLimit(1)
@@ -255,7 +255,6 @@ struct CameraOptionsPanel: View {
         Image(systemName: name)
             .font(.system(size: size, weight: .semibold))
             .foregroundStyle(.white.opacity(opacity))
-            .rotationEffect(iconRotation)
     }
 
     private func valueText(_ text: String) -> some View {
@@ -281,7 +280,6 @@ struct CameraOptionsPanel: View {
             HStack(spacing: 5) {
                 if let symbol {
                     Image(systemName: symbol)
-                        .rotationEffect(iconRotation)
                 }
                 title
                     .lineLimit(1)
