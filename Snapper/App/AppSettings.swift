@@ -14,6 +14,7 @@ final class AppSettings {
         static let onboardingDone = "app.hasCompletedOnboarding"
         static let introPaywallShown = "app.hasSeenIntroPaywall"
         static let lastLookID = "camera.lastLookID"
+        static let lastPresetID = "camera.lastPresetID"
         static let showGrid = "camera.showGrid"
         static let selfTimer = "camera.selfTimer"
         static let showLevel = "camera.showLevel"
@@ -66,6 +67,10 @@ final class AppSettings {
 
     var lastLookID: String? {
         didSet { defaults.set(lastLookID, forKey: Key.lastLookID) }
+    }
+
+    var lastPresetID: UUID? {
+        didSet { defaults.set(lastPresetID?.uuidString, forKey: Key.lastPresetID) }
     }
 
     /// Rule-of-thirds lines over the camera preview.
@@ -124,6 +129,7 @@ final class AppSettings {
         hasCompletedOnboarding = defaults.bool(forKey: Key.onboardingDone)
         hasSeenIntroPaywall = defaults.bool(forKey: Key.introPaywallShown)
         lastLookID = defaults.string(forKey: Key.lastLookID)
+        lastPresetID = defaults.string(forKey: Key.lastPresetID).flatMap(UUID.init(uuidString:))
         showGrid = defaults.bool(forKey: Key.showGrid)
         selfTimer = SelfTimer(rawValue: defaults.integer(forKey: Key.selfTimer)) ?? .off
         showLevel = defaults.bool(forKey: Key.showLevel)

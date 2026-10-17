@@ -8,11 +8,22 @@ struct LibraryView: View {
     @Bindable var model: LibraryModel
     var onClose: () -> Void
     var onShowPaywall: () -> Void
+    var onShootPreset: ((SavedPreset) -> Bool)?
 
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showDeleteConfirmation = false
     @State private var upgradeAfterPresets = false
+    @State private var finishing: FinishSelection?
+    @State private var upgradeAfterFinish = false
+    @State private var shareAfterFinish = false
+
+    private struct FinishSelection: Identifiable {
+        let id = UUID()
+        let records: [CaptureRecord]
+    }
+    /// Photos waiting on the delete confirmation: the selection, or the one
+    /// photo whose context menu was used (kept apart from the selection).
+    @State private var deleteTarget: Set<UUID>?
     /// Photos grow into the editor from their grid cell and shrink back.
     @Namespace private var photoZoom
 
@@ -33,7 +44,7 @@ struct LibraryView: View {
                 .toolbar { toolbar }
                 .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
                 .navigationDestination(item: $model.editor) { editor in
-                    EditorView(model: editor, onShowPaywall: onShowPaywall)
+                    EditorView(model: editor, onShowPaywall: onShowPaywall, onShootPreset: onShootPreset)
                         .zoomTransition(from: editor.id, in: photoZoom)
                 }
         }
@@ -59,12 +70,22 @@ struct LibraryView: View {
                         onApply: { model.applyPresetToSelection($0) },
                         onUpgrade: { upgradeAfterPresets = true })
         }
-        .confirmationDialog(deleteTitle, isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .sheet(item: $finishing, onDismiss: {
+            if upgradeAfterFinish { upgradeAfterFinish = false; onShowPaywall() }
+            else if shareAfterFinish { shareAfterFinish = false; model.shareSelected() }
+        }) { selected in
+            BatchFinishView(model: model, records: selected.records,
+                            onUpgrade: { upgradeAfterFinish = true },
+                            onShareAfterDismiss: { shareAfterFinish = true })
+        }
+        .confirmationDialog(deleteTitle, isPresented: deleteBinding, titleVisibility: .visible, presenting: deleteTarget) { ids in
             Button("Delete", role: .destructive) {
-                withAnimation { model.deleteSelected() }
+                withAnimation(animation) { model.delete(ids) }
             }
-        } message: {
-            Text("They will be removed from Snapper. Copies already saved to your photo library are not affected.")
+        } message: { ids in
+            Text(ids.count == 1
+                 ? "It will be removed from Snapper. Copies already saved to your photo library are not affected."
+                 : "They will be removed from Snapper. Copies already saved to your photo library are not affected.")
         }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {
@@ -91,7 +112,11 @@ struct LibraryView: View {
     }
 
     private var deleteTitle: Text {
-        Text("Delete \(LibraryModel.photoCount(model.selection.count))?")
+        Text("Delete \(LibraryModel.photoCount(deleteTarget?.count ?? 0))?")
+    }
+
+    private var deleteBinding: Binding<Bool> {
+        Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } })
     }
 
     private var alertTitle: Text {
@@ -278,8 +303,7 @@ struct LibraryView: View {
                     Label("Edit", systemImage: "slider.horizontal.3")
                 }
                 Button(role: .destructive) {
-                    model.selection = [record.id]
-                    showDeleteConfirmation = true
+                    deleteTarget = [record.id]
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
@@ -379,6 +403,9 @@ struct LibraryView: View {
             barButton("Share", systemImage: "square.and.arrow.up") { model.shareSelected() }
             barButton("Save", systemImage: "square.and.arrow.down") { model.saveSelected() }
             Menu {
+                Button("Finish Photo Set", systemImage: "rectangle.inset.filled") {
+                    finishing = FinishSelection(records: model.selectedRecords)
+                }
                 Button("Apply a Look", systemImage: "camera.filters") { model.prepareLookChoice() }
                 Button("Apply Personal Preset", systemImage: "slider.horizontal.3") {
                     if model.hasPremiumNow { model.isChoosingPreset = true }
@@ -393,7 +420,7 @@ struct LibraryView: View {
             }
             .tint(.white)
             barButton("Delete", systemImage: "trash", tint: Color(red: 1, green: 0.41, blue: 0.38)) {
-                showDeleteConfirmation = true
+                deleteTarget = model.selection
             }
         }
         .frame(minHeight: 70)

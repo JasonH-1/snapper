@@ -10,6 +10,7 @@ struct EditorView: View {
     @State private var showsPresets = false
     @State private var upgradeAfterPresets = false
     var onShowPaywall: () -> Void = {}
+    var onShootPreset: ((SavedPreset) -> Bool)?
 
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -44,7 +45,8 @@ struct EditorView: View {
         }) {
             PresetsView(store: model.settings.presets, looks: model.looks, hasPremium: model.hasPremiumNow,
                         currentRecipe: model.recipe, onApply: { model.applyPreset($0) },
-                        onUpgrade: { upgradeAfterPresets = true })
+                        onUpgrade: { upgradeAfterPresets = true }, onShoot: onShootPreset,
+                        samplePhotoURL: model.record.map { model.library.url(for: $0) })
         }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {
@@ -153,9 +155,9 @@ struct EditorView: View {
     private var canvas: some View {
         if model.tab == .crop {
             if let base = model.cropBase {
-                CropCanvas(image: base, straighten: model.straighten, rect: model.cropRect, aspect: model.cropAspect) { rect in
-                    model.setCropRect(rect)
-                }
+                CropCanvas(image: base, straighten: model.straighten, rect: model.cropRect, aspect: model.cropAspect,
+                           onChange: { model.setCropRect($0) },
+                           onInteraction: { model.interaction(began: $0) })
                 .transition(.opacity)
             } else {
                 ProgressView()
@@ -276,8 +278,10 @@ struct EditorView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                Slider(value: $model.strength, in: 0...1)
-                    .disabled(model.currentLook.isOriginal)
+                Slider(value: $model.strength, in: 0...1) { editing in
+                    model.interaction(began: editing)
+                }
+                .disabled(model.currentLook.isOriginal)
                 Text("\(Int((model.strength * 100).rounded()))")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .fixedSize()
@@ -371,7 +375,8 @@ struct EditorView: View {
                 .accessibilityLabel(Text("Reset \(String(localized: kind.title))"))
 
                 RulerSlider(value: Binding(get: { model.value(of: kind) }, set: { model.setValue($0, for: kind) }),
-                            range: kind.range, tickStep: 0.05)
+                            range: kind.range, tickStep: 0.05,
+                            onEditingChanged: { model.interaction(began: $0) })
                     .frame(height: 28)
                     .padding(.horizontal, 16)
                     .id(kind)
@@ -395,7 +400,7 @@ struct EditorView: View {
                 if model.frame != .none {
                     HStack {
                         Text("Border").font(.subheadline)
-                        Slider(value: $model.border, in: 0.01...0.16)
+                        Slider(value: $model.border, in: 0.01...0.16, onEditingChanged: { model.interaction(began: $0) })
                             .accessibilityLabel("Border width")
                     }
                 }
@@ -461,7 +466,8 @@ struct EditorView: View {
                             .minimumScaleFactor(0.7)
                     }
                     .buttonStyle(PressableButtonStyle())
-                    RulerSlider(value: $model.straighten, range: PhotoCrop.straightenRange, tickStep: 1, spacing: 8)
+                    RulerSlider(value: $model.straighten, range: PhotoCrop.straightenRange, tickStep: 1, spacing: 8,
+                                onEditingChanged: { model.interaction(began: $0) })
                         .frame(height: 24)
                         .accessibilityLabel(Text("Straighten"))
                 }

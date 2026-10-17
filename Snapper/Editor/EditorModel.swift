@@ -47,6 +47,8 @@ final class EditorModel: Identifiable, Hashable {
     var tab: Tab = .looks {
         didSet {
             guard tab != oldValue else { return }
+            interaction(began: false)
+            isShowingOriginal = false
             scheduleRender()
             if tab == .looks { refreshLookThumbnails() }
         }
@@ -99,6 +101,11 @@ final class EditorModel: Identifiable, Hashable {
     /// collecting into a single undo step; closed when it is stored.
     @ObservationIgnored private var isChangeGroupOpen = false
     @ObservationIgnored private var hintTask: Task<Void, Never>?
+    /// A finger is on a slider, dial or the crop box: everything until it
+    /// lifts is one undo step, however long it pauses.
+    @ObservationIgnored private var isInteracting = false
+    /// The original photo's upright size in pixels.
+    @ObservationIgnored private let sourceSize: CGSize?
 
     /// Undo steps kept per editing session.
     static let maxUndoSteps = 50
@@ -125,6 +132,8 @@ final class EditorModel: Identifiable, Hashable {
         self.requestPremium = requestPremium
         self.recipe = library.record(id: id)?.recipe ?? .untouched
         self.recentIDsAtOpen = settings.recentLookIDs
+        // Only the file's header is read, so this is quick enough to do here.
+        self.sourceSize = library.record(id: id).flatMap { PhotoRenderer.orientedPixelSize(url: library.url(for: $0)) }
         preview = library.thumbnails[id]
         scheduleRender()
         refreshLookThumbnails()
@@ -261,10 +270,12 @@ final class EditorModel: Identifiable, Hashable {
 
     // MARK: - Crop
 
-    /// The turned frame's size in pixels (for box shapes).
+    /// The turned, uncropped frame's size in pixels (for box shapes). Taken
+    /// from the original, never from the preview, which is already cropped.
     var frameSize: CGSize {
-        if let cropBase { return cropBase.size }
-        if let preview { return preview.size }
+        if let size = sourceSize ?? cropBase?.size.applyingTurns(-recipe.crop.quarterTurns) {
+            return size.applyingTurns(recipe.crop.quarterTurns)
+        }
         return CGSize(width: 3, height: 4)
     }
 
@@ -334,9 +345,17 @@ final class EditorModel: Identifiable, Hashable {
             isChangeGroupOpen = true
         }
         recipe = next
+        // Comparing would hide the change being made.
+        isShowingOriginal = false
         scheduleRender()
         scheduleCommit()
         showEditsKeptHintIfNeeded()
+    }
+
+    /// A slider, dial or crop drag started or ended.
+    func interaction(began: Bool) {
+        isInteracting = began
+        if !began { commit() }
     }
 
     /// A single tap's change (a look, a shape, a turn, a reset): always its
@@ -415,7 +434,12 @@ final class EditorModel: Identifiable, Hashable {
         commitTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            commit()
+            if isInteracting {
+                // Store it in case the app goes away mid-drag, but keep the undo step open.
+                library.updateRecipe(id: id, recipe)
+            } else {
+                commit()
+            }
         }
     }
 
@@ -429,6 +453,7 @@ final class EditorModel: Identifiable, Hashable {
 
     /// Called when the editor closes.
     func finish() {
+        isInteracting = false
         commit()
         if !currentLook.isOriginal {
             settings.noteRecentlyUsed(currentLook)
@@ -459,6 +484,7 @@ final class EditorModel: Identifiable, Hashable {
         let renderer = library.renderer
         let recipe = self.recipe
         let look = currentLook
+        let renderingTab = tab
 
         if tab == .crop {
             let key = CropBaseKey(lookID: recipe.lookID, strength: recipe.strength, adjustments: recipe.adjustments,
@@ -468,6 +494,7 @@ final class EditorModel: Identifiable, Hashable {
                 base.crop = PhotoCrop(shape: .free, quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)
                 base.finish = .none
                 if let image = await renderer.preview(id: id, sourceURL: url, look: look, recipe: base) {
+                    guard self.recipe == recipe, tab == renderingTab else { return }
                     cropBase = image
                     cropBaseKey = key
                 }
@@ -476,10 +503,12 @@ final class EditorModel: Identifiable, Hashable {
         }
 
         if let image = await renderer.preview(id: id, sourceURL: url, look: look, recipe: recipe) {
+            guard self.recipe == recipe, tab == renderingTab else { return }
             preview = image
         }
         if originalCrop != recipe.crop || original == nil {
             if let image = await renderer.original(id: id, sourceURL: url, crop: recipe.crop) {
+                guard self.recipe == recipe, tab == renderingTab else { return }
                 original = image
                 originalCrop = recipe.crop
             }
@@ -557,4 +586,11 @@ final class EditorModel: Identifiable, Hashable {
         }
     }
 
+}
+
+private extension CGSize {
+    /// The size after `turns` quarter turns (negative turns back).
+    func applyingTurns(_ turns: Int) -> CGSize {
+        turns % 2 == 0 ? self : CGSize(width: height, height: width)
+    }
 }

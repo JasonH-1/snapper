@@ -141,7 +141,7 @@ struct PaywallView: View {
             benefit(symbol: "camera.filters", title: Text("\(model.premiumLookCount) premium looks"),
                     detail: Text("Every collection, complete. Preview them live, keep the ones you love."))
             benefit(symbol: "slider.horizontal.3", title: Text("Make your style repeatable"),
-                    detail: Text("Save unlimited personal presets and apply them across a whole album."))
+                    detail: Text("Shoot with your personal presets and apply them across a whole photo set."))
             benefit(symbol: "rectangle.portrait", title: Text("Ready to share"),
                     detail: Text("Add frames, date stamps and fitted post or story layouts."))
             benefit(symbol: "calendar.badge.clock", title: Text("Cancel anytime"),
