@@ -61,6 +61,10 @@ final class CameraModel {
         return lower <= upper ? lower...upper : 0...0
     }
 
+    var canCapture: Bool {
+        isPreviewVisible && isAppActive && (status == .running || status == .noCamera)
+    }
+
     var currentLook: Look { looks.indices.contains(lookIndex) ? looks[lookIndex] : .original }
     var collectionName: String? { library.collection(for: currentLook)?.name }
 
@@ -79,8 +83,8 @@ final class CameraModel {
     /// The last metering point, in device coordinates (centre until a tap).
     @ObservationIgnored private var meteringPoint = CGPoint(x: 0.5, y: 0.5)
     @ObservationIgnored private var swipeTarget: Int?
-    @ObservationIgnored private var isPreviewVisible = true
-    @ObservationIgnored private var isAppActive = true
+    private var isPreviewVisible = true
+    private var isAppActive = true
     @ObservationIgnored private var hasStarted = false
 
     /// Called with each new photo and the look it was taken with.
@@ -165,11 +169,13 @@ final class CameraModel {
     /// Pause the camera while another full-screen view covers it.
     func setPreviewVisible(_ visible: Bool) {
         isPreviewVisible = visible
+        if !visible { cancelCountdown() }
         updateRunningState()
     }
 
     func scenePhaseChanged(_ phase: ScenePhase) {
-        isAppActive = phase != .background
+        isAppActive = phase == .active
+        if !isAppActive { cancelCountdown() }
         // Coming back from the Settings app: camera access may have changed.
         if phase == .active, status == .denied || status == .needsPermission {
             renderer.setEnabled(isPreviewVisible)
@@ -271,8 +277,11 @@ final class CameraModel {
         if let index = looks.firstIndex(of: current) {
             lookIndex = index
         } else {
+            activePreset = nil
+            swipeTarget = nil
             lookIndex = 0
             renderer.show(lookState(for: currentLook))
+            onLookChange?(currentLook)
         }
     }
 
@@ -520,6 +529,7 @@ final class CameraModel {
     /// The shutter button: shoots now, starts the self-timer, or cancels a
     /// running countdown.
     func shutterPressed(options: CaptureOptions) {
+        guard canCapture else { cancelCountdown(); return }
         if countdown != nil {
             cancelCountdown()
             return
@@ -548,7 +558,7 @@ final class CameraModel {
     }
 
     func capture(options: CaptureOptions = CaptureOptions()) {
-        guard !isCapturing else { return }
+        guard canCapture, !isCapturing else { return }
         let look = currentLook
         let style = captureStyle
         shutterCount += 1

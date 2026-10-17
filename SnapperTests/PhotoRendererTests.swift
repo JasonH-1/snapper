@@ -38,6 +38,13 @@ final class PhotoRendererTests: XCTestCase {
         XCTAssertEqual(props[kCGImagePropertyOrientation] as? Int ?? 1, 1)
     }
 
+    func testOrientedSizeReadsTheHeader() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jpg")
+        try makeRotatedJPEG().write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertEqual(PhotoRenderer.orientedPixelSize(url: url), CGSize(width: 30, height: 40), "EXIF 6 stands it upright")
+    }
+
     func testExportAppliesTheCrop() async throws {
         let renderer = PhotoRenderer()
         var recipe = PhotoRecipe.untouched

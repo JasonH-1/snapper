@@ -60,6 +60,7 @@ final class AppModel {
     var isShowingLookPicker = false
     var isShowingCameraPresets = false
     var upgradeAfterCameraPresets = false
+    var isImportingPreset = false
     var toast: Toast?
 
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -98,7 +99,7 @@ final class AppModel {
         camera.selectPreset(preset)
         libraryScreen?.editor?.finish()
         libraryScreen = nil
-        camera.setPreviewVisible(true)
+        updateCameraVisibility()
         return true
     }
 
@@ -193,7 +194,18 @@ final class AppModel {
         camera.select(look)
     }
 
+    func openCameraPresets() {
+        camera.setPreviewVisible(false)
+        isShowingCameraPresets = true
+    }
+
+    func cameraPresetsDismissed() {
+        isShowingCameraPresets = false
+        updateCameraVisibility()
+    }
+
     func openLookPicker() {
+        camera.setPreviewVisible(false)
         lookThumbnails.load(looks: library.looks, renderer: renderer)
         isShowingLookPicker = true
     }
@@ -271,9 +283,11 @@ final class AppModel {
     func lookPickerDismissed() {
         isShowingLookPicker = false
         camera.setLookOrder(settings.orderedLooks(from: library))
+        updateCameraVisibility()
     }
 
-    private func updateCameraVisibility() {
-        camera.setPreviewVisible(libraryScreen == nil && paywall == nil && !isShowingSettings)
+    func updateCameraVisibility() {
+        camera.setPreviewVisible(libraryScreen == nil && paywall == nil && !isShowingSettings
+                                 && !isShowingLookPicker && !isShowingCameraPresets && !isImportingPreset)
     }
 }

@@ -418,8 +418,10 @@ final class LibraryModel: Identifiable {
 
     var hasPremiumNow: Bool { hasPremium() }
 
-    func deleteSelected() {
-        captures.delete(ids: selection)
+    /// Deletes photos (copies already in Photos are not affected) and leaves Select mode.
+    func delete(_ ids: Set<UUID>) {
+        captures.delete(ids: ids)
+        selection.subtract(ids)
         isSelecting = false
     }
 

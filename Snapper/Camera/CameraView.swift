@@ -35,7 +35,7 @@ struct CameraView: View {
             || settings.aspectRatio != .fourThree
     }
 
-    private var canShoot: Bool { model.status == .running || model.status == .noCamera }
+    private var canShoot: Bool { model.canCapture }
 
     private var isLocked: Bool { model.currentLook.isPremium && !hasPremium }
 

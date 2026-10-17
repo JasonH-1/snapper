@@ -7,7 +7,9 @@ struct RootView: View {
     @Namespace private var libraryZoom
     @State private var incomingPreset: PresetFile?
     @State private var importError: String?
-    @State private var importTask: Task<Void, Never>?
+    @State private var pendingPreset: PresetFile?
+    @State private var pendingImportError: String?
+    @State private var waitingForDismissals: Set<String> = []
     @State private var upgradeAfterImport = false
 
     var body: some View {
@@ -24,6 +26,9 @@ struct RootView: View {
         }
         .onOpenURL { receivePreset($0) }
         .sheet(item: $incomingPreset, onDismiss: {
+            app.isImportingPreset = false
+            app.updateCameraVisibility()
+            presentationDismissed("import")
             if upgradeAfterImport { upgradeAfterImport = false; app.presentPaywall(.upgrade) }
         }) { file in
             PresetImportView(file: file, store: app.settings.presets, looks: app.library, hasPremium: app.hasPremium,
@@ -51,12 +56,14 @@ struct RootView: View {
             onShowPaywall: { app.presentPaywall(.upgrade) },
             onOpenSettings: { app.openSettings() },
             onOpenLookPicker: { app.openLookPicker() },
-            onOpenPresets: { app.isShowingCameraPresets = true }
+            onOpenPresets: { app.openCameraPresets() }
         )
         .onAppear { app.synchronizeCameraPreset() }
         .onChange(of: app.hasPremium) { _, _ in app.synchronizeCameraPreset() }
         .onChange(of: app.settings.presets.presets) { _, _ in app.synchronizeCameraPreset() }
         .sheet(isPresented: $app.isShowingCameraPresets, onDismiss: {
+            app.cameraPresetsDismissed()
+            presentationDismissed("presets")
             if app.upgradeAfterCameraPresets {
                 app.upgradeAfterCameraPresets = false
                 app.presentPaywall(.upgrade)
@@ -74,20 +81,20 @@ struct RootView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .fullScreenCover(item: $app.libraryScreen, onDismiss: { app.libraryDismissed() }) { library in
+        .fullScreenCover(item: $app.libraryScreen, onDismiss: { app.libraryDismissed(); presentationDismissed("library") }) { library in
             LibraryView(model: library,
                         onClose: { app.libraryScreen = nil },
                         onShowPaywall: { app.presentPaywall(.upgrade) },
                         onShootPreset: { app.shootWithPreset($0) })
-                .paywallHost(app, as: .library)
+                .paywallHost(app, as: .library, onDismiss: { presentationDismissed("paywall") })
                 .zoomTransition(from: AppModel.libraryZoomID, in: libraryZoom)
         }
-        .paywallHost(app, as: .root)
-        .sheet(isPresented: $app.isShowingSettings, onDismiss: { app.settingsDismissed() }) {
+        .paywallHost(app, as: .root, onDismiss: { presentationDismissed("paywall") })
+        .sheet(isPresented: $app.isShowingSettings, onDismiss: { app.settingsDismissed(); presentationDismissed("settings") }) {
             SettingsView(app: app, onClose: { app.isShowingSettings = false })
-                .paywallHost(app, as: .settings)
+                .paywallHost(app, as: .settings, onDismiss: { presentationDismissed("paywall") })
         }
-        .sheet(isPresented: $app.isShowingLookPicker, onDismiss: { app.lookPickerDismissed() }) {
+        .sheet(isPresented: $app.isShowingLookPicker, onDismiss: { app.lookPickerDismissed(); presentationDismissed("looks") }) {
             LookPickerView(library: app.library,
                            selectedID: app.camera.currentLook.id,
                            hasPremium: app.hasPremium,
@@ -101,25 +108,67 @@ struct RootView: View {
     }
 
     private func receivePreset(_ url: URL) {
-        importTask?.cancel()
+        pendingPreset = nil
+        pendingImportError = nil
         do {
             guard url.isFileURL else { throw PresetFile.FileError.invalid }
-            let file = try PresetFile.read(url, looks: app.library)
-            app.camera.cancelCountdown()
+            pendingPreset = try PresetFile.read(url, looks: app.library)
+        } catch { pendingImportError = error.localizedDescription }
+        app.camera.cancelCountdown()
+        app.upgradeAfterCameraPresets = false
+        upgradeAfterImport = false
+        presentPendingImport()
+    }
+
+    private func presentationDismissed(_ name: String) {
+        waitingForDismissals.remove(name)
+        presentPendingImport()
+    }
+
+    private func presentPendingImport() {
+        guard pendingPreset != nil || pendingImportError != nil, waitingForDismissals.isEmpty else { return }
+        // Dismiss the topmost surface first, then wait for its callback before
+        // dismissing its parent. Never race a guessed animation duration.
+        if incomingPreset != nil {
+            waitingForDismissals.insert("import")
+            incomingPreset = nil
+            return
+        }
+        if app.paywall != nil {
+            waitingForDismissals.insert("paywall")
+            app.paywall = nil
+            return
+        }
+        if app.isShowingCameraPresets {
+            waitingForDismissals.insert("presets")
+            app.isShowingCameraPresets = false
+            return
+        }
+        if app.isShowingSettings {
+            waitingForDismissals.insert("settings")
+            app.isShowingSettings = false
+            return
+        }
+        if app.isShowingLookPicker {
+            waitingForDismissals.insert("looks")
+            app.isShowingLookPicker = false
+            return
+        }
+        if app.libraryScreen != nil {
+            waitingForDismissals.insert("library")
             app.libraryScreen?.editor?.finish()
             app.libraryScreen = nil
-            app.isShowingSettings = false
-            app.isShowingLookPicker = false
-            app.isShowingCameraPresets = false
-            app.paywall = nil
-            incomingPreset = nil
-            importTask = Task { @MainActor in
-                // Allow any presented screen to finish dismissing before import.
-                try? await Task.sleep(for: .milliseconds(600))
-                guard !Task.isCancelled else { return }
-                incomingPreset = file
-            }
-        } catch { importError = error.localizedDescription }
+            return
+        }
+        if let file = pendingPreset {
+            pendingPreset = nil
+            app.isImportingPreset = true
+            app.updateCameraVisibility()
+            incomingPreset = file
+        } else if let error = pendingImportError {
+            pendingImportError = nil
+            importError = error
+        }
     }
 
     private func handle(_ action: Toast.Action) {
@@ -135,8 +184,8 @@ struct RootView: View {
 
 extension View {
     /// Presents the paywall from this screen when it is the top-most one.
-    func paywallHost(_ app: AppModel, as host: AppModel.PaywallHost) -> some View {
-        fullScreenCover(item: app.paywallBinding(for: host), onDismiss: { app.paywallDismissed() }) { paywall in
+    func paywallHost(_ app: AppModel, as host: AppModel.PaywallHost, onDismiss: @escaping () -> Void = {}) -> some View {
+        fullScreenCover(item: app.paywallBinding(for: host), onDismiss: { app.paywallDismissed(); onDismiss() }) { paywall in
             PaywallView(model: paywall, onClose: { app.paywall = nil })
         }
     }
