@@ -33,7 +33,8 @@ actor PhotoRenderer {
     private let lutStore: LUTStore
 
     /// Downscaled, oriented sources for interactive editing, by capture id.
-    private var proxies: [UUID: CIImage] = [:]
+    private struct Proxy { let image: CIImage; let maxPixelSize: Int }
+    private var proxies: [UUID: Proxy] = [:]
     private var proxyOrder: [UUID] = []
 
     init(lutStore: LUTStore = .shared) {
@@ -152,9 +153,10 @@ actor PhotoRenderer {
     }
 
     private func proxy(id: UUID, sourceURL: URL, maxPixelSize: Int) -> CIImage? {
-        if let cached = proxies[id] { return cached }
+        if let cached = proxies[id], cached.maxPixelSize >= maxPixelSize { return cached.image }
         guard let image = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        proxies[id] = image
+        proxies[id] = Proxy(image: image, maxPixelSize: maxPixelSize)
+        proxyOrder.removeAll { $0 == id }
         proxyOrder.append(id)
         if proxyOrder.count > 6 {
             proxies[proxyOrder.removeFirst()] = nil
@@ -167,6 +169,21 @@ actor PhotoRenderer {
             return nil
         }
         return UIImage(cgImage: cgImage)
+    }
+
+    /// The photo's size in pixels once its orientation is applied (portrait
+    /// photos come out taller than wide), read from the file's header only.
+    static func orientedPixelSize(url: URL) -> CGSize? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              width > 0, height > 0 else { return nil }
+        // EXIF orientations 5–8 turn the picture on its side.
+        let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1
+        return (5...8).contains(orientation)
+            ? CGSize(width: height, height: width)
+            : CGSize(width: width, height: height)
     }
 
     /// Fast, memory-friendly decode at a reduced size with orientation applied.

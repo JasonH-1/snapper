@@ -16,6 +16,14 @@ struct SavedPreset: Identifiable, Codable, Hashable, Sendable {
         adjustments = recipe.adjustments
     }
 
+    var isValid: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed.count <= 40 && !lookID.isEmpty
+            && !trimmed.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
+            && strength.isFinite && (0...1).contains(strength)
+            && PhotoAdjustments.Kind.allCases.allSatisfy { adjustments[$0].isFinite && $0.range.contains(adjustments[$0]) }
+    }
+
     func applying(to recipe: PhotoRecipe) -> PhotoRecipe {
         var result = recipe
         result.lookID = lookID
@@ -29,11 +37,12 @@ struct SavedPreset: Identifiable, Codable, Hashable, Sendable {
 @Observable
 final class PresetStore {
     enum StoreError: LocalizedError {
-        case premiumRequired, invalidName, unavailable
+        case premiumRequired, invalidName, invalidStyle, unavailable
         var errorDescription: String? {
             switch self {
             case .premiumRequired: String(localized: "The free plan includes one personal preset. Premium unlocks unlimited presets.")
             case .invalidName: String(localized: "Give your preset a name between 1 and 40 characters.")
+            case .invalidStyle: String(localized: "This style has invalid adjustment values. No presets were changed.")
             case .unavailable: String(localized: "Your saved presets couldn't be opened. They have been kept on this iPhone; no changes were written.")
             }
         }
@@ -54,7 +63,8 @@ final class PresetStore {
         if let data = defaults.data(forKey: Self.storageKey) {
             do {
                 let archive = try JSONDecoder().decode(Archive.self, from: data)
-                guard archive.version == 1 else { throw StoreError.unavailable }
+                guard archive.version == 1, archive.presets.allSatisfy(\.isValid),
+                      Set(archive.presets.map(\.id)).count == archive.presets.count else { throw StoreError.unavailable }
                 presets = archive.presets
             } catch { loadFailed = true }
         }
@@ -63,13 +73,14 @@ final class PresetStore {
     /// After a subscription ends, keep every preset and allow the first one.
     /// The person can choose a different free preset without deleting anything.
     func canUse(_ preset: SavedPreset, hasPremium: Bool) -> Bool {
-        hasPremium || presets.first?.id == preset.id
+        !loadFailed && presets.contains(preset) && (hasPremium || presets.first?.id == preset.id)
     }
 
     @discardableResult
     func save(name: String, recipe: PhotoRecipe, hasPremium: Bool) throws -> SavedPreset {
         guard hasPremium || presets.isEmpty else { throw StoreError.premiumRequired }
         let preset = SavedPreset(name: try validName(name), recipe: recipe)
+        guard preset.isValid else { throw StoreError.invalidStyle }
         try persist(presets + [preset])
         return preset
     }
@@ -98,7 +109,8 @@ final class PresetStore {
 
     private func validName(_ name: String) throws -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed.count <= 40 else { throw StoreError.invalidName }
+        guard !trimmed.isEmpty, trimmed.count <= 40,
+              !trimmed.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw StoreError.invalidName }
         return trimmed
     }
 

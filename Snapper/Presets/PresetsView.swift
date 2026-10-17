@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Shared browser for single-photo editing and batch styling.
 struct PresetsView: View {
@@ -8,6 +9,14 @@ struct PresetsView: View {
     var currentRecipe: PhotoRecipe?
     var onApply: (SavedPreset) -> Bool
     var onUpgrade: () -> Void
+    var onShoot: ((SavedPreset) -> Bool)?
+    var samplePhotoURL: URL?
+    @State private var isImporting = false
+    @State private var incoming: PresetFile?
+    @State private var shareItems: LibraryModel.ShareItems?
+    @State private var sharedDirectory: URL?
+    @State private var upgradeAfterImport = false
+    @State private var isPreparingShare = false
 
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -47,6 +56,12 @@ struct PresetsView: View {
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.loadFailed)
                     }
                 }
+                Section {
+                    Button("Import Preset File", systemImage: "square.and.arrow.down") { isImporting = true }
+                        .disabled(store.loadFailed)
+                    Text("Open a .snapperpreset file shared by a friend. You can preview it before importing.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 Section("Your Presets") {
                     if store.presets.isEmpty {
                         Text("Edit a photo, then open Presets to save your first style.")
@@ -74,6 +89,21 @@ struct PresetsView: View {
                             .buttonStyle(.plain)
                             .disabled(looks.look(id: preset.lookID) == nil)
                             Menu {
+                                if let onShoot {
+                                    Button("Shoot with This Preset", systemImage: "camera") {
+                                        guard store.canUse(preset, hasPremium: hasPremium) else { upgrade(); return }
+                                        if onShoot(preset) { dismiss() }
+                                    }
+                                    .disabled(looks.look(id: preset.lookID) == nil)
+                                }
+                                Button("Share Preset File", systemImage: "square.and.arrow.up") { share(preset, card: false) }
+                                    .disabled(isPreparingShare)
+                                Button("Share Style Card", systemImage: "photo") {
+                                    guard store.canUse(preset, hasPremium: hasPremium),
+                                          hasPremium || (looks.look(id: preset.lookID)?.isPremium == false && currentRecipe?.finish.isActive != true) else { upgrade(); return }
+                                    share(preset, card: true)
+                                }
+                                .disabled(isPreparingShare || looks.look(id: preset.lookID) == nil)
                                 Button("Rename", systemImage: "pencil") { renameText = preset.name; renaming = preset }
                                 Button("Duplicate", systemImage: "plus.square.on.square") {
                                     guard hasPremium || store.presets.isEmpty else { upgrade(); return }
@@ -93,11 +123,25 @@ struct PresetsView: View {
                         .padding(.vertical, 4)
                     }
                 }
+                if isPreparingShare { ProgressView("Preparing style to share…") }
                 if let message { Text(message).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently) }
+            }
+            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.snapperPreset, .json]) { result in
+                perform { incoming = try PresetFile.read(result.get(), looks: looks) }
+            }
+            .sheet(item: $incoming, onDismiss: {
+                if upgradeAfterImport { upgradeAfterImport = false; upgrade() }
+            }) { file in
+                PresetImportView(file: file, store: store, looks: looks, hasPremium: hasPremium,
+                                 onUpgrade: { upgradeAfterImport = true })
+            }
+            .sheet(item: $shareItems, onDismiss: cleanupShare) { items in
+                ShareSheet(items: items.urls)
             }
             .navigationTitle("Personal Presets")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.disabled(isPreparingShare) } }
+            .interactiveDismissDisabled(isPreparingShare)
             .alert("Rename Preset", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
                 TextField("Name", text: $renameText)
                 Button("Cancel", role: .cancel) { renaming = nil }
@@ -112,9 +156,44 @@ struct PresetsView: View {
                     deleting = nil
                 }
             } message: { Text("Photos already edited with this preset keep their edits.") }
-            .alert("Couldn't Save Preset", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            .alert("Couldn't Complete Preset Action", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: { Text(error ?? "") }
+        }
+    }
+
+    private func cleanupShare() {
+        if let sharedDirectory { try? FileManager.default.removeItem(at: sharedDirectory) }
+        sharedDirectory = nil
+    }
+
+    private func share(_ preset: SavedPreset, card: Bool) {
+        guard !isPreparingShare else { return }
+        isPreparingShare = true
+        Task { @MainActor in
+            defer { isPreparingShare = false }
+            do {
+                cleanupShare()
+                let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                sharedDirectory = directory
+                let file = directory.appendingPathComponent("Snapper-Preset.snapperpreset")
+                try PresetDocument(preset).data.write(to: file, options: .atomic)
+                var urls = [file]
+                if card {
+                    guard let source = samplePhotoURL ?? DemoScene.url, let look = looks.look(id: preset.lookID),
+                          let photo = await PhotoRenderer().preview(id: UUID(), sourceURL: source, look: look,
+                                                                   recipe: preset.applying(to: currentRecipe ?? .untouched), maxPixelSize: 1200),
+                          let data = StyleCard.image(photo: photo, preset: preset, lookName: look.name,
+                                                     isSample: samplePhotoURL == nil).jpegData(compressionQuality: 0.92) else {
+                        throw PhotoRenderer.RenderError.unreadableImage
+                    }
+                    let image = directory.appendingPathComponent("Snapper-Style.jpg")
+                    try data.write(to: image, options: .atomic)
+                    urls.insert(image, at: 0)
+                }
+                shareItems = LibraryModel.ShareItems(urls: urls)
+            } catch { cleanupShare(); self.error = error.localizedDescription }
         }
     }
 

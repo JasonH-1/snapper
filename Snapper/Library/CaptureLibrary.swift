@@ -74,7 +74,10 @@ final class CaptureLibrary {
             try store.write(data, fileName: fileName)
         }.value
 
-        let recipe = PhotoRecipe(lookID: look.id, crop: PhotoCrop(shape: CropShape(cameraAspect: photo.aspect)))
+        var recipe = photo.style ?? PhotoRecipe(lookID: look.id)
+        recipe.lookID = look.id
+        recipe.crop = PhotoCrop(shape: CropShape(cameraAspect: photo.aspect))
+        recipe.finish = .none
         let record = CaptureRecord(id: id, fileName: fileName, source: .camera, isFrontCamera: photo.isFrontCamera,
                                    recipe: recipe)
         records.insert(record, at: 0)
@@ -118,13 +121,6 @@ final class CaptureLibrary {
 
     func record(id: UUID) -> CaptureRecord? {
         records.first { $0.id == id }
-    }
-
-    func updateRecipe(id: UUID, lookID: String, strength: Double) {
-        guard var recipe = record(id: id)?.recipe else { return }
-        recipe.lookID = lookID
-        recipe.strength = strength
-        updateRecipe(id: id, recipe)
     }
 
     /// Stores a new recipe for a photo and redraws its thumbnail.
@@ -218,23 +214,19 @@ final class CaptureLibrary {
     }
 
     /// Writes JPEGs of several photos to temporary files for the share sheet,
-    /// replacing the previous share's files.
+    /// in an isolated folder so another share cannot invalidate these URLs.
     func exportForSharing(_ records: [CaptureRecord], watermark: Bool) async throws -> [URL] {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Share", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try await Task.detached(priority: .userInitiated) {
-            try? FileManager.default.removeItem(at: folder)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }.value
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         var urls: [URL] = []
-        var usedNames: Set<String> = []
         for record in records {
             let data = try await export(record, watermark: watermark, format: .jpeg)
-            var name = "Snapper-\(formatter.string(from: record.takenAt ?? record.createdAt))"
-            if !usedNames.insert(name).inserted {
-                name += "-\(record.id.uuidString.prefix(4))"
-            }
+            let name = "Snapper-\(formatter.string(from: record.takenAt ?? record.createdAt))-\(record.id.uuidString)"
             let url = folder.appendingPathComponent(name + ".jpg")
             try await Task.detached(priority: .userInitiated) {
                 try data.write(to: url, options: .atomic)
@@ -249,7 +241,7 @@ final class CaptureLibrary {
     func refreshThumbnail(for record: CaptureRecord) async {
         let image = await renderer.thumbnail(sourceURL: store.url(for: record), look: look(for: record),
                                              recipe: record.recipe, seed: record.id.effectsSeed)
-        // Skip photos deleted while drawing.
+        // Skip deleted photos and drawings overtaken by a newer edit.
         guard let image, self.record(id: record.id)?.recipe == record.recipe else { return }
         thumbnails[record.id] = image
         thumbnailOrder.removeAll { $0 == record.id }

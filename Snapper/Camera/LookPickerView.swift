@@ -14,6 +14,7 @@ struct LookPickerView: View {
     var onSelect: (Look) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var occasion: LookOccasion?
     @State private var position: String?
     @State private var activeCategory: LookCategory?
     @State private var jumpingTo: LookCategory?
@@ -31,7 +32,8 @@ struct LookPickerView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
-                    featuredGuidance
+                    occasionDiscovery
+                    if occasion == nil { featuredGuidance }
                     section(id: LookCatalog.originalEntryID, title: nil, tagline: nil, looks: [.original])
                     ForEach(catalog.sections) { section in
                         self.section(id: section.id, title: section.title, tagline: section.tagline, looks: section.looks)
@@ -72,6 +74,30 @@ struct LookPickerView: View {
                 if activeCategory == nil { activeCategory = catalog.sections.first?.category }
             }
         }
+    }
+
+    private var occasionDiscovery: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("What are you shooting?").font(.headline)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack {
+                    Button("All Looks") { occasion = nil }
+                        .buttonStyle(.bordered).tint(occasion == nil ? Theme.accent : .secondary)
+                    ForEach(LookOccasion.allCases) { item in
+                        Button(item.title) { occasion = item }
+                            .buttonStyle(.bordered).tint(occasion == item ? Theme.accent : .secondary)
+                            .accessibilityAddTraits(occasion == item ? .isSelected : [])
+                    }
+                }
+            }
+            if let occasion {
+                Text(occasion.tip).font(.subheadline).foregroundStyle(.secondary)
+                section(id: "occasion-results", title: "Try these looks", tagline: "Creative starting points; adjust for your light.",
+                        looks: occasion.lookIDs.compactMap { library.look(id: $0) })
+                Text("All looks are still below.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .id("occasion-discovery")
     }
 
     private var featuredGuidance: some View {

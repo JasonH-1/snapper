@@ -16,10 +16,14 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         let id: String
         let lut: CubeLUT?
         let effects: LookEffects
+        var strength = 1.0
+        var adjustments = PhotoAdjustments.none
 
         static let original = LookState(id: Look.original.id, lut: nil, effects: .none)
 
-        static func == (lhs: LookState, rhs: LookState) -> Bool { lhs.id == rhs.id }
+        static func == (lhs: LookState, rhs: LookState) -> Bool {
+            lhs.id == rhs.id && lhs.strength == rhs.strength && lhs.adjustments == rhs.adjustments
+        }
     }
 
     /// Which side the incoming look enters from during a swipe.
@@ -218,8 +222,10 @@ final class PreviewRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDeleg
         return progress
     }
 
-    private static func render(_ look: LookState, on base: CIImage, seed: UInt64) -> CIImage {
-        LookPipeline.applyEffects(look.effects, seed: seed, to: LookPipeline.apply(look.lut, to: base))
+    static func render(_ look: LookState, on base: CIImage, seed: UInt64) -> CIImage {
+        let graded = LookPipeline.apply(look.lut, strength: Float(look.strength), to: base)
+        let textured = LookPipeline.applyEffects(look.effects, strength: Float(look.strength), seed: seed, to: graded)
+        return PhotoEditing.adjust(textured, with: look.adjustments, seed: seed)
     }
 
     static func aspectFill(_ image: CIImage, in size: CGSize) -> CIImage {
