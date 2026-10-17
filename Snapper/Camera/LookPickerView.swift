@@ -89,6 +89,8 @@ struct LookPickerView: View {
                 }
                 activeCategory = category
             }
+            .onChange(of: query) { _, _ in resetSearchPosition() }
+            .onChange(of: scope) { _, _ in resetSearchPosition() }
             .background(Theme.canvas)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search looks, moods, or light")
             .navigationTitle(title)
@@ -127,6 +129,12 @@ struct LookPickerView: View {
             }
         }
         .id("occasion-discovery")
+    }
+
+    private func resetSearchPosition() {
+        jumpingTo = nil
+        position = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && scope == .all
+            ? "occasion-discovery" : "search-results"
     }
 
     private func accepts(_ look: Look) -> Bool {
