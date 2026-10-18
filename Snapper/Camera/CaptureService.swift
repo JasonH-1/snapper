@@ -262,6 +262,8 @@ actor CaptureService {
     func setWhiteBalance(_ preset: WhiteBalancePreset) throws {
         guard let original = deviceInput?.device else { throw CameraError.notRunning }
         let originalZoom = original.videoZoomFactor * displayZoomMultiplier
+        let originalReturnDevice = whiteBalanceReturnDevice
+        let originalReturnZoom = whiteBalanceReturnZoom
         var changedInput = false
         do {
             let main = position == .back ? Self.manualWhiteBalanceCamera() : nil
@@ -295,10 +297,16 @@ actor CaptureService {
             // A new camera may expose different capabilities after activation.
             // Roll back to automatic on the original camera if application fails.
             if changedInput {
-                try? replaceInput(with: original, position: position)
-                setZoom(originalZoom, animated: false)
-                whiteBalanceReturnDevice = nil
+                do {
+                    try replaceInput(with: original, position: position)
+                    setZoom(originalZoom, animated: false)
+                    whiteBalanceReturnDevice = originalReturnDevice
+                    whiteBalanceReturnZoom = originalReturnZoom
+                } catch {
+                    Logger.camera.error("White balance camera rollback failed: \(error.localizedDescription, privacy: .public)")
+                }
                 if let active = deviceInput?.device {
+                    try? applyWhiteBalance(.auto, to: active)
                     eventContinuation.yield(.configured(capabilities(for: active)))
                 }
             }
