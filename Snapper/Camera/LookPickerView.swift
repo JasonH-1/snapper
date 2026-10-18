@@ -81,7 +81,12 @@ struct LookPickerView: View {
                         section(id: "search-results", title: "\(filteredLooks.count) looks", tagline: nil, looks: filteredLooks)
                     } else {
                         if accepts(.original) {
-                            section(id: LookCatalog.originalEntryID, title: nil, tagline: nil, looks: [.original])
+                            OriginalRow(image: thumbnails.images[Look.original.id],
+                                        isSelected: selectedID == Look.original.id) {
+                                onSelect(.original)
+                                dismiss()
+                            }
+                            .id(LookCatalog.originalEntryID)
                         }
                         ForEach(catalog.sections) { section in
                             let matches = section.looks.filter(accepts)
@@ -96,7 +101,7 @@ struct LookPickerView: View {
                 .padding(.vertical, 12)
             }
             .scrollPosition(id: $position, anchor: .top)
-            .safeAreaInset(edge: .top, spacing: 0) {
+            .pinnedHeader {
                 VStack(spacing: 8) {
                     Picker("Show looks", selection: $scope) {
                         ForEach(LookDiscovery.Scope.allCases) { Text($0.title).tag($0) }
@@ -107,7 +112,6 @@ struct LookPickerView: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(.bar)
             }
             .onChange(of: position) { _, id in
                 guard let id else { return }
@@ -150,6 +154,7 @@ struct LookPickerView: View {
     private var occasionDiscovery: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("What are you shooting?").font(.title3.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     occasionChip(String(localized: "All Looks"), isSelected: occasion == nil) { occasion = nil }
@@ -195,10 +200,12 @@ struct LookPickerView: View {
 
     private var featuredGuidance: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Find your signature.").font(Theme.lookName(.title2))
-                Text("A little direction for your next photo.").font(.subheadline).foregroundStyle(.secondary)
+            // Styled like every other section heading on the page.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Find your signature.").font(.title3.weight(.semibold))
+                Text("A little direction for your next photo.").font(.footnote).foregroundStyle(.secondary)
             }
+            .accessibilityAddTraits(.isHeader)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(LookGuide.featured) { guide in
@@ -332,11 +339,65 @@ private struct LookTile: View {
     }
 }
 
+/// "No look" as one slim row, so it doesn't sit alone in a mostly empty row
+/// of the grid.
+private struct OriginalRow: View {
+    let image: UIImage?
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                Rectangle().fill(.quaternary)
+                    .frame(width: 52, height: 52)
+                    .overlay {
+                        if let image { Image(uiImage: image).resizable().scaledToFill() }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Look.original.name).font(Theme.lookName(.headline))
+                    Text("No look, just your photo").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.black, .white)
+                }
+            }
+            .padding(10)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(isSelected ? Color.white : .clear, lineWidth: 2)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(Text(Look.original.name))
+        .accessibilityValue(Text("No look"))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
 private extension View {
     /// Lets a horizontal row inside the sheet's 16 pt margins scroll out to
     /// the screen edges, while its first item still lines up with the margin.
     func edgeToEdgeScroll() -> some View {
         contentMargins(.horizontal, 16, for: .scrollContent)
             .padding(.horizontal, -16)
+    }
+
+    /// Pins the scope picker and chips under the search field. On iOS 26 they
+    /// share the navigation bar's soft scroll edge, so the sheet is one colour
+    /// instead of a grey band over a darker page.
+    @ViewBuilder
+    func pinnedHeader<Header: View>(@ViewBuilder _ header: () -> Header) -> some View {
+        if #available(iOS 26, *) {
+            safeAreaBar(edge: .top, spacing: 0, content: header)
+        } else {
+            safeAreaInset(edge: .top, spacing: 0) { header().background(.bar) }
+        }
     }
 }
