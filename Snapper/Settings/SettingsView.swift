@@ -9,6 +9,8 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.requestReview) private var requestReview
     @State private var showManageSubscriptions = false
+    @State private var showGuide = false
+    @State private var guideDestination: GuideDestination?
     @State private var isRestoring = false
     @State private var restoreMessage: RestoreMessage?
     @State private var storageUsed: Int64?
@@ -23,6 +25,17 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Button { showGuide = true } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Snapper Guide").font(.headline)
+                                Text("Camera, looks, editing and saving — with visual examples")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        } icon: { Image(systemName: "book.closed").foregroundStyle(Theme.accent) }
+                    }.foregroundStyle(.primary)
+                }
                 premiumSection
                 photosSection
                 librarySection
@@ -39,6 +52,18 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: onClose)
+                }
+            }
+            .fullScreenCover(isPresented: $showGuide, onDismiss: {
+                if let destination = guideDestination {
+                    guideDestination = nil
+                    app.pendingGuideDestination = destination
+                    onClose()
+                }
+            }) {
+                GuideView(library: app.library) { destination in
+                    guideDestination = destination
+                    showGuide = false
                 }
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)

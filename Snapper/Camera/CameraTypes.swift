@@ -184,6 +184,8 @@ struct CameraCapabilities: Sendable, Equatable {
     var maxShutter: Double = 0.5
     var supportsManualFocus = false
     var supportsWhiteBalance = false
+    var whiteBalanceRequiresMainCamera = false
+    var whiteBalanceUsesMainCamera = false
     /// Photo sizes the camera can take, in megapixels (e.g. 12, 24, 48).
     var photoMegapixels: [Int] = [12]
 }
@@ -191,6 +193,7 @@ struct CameraCapabilities: Sendable, Equatable {
 /// Events the capture service reports back to the camera model.
 enum CaptureEvent: Sendable {
     case configured(CameraCapabilities)
+    case whiteBalanceChanged(WhiteBalancePreset)
     case running(Bool)
     case interrupted(CameraInterruption?)
     case failed(String)

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The camera screen: live filtered preview, swipe to change looks, shutter.
+/// Portrait camera controls stay aligned with their labels and hit targets.
+/// Captured-photo orientation is handled separately by CaptureService.
 struct CameraView: View {
     @Bindable var model: CameraModel
     /// Camera preferences: grid, level, timer, aspect ratio and more.
@@ -15,9 +16,9 @@ struct CameraView: View {
     var onShowPaywall: () -> Void = {}
     var onOpenSettings: () -> Void = {}
     var onOpenLookPicker: () -> Void = {}
+    var onOpenPresets: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
-    @State private var orientation = DeviceOrientationObserver()
     @State private var showBanner = false
     @State private var bannerTask: Task<Void, Never>?
     @State private var zoomAtGestureStart: CGFloat?
@@ -34,13 +35,15 @@ struct CameraView: View {
             || settings.aspectRatio != .fourThree
     }
 
-    private var canShoot: Bool { model.status == .running || model.status == .noCamera }
+    private var canShoot: Bool { model.canCapture }
 
-    private var isLocked: Bool { model.currentLook.isPremium && !hasPremium }
+    private var isLocked: Bool {
+        (model.currentLook.isPremium || model.activePreset?.adjustments.requiresPremium == true) && !hasPremium
+    }
 
     private static let topBarHeight: CGFloat = 52
     /// Approximate height of the look caption + shutter row.
-    private static let controlsHeight: CGFloat = 166
+    private static let controlsHeight: CGFloat = 186
 
     var body: some View {
         GeometryReader { geometry in
@@ -69,10 +72,8 @@ struct CameraView: View {
         // review screen still follow the system appearance.
         .environment(\.colorScheme, .dark)
         .task {
-            orientation.start()
             await model.start()
         }
-        .onDisappear { orientation.stop() }
         .onChange(of: scenePhase) { _, phase in
             model.scenePhaseChanged(phase)
         }
@@ -105,9 +106,8 @@ struct CameraView: View {
                         Image(systemName: model.flashMode.symbolName)
                             .foregroundStyle(model.flashMode == .off ? Color.white : Theme.accent)
                             .contentTransition(.symbolEffect(.replace))
-                            .rotationEffect(orientation.iconRotation)
                     }
-                    .buttonStyle(CameraIconButtonStyle(size: 40))
+                    .buttonStyle(CameraIconButtonStyle(size: 44))
                     .accessibilityLabel(Text(model.flashMode.accessibilityLabel))
                 }
 
@@ -117,18 +117,16 @@ struct CameraView: View {
                     Image(systemName: showOptions ? "chevron.up" : "slider.horizontal.3")
                         .foregroundStyle(optionsActive || showOptions ? Theme.accent : .white)
                         .contentTransition(.symbolEffect(.replace))
-                        .rotationEffect(orientation.iconRotation)
                 }
-                .buttonStyle(CameraIconButtonStyle(size: 40))
+                .buttonStyle(CameraIconButtonStyle(size: 44))
                 .accessibilityLabel(showOptions ? Text("Hide camera options") : Text("Camera options"))
 
                 Spacer()
 
                 Button(action: onOpenSettings) {
                     Image(systemName: "gearshape.fill")
-                        .rotationEffect(orientation.iconRotation)
                 }
-                .buttonStyle(CameraIconButtonStyle(size: 40))
+                .buttonStyle(CameraIconButtonStyle(size: 44))
                 .accessibilityLabel(Text("Settings"))
             }
 
@@ -143,6 +141,7 @@ struct CameraView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                     .background(Theme.accent, in: Capsule())
+                    .minimumTapTarget()
                 }
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                 .accessibilityHint(Text("Shows Snapper Premium"))
@@ -150,7 +149,6 @@ struct CameraView: View {
         }
         .padding(.horizontal, 16)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isLocked)
-        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: orientation.iconRotation)
     }
 
     // MARK: - Preview
@@ -180,7 +178,6 @@ struct CameraView: View {
 
             if showBanner {
                 LookBanner(look: model.currentLook, collectionName: model.collectionName, isLocked: isLocked)
-                    .rotationEffect(orientation.iconRotation)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .allowsHitTesting(false)
             }
@@ -216,7 +213,6 @@ struct CameraView: View {
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.5), radius: 12)
                     .contentTransition(.numericText(countsDown: true))
-                    .rotationEffect(orientation.iconRotation)
                     .allowsHitTesting(false)
                     .accessibilityLabel(Text("Taking photo in \(countdown) seconds"))
             }
@@ -224,16 +220,13 @@ struct CameraView: View {
             VStack(spacing: 12) {
                 Spacer()
                 if showOptions {
-                    CameraOptionsPanel(model: model, settings: settings, tab: $optionsTab,
-                                       iconRotation: orientation.iconRotation)
+                    CameraOptionsPanel(model: model, settings: settings, tab: $optionsTab)
                         .padding(.horizontal, 12)
                         .padding(.bottom, model.capabilities.zoomPresets.count > 1 ? 0 : 14 + bottomInset)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 if model.capabilities.zoomPresets.count > 1 {
-                    ZoomControl(presets: model.capabilities.zoomPresets,
-                                zoom: model.zoom,
-                                iconRotation: orientation.iconRotation) { preset in
+                    ZoomControl(presets: model.capabilities.zoomPresets, zoom: model.zoom) { preset in
                         model.setZoom(preset, animated: true)
                     }
                     .padding(.bottom, 14 + bottomInset)
@@ -308,13 +301,38 @@ struct CameraView: View {
     // MARK: - Bottom controls
 
     private var bottomControls: some View {
-        VStack(spacing: 18) {
-            Button(action: onOpenLookPicker) {
-                LookCaption(look: model.currentLook, collectionName: model.collectionName, isLocked: isLocked)
-                    .animation(.easeInOut(duration: 0.2), value: model.currentLook)
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Button(action: onOpenLookPicker) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "camera.filters").foregroundStyle(Theme.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("LOOKS").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                            Text(model.currentLook.name).font(Theme.lookName(.headline)).lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    }
+                    .padding(12).frame(maxWidth: .infinity, minHeight: 58)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Browse looks. Current look: \(model.currentLook.name)")
+                Button(action: onOpenPresets) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("MY STYLES", systemImage: "square.stack").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                        Text(model.activePreset?.name ?? String(localized: "Presets"))
+                            .font(.subheadline.weight(.semibold)).lineLimit(1)
+                            .foregroundStyle(model.activePreset == nil ? Color.white : Theme.accent)
+                    }
+                    .padding(12).frame(minHeight: 58)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .contentShape(Rectangle())
+                }
+                .accessibilityHint("Choose or save a personal style")
             }
-            .buttonStyle(.plain)
-
+            .buttonStyle(PressableButtonStyle())
+            .padding(.horizontal, 16)
             HStack {
                 libraryButton
                 Spacer()
@@ -326,10 +344,15 @@ struct CameraView: View {
                 Button {
                     model.switchCamera()
                 } label: {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .rotationEffect(orientation.iconRotation)
+                    VStack(spacing: 5) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .frame(width: 52, height: 52)
+                            .glassSurface(in: Circle(), interactive: true)
+                        Text("Flip").font(.caption.weight(.semibold))
+                    }
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(CameraIconButtonStyle(size: 52))
+                .buttonStyle(.plain)
                 .disabled(!model.capabilities.canSwitchCamera)
                 .opacity(model.capabilities.canSwitchCamera ? 1 : 0.35)
                 .accessibilityLabel(Text("Switch camera"))
@@ -380,7 +403,6 @@ struct CameraView: View {
                         .overlay(Circle().strokeBorder(.black, lineWidth: 2))
                         .offset(x: 6, y: 6)
                 }
-                .rotationEffect(orientation.iconRotation)
                 .animation(.spring(response: 0.35, dampingFraction: 0.75), value: lastCapture)
 
                 Text("Library")
@@ -388,6 +410,7 @@ struct CameraView: View {
                     .foregroundStyle(.white)
             }
             .frame(width: 64)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Library"))

@@ -8,14 +8,27 @@ import SwiftUI
 @Observable
 final class EditorModel: Identifiable, Hashable {
     enum Tab: String, CaseIterable, Identifiable {
-        case looks, adjust, crop, finish
+        case looks, adjust, color, selective, crop, finish
 
         var id: String { rawValue }
+
+        var symbol: String {
+            switch self {
+            case .looks: "camera.filters"
+            case .adjust: "slider.horizontal.3"
+            case .color: "slider.horizontal.below.square.filled.and.square"
+            case .selective: "person.crop.rectangle"
+            case .crop: "crop.rotate"
+            case .finish: "rectangle.inset.filled"
+            }
+        }
 
         var title: LocalizedStringResource {
             switch self {
             case .looks: "Looks"
             case .adjust: "Adjust"
+            case .color: "Color"
+            case .selective: "Selective"
             case .crop: "Crop"
             case .finish: "Finish"
             }
@@ -47,6 +60,8 @@ final class EditorModel: Identifiable, Hashable {
     var tab: Tab = .looks {
         didSet {
             guard tab != oldValue else { return }
+            interaction(began: false)
+            isShowingOriginal = false
             scheduleRender()
             if tab == .looks { refreshLookThumbnails() }
         }
@@ -58,6 +73,9 @@ final class EditorModel: Identifiable, Hashable {
 
     /// The edited photo at screen size.
     private(set) var preview: UIImage?
+    private(set) var subjectMaskPreview: UIImage?
+    private(set) var isDetectingSubject = false
+    private(set) var subjectDetectionFailed = false
     /// The photo framed but with no look or sliders, for press-and-hold compare.
     private(set) var original: UIImage?
     /// For the Crop tab: mirrored and turned, with the look and sliders, but
@@ -99,6 +117,11 @@ final class EditorModel: Identifiable, Hashable {
     /// collecting into a single undo step; closed when it is stored.
     @ObservationIgnored private var isChangeGroupOpen = false
     @ObservationIgnored private var hintTask: Task<Void, Never>?
+    /// A finger is on a slider, dial or the crop box: everything until it
+    /// lifts is one undo step, however long it pauses.
+    @ObservationIgnored private var isInteracting = false
+    /// The original photo's upright size in pixels.
+    @ObservationIgnored private let sourceSize: CGSize?
 
     /// Undo steps kept per editing session.
     static let maxUndoSteps = 50
@@ -107,6 +130,7 @@ final class EditorModel: Identifiable, Hashable {
         var lookID: String
         var strength: Double
         var adjustments: PhotoAdjustments
+        var selective: SelectiveEdits
         var quarterTurns: Int
         var isFlipped: Bool
     }
@@ -125,6 +149,8 @@ final class EditorModel: Identifiable, Hashable {
         self.requestPremium = requestPremium
         self.recipe = library.record(id: id)?.recipe ?? .untouched
         self.recentIDsAtOpen = settings.recentLookIDs
+        // Only the file's header is read, so this is quick enough to do here.
+        self.sourceSize = library.record(id: id).flatMap { PhotoRenderer.orientedPixelSize(url: library.url(for: $0)) }
         preview = library.thumbnails[id]
         scheduleRender()
         refreshLookThumbnails()
@@ -137,7 +163,7 @@ final class EditorModel: Identifiable, Hashable {
 
     var record: CaptureRecord? { library.record(id: id) }
     var currentLook: Look { looks.look(id: recipe.lookID) ?? .original }
-    var isLocked: Bool { (currentLook.isPremium || recipe.finish.isActive) && !hasPremium() }
+    var isLocked: Bool { (currentLook.isPremium || recipe.requiresPremium) && !hasPremium() }
     var hasPremiumNow: Bool { hasPremium() }
     var isImported: Bool { record?.isImported ?? false }
     var isEdited: Bool { record.map { recipe != $0.initialRecipe } ?? false }
@@ -259,12 +285,58 @@ final class EditorModel: Identifiable, Hashable {
         step { $0.adjustments[kind] = 0 }
     }
 
+    func setColorMix(_ value: ColorMix, for band: ColorBand) {
+        guard value.isValid else { return }
+        update { $0.adjustments.colorMixer[band] = value }
+    }
+    func resetColorMix() { step { $0.adjustments.colorMixer = ColorMixer() } }
+    func setSelective(_ value: Double, key: WritableKeyPath<SelectiveAdjustment, Double>, background: Bool) {
+        guard value.isFinite, subjectMaskPreview != nil else { return }
+        let safe = min(max(value, -1), 1)
+        update {
+            if background { $0.selective.background[keyPath: key] = safe }
+            else { $0.selective.subject[keyPath: key] = safe }
+        }
+    }
+    func resetSelective() { step { $0.selective = SelectiveEdits() } }
+    func prepareSelective(retry: Bool = false) async {
+        guard let record, !isDetectingSubject else { return }
+        isDetectingSubject = true
+        subjectDetectionFailed = false
+        subjectMaskPreview = nil
+        let crop = recipe.crop
+        let mask = await library.renderer.prepareSubject(sourceURL: library.url(for: record), crop: crop, retry: retry)
+        isDetectingSubject = false
+        guard recipe.crop == crop else {
+            await prepareSelective(retry: retry)
+            return
+        }
+        subjectMaskPreview = mask
+        subjectDetectionFailed = mask == nil
+        if mask != nil {
+            scheduleRender()
+            thumbnailsRecipe = nil
+            if tab == .looks { refreshLookThumbnails() }
+        }
+    }
+    func applyCuratedStyle(_ style: CuratedStyle) {
+        guard CuratedCollection.contains(style), looks.look(id: style.recipe.lookID) != nil else { return }
+        step {
+            $0.lookID = style.recipe.lookID
+            $0.strength = style.recipe.strength
+            $0.adjustments = style.recipe.adjustments
+        }
+        refreshLookThumbnails()
+    }
+
     // MARK: - Crop
 
-    /// The turned frame's size in pixels (for box shapes).
+    /// The turned, uncropped frame's size in pixels (for box shapes). Taken
+    /// from the original, never from the preview, which is already cropped.
     var frameSize: CGSize {
-        if let cropBase { return cropBase.size }
-        if let preview { return preview.size }
+        if let size = sourceSize ?? cropBase?.size.applyingTurns(-recipe.crop.quarterTurns) {
+            return size.applyingTurns(recipe.crop.quarterTurns)
+        }
         return CGSize(width: 3, height: 4)
     }
 
@@ -334,9 +406,17 @@ final class EditorModel: Identifiable, Hashable {
             isChangeGroupOpen = true
         }
         recipe = next
+        // Comparing would hide the change being made.
+        isShowingOriginal = false
         scheduleRender()
         scheduleCommit()
         showEditsKeptHintIfNeeded()
+    }
+
+    /// A slider, dial or crop drag started or ended.
+    func interaction(began: Bool) {
+        isInteracting = began
+        if !began { commit() }
     }
 
     /// A single tap's change (a look, a shape, a turn, a reset): always its
@@ -415,7 +495,12 @@ final class EditorModel: Identifiable, Hashable {
         commitTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            commit()
+            if isInteracting {
+                // Store it in case the app goes away mid-drag, but keep the undo step open.
+                library.updateRecipe(id: id, recipe)
+            } else {
+                commit()
+            }
         }
     }
 
@@ -429,6 +514,7 @@ final class EditorModel: Identifiable, Hashable {
 
     /// Called when the editor closes.
     func finish() {
+        isInteracting = false
         commit()
         if !currentLook.isOriginal {
             settings.noteRecentlyUsed(currentLook)
@@ -459,15 +545,17 @@ final class EditorModel: Identifiable, Hashable {
         let renderer = library.renderer
         let recipe = self.recipe
         let look = currentLook
+        let renderingTab = tab
 
         if tab == .crop {
             let key = CropBaseKey(lookID: recipe.lookID, strength: recipe.strength, adjustments: recipe.adjustments,
-                                  quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)
+                                  selective: recipe.selective, quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)
             if key != cropBaseKey || cropBase == nil {
                 var base = recipe
                 base.crop = PhotoCrop(shape: .free, quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)
                 base.finish = .none
                 if let image = await renderer.preview(id: id, sourceURL: url, look: look, recipe: base) {
+                    guard self.recipe == recipe, tab == renderingTab else { return }
                     cropBase = image
                     cropBaseKey = key
                 }
@@ -476,10 +564,12 @@ final class EditorModel: Identifiable, Hashable {
         }
 
         if let image = await renderer.preview(id: id, sourceURL: url, look: look, recipe: recipe) {
+            guard self.recipe == recipe, tab == renderingTab else { return }
             preview = image
         }
         if originalCrop != recipe.crop || original == nil {
             if let image = await renderer.original(id: id, sourceURL: url, crop: recipe.crop) {
+                guard self.recipe == recipe, tab == renderingTab else { return }
                 original = image
                 originalCrop = recipe.crop
             }
@@ -557,4 +647,11 @@ final class EditorModel: Identifiable, Hashable {
         }
     }
 
+}
+
+private extension CGSize {
+    /// The size after `turns` quarter turns (negative turns back).
+    func applyingTurns(_ turns: Int) -> CGSize {
+        turns % 2 == 0 ? self : CGSize(width: height, height: width)
+    }
 }

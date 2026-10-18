@@ -1,6 +1,8 @@
 # Snapper
 
-An iPhone camera with live film looks, sold with an auto-renewing subscription.
+Find your look. Shoot with it. Style your whole weekend.
+
+An iPhone camera and photo editor with live film looks and reusable personal styles.
 
 - **Live preview through every look:** Core Image + Metal, 30 fps, off the main thread. Swipe the preview to change looks, with a live split as you drag.
 - **What you see is what you save:** the preview, the full-resolution photo and every export go through the same pipeline (`LookPipeline`).
@@ -21,6 +23,15 @@ Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6
 - **Free experience:** all allowed exports are watermark-free. Onboarding no longer opens a paywall. The first automatic save may show an optional upgrade toast, and the editor offers an upgrade after saving.
 
 See [the release checklist](docs/release-checklist.md) for owner-supplied details, photographic acceptance, StoreKit tests and device checks still needed before public release.
+
+## Connected photo workflows
+
+- **Choose by occasion:** Looks starts with Friends & Flash, Travel & Daylight, Soft Portraits and City at Night. Each offers three existing looks and a practical shooting tip; the complete catalog remains below.
+- **Shoot your personal style:** Camera › Presets applies the saved strength and all color adjustments to the live feed and new photos. The active preset is remembered. Choosing/swiping to a base look clears the preset; canceling a swipe keeps it. Editor › Presets › … › Shoot with This Preset returns to the camera.
+- **Finish a set:** Library › Select › Style › Finish Photo Set previews a shared frame and/or layout on every selected photo. Crops, color edits and date stamps are preserved. Apply keeps the set selected; Apply & Share prepares a single share operation. Premium is checked again when applying/exporting. Undo Last Batch preserves later edits.
+- **Exchange styles:** Presets › … › Share Preset File creates a `.snapperpreset` file. Import through Presets › Import Preset File, or open a shared file in Snapper. A sample preview and settings appear before confirmation. Each import creates a new preset, respects the one-free-preset limit and never overwrites an existing style. Imported premium looks still require Premium to export photos.
+- **Optional style cards:** Share Style Card sends a labeled image plus its preset file. From the editor it uses that photo with its crop and finishing kept, using the selected style; elsewhere it uses a clearly labeled sample. Ordinary exports stay clean.
+- Preset files carry only a version, name, look identifier, strength and adjustments. Imports are bounded to 64 KB and reject unknown versions/looks and invalid values. No server or account is added.
 
 ## Run it on your iPhone
 

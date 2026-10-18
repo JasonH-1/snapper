@@ -94,6 +94,8 @@ final class LibraryModel: Identifiable {
     var shareItems: ShareItems?
     var isChoosingLook = false
     var isChoosingPreset = false
+    /// Session-only color clipboard; never includes crop, frame, or date.
+    private(set) var copiedStyle: SavedPreset?
     /// Last batch only; skip any photos individually edited afterwards.
     private(set) var batchUndo: [UUID: (before: PhotoRecipe, after: PhotoRecipe)] = [:]
     var canUndoBatch: Bool { !batchUndo.isEmpty }
@@ -146,9 +148,9 @@ final class LibraryModel: Identifiable {
 
     var emptyMessage: (title: LocalizedStringResource, detail: LocalizedStringResource) {
         switch filter {
-        case .all: ("No photos yet", "Photos you take in Snapper show up here. Tap + to bring in photos from your library.")
+        case .all: ("No photos yet", "Photos you take in Snapper show up here. Tap Import Photos to bring in photos from your library.")
         case .camera: ("No Snapper shots yet", "Photos you take with Snapper's camera show up here.")
-        case .imported: ("Nothing imported", "Tap + to pick photos from your library. Snapper edits its own copy.")
+        case .imported: ("Nothing imported", "Tap Import Photos to pick photos from your library. Snapper edits its own copy.")
         case .edited: ("No edited photos", "Photos you change after taking or importing them show up here.")
         case .notSaved: ("Everything is saved", "Every photo here is already in your photo library.")
         }
@@ -280,7 +282,7 @@ final class LibraryModel: Identifiable {
     }
 
     private func isLocked(_ record: CaptureRecord) -> Bool {
-        (captures.look(for: record).isPremium || record.recipe.finish.isActive) && !hasPremium()
+        (captures.look(for: record).isPremium || record.recipe.requiresPremium) && !hasPremium()
     }
 
     // MARK: - Batch actions
@@ -300,7 +302,7 @@ final class LibraryModel: Identifiable {
             do {
                 shareItems = ShareItems(urls: try await captures.exportForSharing(allowed, watermark: watermark))
                 if allowed.count < chosen.count {
-                    show(String(localized: "Photos with Premium looks or finishing were left out."))
+                    show(String(localized: "Photos with Premium looks or edits were left out."))
                 }
             } catch {
                 alert = .error(error.localizedDescription)
@@ -331,7 +333,7 @@ final class LibraryModel: Identifiable {
                 }
                 let skipped = chosen.count - allowed.count
                 show(skipped > 0
-                     ? String(localized: "Saved \(Self.photoCount(saved)). Premium looks and finishing need Premium to save.")
+                     ? String(localized: "Saved \(Self.photoCount(saved)). Premium looks and edits need Premium to save.")
                      : String(localized: "Saved \(Self.photoCount(saved)) to Photos"))
                 isSelecting = false
             } catch PhotoLibrarySaver.SaveError.notAuthorized {
@@ -354,7 +356,6 @@ final class LibraryModel: Identifiable {
         }
         settings.noteRecentlyUsed(look)
         show(String(localized: "Applied \(look.name) to \(Self.photoCount(chosen.count))"))
-        isSelecting = false
     }
 
     @discardableResult
@@ -365,7 +366,49 @@ final class LibraryModel: Identifiable {
         applyBatch(chosen) { preset.applying(to: $0.recipe) }
         if let look = looks.look(id: preset.lookID) { settings.noteRecentlyUsed(look) }
         show(String(localized: "Applied \(preset.name) to \(Self.photoCount(chosen.count)). Crops and finishing kept."))
-        isSelecting = false
+        return true
+    }
+
+    func copyStyle(from record: CaptureRecord) {
+        guard let current = captures.record(id: record.id) else { return }
+        let name = captures.look(for: current).name
+        copiedStyle = SavedPreset(name: name, recipe: current.recipe)
+        show(String(localized: "Copied \(name). Choose another photo or select a set to paste."))
+    }
+
+    @discardableResult
+    func pasteStyle(to ids: Set<UUID>) -> Bool {
+        guard !isWorking, let style = copiedStyle, let look = looks.look(id: style.lookID) else { return false }
+        let chosen = records.filter { ids.contains($0.id) }
+        guard !chosen.isEmpty else { return false }
+        if chosen.count > 1 && !hasPremium() {
+            requestPremium(look, nil, nil)
+            return false
+        }
+        applyBatch(chosen) { style.applying(to: $0.recipe) }
+        settings.noteRecentlyUsed(look)
+        show(String(localized: "Pasted style to \(Self.photoCount(chosen.count)). Crops and finishing kept."))
+        return true
+    }
+
+    /// Snapshot-based application avoids overwriting changes made since preview opened.
+    @discardableResult
+    func applyFinishing(_ finish: BatchFinish, to snapshots: [CaptureRecord]) -> Bool {
+        guard hasPremium(), !isWorking, finish.hasChanges, !snapshots.isEmpty else { return false }
+        let unchanged = snapshots.compactMap { snapshot -> CaptureRecord? in
+            guard let current = captures.record(id: snapshot.id), current.recipe == snapshot.recipe else { return nil }
+            return current
+        }
+        guard !unchanged.isEmpty else {
+            show(String(localized: "These photos changed. Reopen the finishing preview to try again."))
+            return false
+        }
+        applyBatch(unchanged) { finish.applying(to: $0.recipe) }
+        isSelecting = true
+        selection = Set(unchanged.map(\.id))
+        let skipped = snapshots.count - unchanged.count
+        show(skipped == 0 ? String(localized: "Finishing applied. Your photo set is ready to save or share.")
+             : String(localized: "Finishing applied. \(skipped) changed or deleted photos were skipped."))
         return true
     }
 
@@ -399,8 +442,10 @@ final class LibraryModel: Identifiable {
 
     var hasPremiumNow: Bool { hasPremium() }
 
-    func deleteSelected() {
-        captures.delete(ids: selection)
+    /// Deletes photos (copies already in Photos are not affected) and leaves Select mode.
+    func delete(_ ids: Set<UUID>) {
+        captures.delete(ids: ids)
+        selection.subtract(ids)
         isSelecting = false
     }
 

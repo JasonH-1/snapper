@@ -8,8 +8,10 @@ import SwiftUI
 struct EditorView: View {
     @Bindable var model: EditorModel
     @State private var showsPresets = false
+    @State private var showsCollections = false
     @State private var upgradeAfterPresets = false
     var onShowPaywall: () -> Void = {}
+    var onShootPreset: ((SavedPreset) -> Bool)?
 
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -19,19 +21,13 @@ struct EditorView: View {
         VStack(spacing: 12) {
             canvas
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Picker("Edit", selection: $model.tab) {
-                ForEach(EditorModel.Tab.allCases) { tab in
-                    Text(tab.title).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
+            toolNavigation
             panel
             actions
         }
         .padding(.top, 4)
         .padding(.bottom, 8)
-        .background(Color.black.ignoresSafeArea())
+        .background(Theme.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .sheet(item: $model.shareItem) { item in
@@ -39,12 +35,18 @@ struct EditorView: View {
                 .presentationDetents([.medium, .large])
                 .ignoresSafeArea()
         }
+        .sheet(isPresented: $showsCollections) {
+            CuratedCollectionsView(library: model.looks, renderer: model.library.renderer) { style in
+                model.applyCuratedStyle(style)
+            }
+        }
         .sheet(isPresented: $showsPresets, onDismiss: {
             if upgradeAfterPresets { upgradeAfterPresets = false; onShowPaywall() }
         }) {
             PresetsView(store: model.settings.presets, looks: model.looks, hasPremium: model.hasPremiumNow,
                         currentRecipe: model.recipe, onApply: { model.applyPreset($0) },
-                        onUpgrade: { upgradeAfterPresets = true })
+                        onUpgrade: { upgradeAfterPresets = true }, onShoot: onShootPreset,
+                        samplePhotoURL: model.record.map { model.library.url(for: $0) })
         }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {
@@ -67,6 +69,34 @@ struct EditorView: View {
         .sensoryFeedback(.success, trigger: model.savedCount)
         .sensoryFeedback(.selection, trigger: model.tab)
         .onDisappear { model.finish() }
+    }
+
+    private var toolNavigation: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(EditorModel.Tab.allCases) { tab in
+                    Button {
+                        withAnimation(animation) { model.tab = tab }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: tab.symbol).font(.body.weight(.semibold))
+                            Text(tab.title).font(.caption.weight(.semibold))
+                        }
+                        .frame(minWidth: 66, minHeight: 58)
+                        .contentShape(Rectangle())
+                        .foregroundStyle(model.tab == tab ? Color.black : Color.primary)
+                        .background(model.tab == tab ? Theme.accent : .clear, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
+                }
+            }
+        }
+        .padding(5)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 19))
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Editing tools")
     }
 
     private var animation: Animation? { .snapper(Motion.standard, reduceMotion: reduceMotion) }
@@ -128,6 +158,8 @@ struct EditorView: View {
                     withAnimation(animation) { model.resetLight() }
                 }
                 .disabled(!model.isLightChanged)
+                Button("Reset Selective Edits", systemImage: "person.crop.rectangle") { model.resetSelective() }
+                    .disabled(!model.recipe.selective.isActive)
                 Button("Reset Crop", systemImage: "crop") {
                     withAnimation(animation) { model.resetCrop() }
                 }
@@ -153,9 +185,9 @@ struct EditorView: View {
     private var canvas: some View {
         if model.tab == .crop {
             if let base = model.cropBase {
-                CropCanvas(image: base, straighten: model.straighten, rect: model.cropRect, aspect: model.cropAspect) { rect in
-                    model.setCropRect(rect)
-                }
+                CropCanvas(image: base, straighten: model.straighten, rect: model.cropRect, aspect: model.cropAspect,
+                           onChange: { model.setCropRect($0) },
+                           onInteraction: { model.interaction(began: $0) })
                 .transition(.opacity)
             } else {
                 ProgressView()
@@ -245,6 +277,8 @@ struct EditorView: View {
         switch model.tab {
         case .looks: looksPanel
         case .adjust: adjustPanel
+        case .color: ColorMixerPanel(model: model)
+        case .selective: SelectiveEditPanel(model: model)
         case .crop: cropPanel
         case .finish: finishPanel
         }
@@ -254,9 +288,16 @@ struct EditorView: View {
         VStack(spacing: 8) {
             HStack {
                 lookCaption
-                Button("Presets", systemImage: "slider.horizontal.3") { showsPresets = true }
-                    .font(.subheadline.weight(.semibold)).padding(.trailing, 16)
             }
+            HStack(spacing: 16) {
+                Button { showsCollections = true } label: {
+                    Label("Collections", systemImage: "square.stack").minimumTapTarget()
+                }
+                Button { showsPresets = true } label: {
+                    Label("Presets", systemImage: "slider.horizontal.3").minimumTapTarget()
+                }
+            }
+            .font(.subheadline.weight(.semibold))
             if let guide = LookGuide.forLook(model.currentLook.id) {
                 Text(guide.bestFor).font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
@@ -276,8 +317,10 @@ struct EditorView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                Slider(value: $model.strength, in: 0...1)
-                    .disabled(model.currentLook.isOriginal)
+                Slider(value: $model.strength, in: 0...1) { editing in
+                    model.interaction(began: editing)
+                }
+                .disabled(model.currentLook.isOriginal)
                 Text("\(Int((model.strength * 100).rounded()))")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .fixedSize()
@@ -337,14 +380,19 @@ struct EditorView: View {
         let value = model.value(of: kind)
         let isChanged = abs(value) > 0.004
         return VStack(spacing: 10) {
-            HStack(spacing: 4) {
-                ForEach(PhotoAdjustments.Kind.allCases) { tool in
-                    AdjustToolButton(kind: tool, isSelected: model.adjustTool == tool,
-                                     isChanged: abs(model.value(of: tool)) > 0.004,
-                                     showsTitle: !dynamicTypeSize.isAccessibilitySize) {
-                        model.adjustTool = tool
+            if !model.hasPremiumNow && [.highlights, .shadows, .bloom, .halation, .vignette].contains(kind) {
+                Text("Premium tool · preview free").font(.caption).foregroundStyle(Theme.accent)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(PhotoAdjustments.Kind.allCases) { tool in
+                        AdjustToolButton(kind: tool, isSelected: model.adjustTool == tool,
+                                         isChanged: abs(model.value(of: tool)) > 0.004,
+                                         showsTitle: !dynamicTypeSize.isAccessibilitySize) {
+                            model.adjustTool = tool
+                        }
+                        .frame(width: 64)
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(.horizontal, 12)
@@ -371,7 +419,8 @@ struct EditorView: View {
                 .accessibilityLabel(Text("Reset \(String(localized: kind.title))"))
 
                 RulerSlider(value: Binding(get: { model.value(of: kind) }, set: { model.setValue($0, for: kind) }),
-                            range: kind.range, tickStep: 0.05)
+                            range: kind.range, tickStep: 0.05,
+                            onEditingChanged: { model.interaction(began: $0) })
                     .frame(height: 28)
                     .padding(.horizontal, 16)
                     .id(kind)
@@ -395,7 +444,7 @@ struct EditorView: View {
                 if model.frame != .none {
                     HStack {
                         Text("Border").font(.subheadline)
-                        Slider(value: $model.border, in: 0.01...0.16)
+                        Slider(value: $model.border, in: 0.01...0.16, onEditingChanged: { model.interaction(began: $0) })
                             .accessibilityLabel("Border width")
                     }
                 }
@@ -461,7 +510,8 @@ struct EditorView: View {
                             .minimumScaleFactor(0.7)
                     }
                     .buttonStyle(PressableButtonStyle())
-                    RulerSlider(value: $model.straighten, range: PhotoCrop.straightenRange, tickStep: 1, spacing: 8)
+                    RulerSlider(value: $model.straighten, range: PhotoCrop.straightenRange, tickStep: 1, spacing: 8,
+                                onEditingChanged: { model.interaction(began: $0) })
                         .frame(height: 24)
                         .accessibilityLabel(Text("Straighten"))
                 }
@@ -543,7 +593,7 @@ struct EditorView: View {
             .padding(.horizontal, 16)
 
             if model.isLocked {
-                Text("Preview free. Premium is required to save this look or finish.")
+                Text("Preview free. Premium is required to export this look or these edits.")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
             } else if model.savedCount > 0 && !model.hasPremiumNow {
                 Button("Photo saved. Explore Premium styles", action: onShowPaywall)
@@ -641,6 +691,11 @@ extension PhotoAdjustments.Kind {
         case .warmth: "Warmth"
         case .fade: "Fade"
         case .grain: "Grain"
+        case .highlights: "Highlights"
+        case .shadows: "Shadows"
+        case .bloom: "Bloom"
+        case .halation: "Halation"
+        case .vignette: "Vignette"
         }
     }
 
@@ -652,6 +707,11 @@ extension PhotoAdjustments.Kind {
         case .warmth: "thermometer.medium"
         case .fade: "square.dashed"
         case .grain: "circle.grid.3x3.fill"
+        case .highlights: "sun.max.fill"
+        case .shadows: "moon.fill"
+        case .bloom: "sun.haze"
+        case .halation: "sparkles"
+        case .vignette: "circle.dashed"
         }
     }
 }
