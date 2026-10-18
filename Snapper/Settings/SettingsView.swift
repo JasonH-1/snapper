@@ -61,7 +61,7 @@ struct SettingsView: View {
                     onClose()
                 }
             }) {
-                GuideView(app: app) { destination in
+                GuideView(library: app.library) { destination in
                     guideDestination = destination
                     showGuide = false
                 }

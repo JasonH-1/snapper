@@ -74,7 +74,9 @@ final class PaywallModel: Identifiable {
     var title: String {
         switch context {
         case .lockedLook(let look, _, _):
-            String(localized: "Keep \(look.name) with Premium")
+            look.isPremium
+                ? String(localized: "Keep \(look.name) with Premium")
+                : String(localized: "Export your edits with Premium")
         case .intro, .upgrade:
             String(localized: "Your style, in every photo")
         }

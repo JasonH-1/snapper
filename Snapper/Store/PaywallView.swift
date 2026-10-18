@@ -128,7 +128,7 @@ struct PaywallView: View {
             Text(model.title)
                 .font(Theme.lookTitle(size: 30))
                 .multilineTextAlignment(.center)
-            Text("All \(model.totalLookCount) looks, personal presets and finishing tools.")
+            Text("All \(model.totalLookCount) looks, advanced photo tools and reusable styles.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -142,6 +142,10 @@ struct PaywallView: View {
                     detail: Text("Every collection, complete. Preview them live, keep the ones you love."))
             benefit(symbol: "slider.horizontal.3", title: Text("Make your style repeatable"),
                     detail: Text("Shoot with your personal presets and apply them across a whole photo set."))
+            benefit(symbol: "paintpalette", title: Text("Shape light, color and film texture"),
+                    detail: Text("Highlights, shadows, seven color bands, bloom, halation and vignette."))
+            benefit(symbol: "person.crop.rectangle", title: Text("Separate subject and background"),
+                    detail: Text("Adjust brightness, saturation and warmth separately when a subject can be detected."))
             benefit(symbol: "rectangle.portrait", title: Text("Ready to share"),
                     detail: Text("Add frames, date stamps and fitted post or story layouts."))
             benefit(symbol: "calendar.badge.clock", title: Text("Cancel anytime"),

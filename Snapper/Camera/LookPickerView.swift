@@ -11,10 +11,14 @@ struct LookPickerView: View {
     @Bindable var settings: AppSettings
     let thumbnails: LookThumbnails
     var title: String = String(localized: "Looks")
+    var onSelectStyle: ((CuratedStyle) -> Void)? = nil
     var onSelect: (Look) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var showGuide = false
+    @State private var showCollections = false
+    @State private var collectionRenderer = PhotoRenderer()
     @State private var scope: LookDiscovery.Scope = .all
     @State private var occasion: LookOccasion?
     @State private var position: String?
@@ -34,6 +38,25 @@ struct LookPickerView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
+                    Button {
+                        showGuide = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text("Need a guide?").foregroundStyle(.secondary)
+                            Text("Tap here").foregroundStyle(Theme.accent).underline()
+                        }
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open the Looks guide")
+                    .accessibilityHint("Learn about filters, favorites and look strength")
+                    if onSelectStyle != nil {
+                        Button { showCollections = true } label: {
+                            Label("Explore curated collections", systemImage: "square.stack").minimumTapTarget()
+                        }.font(.subheadline.weight(.semibold))
+                    }
                     if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && scope == .all {
                         occasionDiscovery
                         if occasion == nil { featuredGuidance }
@@ -99,6 +122,14 @@ struct LookPickerView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .sheet(isPresented: $showCollections) {
+                CuratedCollectionsView(library: library, renderer: collectionRenderer) { style in
+                    onSelectStyle?(style)
+                }
+            }
+            .fullScreenCover(isPresented: $showGuide) {
+                GuideView(library: library, initialTopicID: "looks")
             }
             .onAppear {
                 if recentIDs == nil { recentIDs = settings.recentLookIDs }

@@ -30,7 +30,7 @@ struct PresetsView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Presets keep the look, strength and light adjustments. Each photo keeps its own crop, frame and date.")
+                    Text("Presets keep the look, strength, color and film adjustments. Each photo keeps its own crop, frame, date and selective edits.")
                         .font(.subheadline).foregroundStyle(.secondary)
                     if !hasPremium {
                         Text("One personal preset is included free. Premium unlocks unlimited presets and batch styling.")
@@ -100,7 +100,8 @@ struct PresetsView: View {
                                     .disabled(isPreparingShare)
                                 Button("Share Style Card", systemImage: "photo") {
                                     guard store.canUse(preset, hasPremium: hasPremium),
-                                          hasPremium || (looks.look(id: preset.lookID)?.isPremium == false && currentRecipe?.finish.isActive != true) else { upgrade(); return }
+                                          hasPremium || (looks.look(id: preset.lookID)?.isPremium == false
+                                              && !preset.applying(to: currentRecipe ?? .untouched).requiresPremium) else { upgrade(); return }
                                     share(preset, card: true)
                                 }
                                 .disabled(isPreparingShare || looks.look(id: preset.lookID) == nil)

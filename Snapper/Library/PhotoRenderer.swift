@@ -20,10 +20,12 @@ actor PhotoRenderer {
     enum RenderError: LocalizedError {
         case unreadableImage
         case encodingFailed
+        case subjectUnavailable
 
         var errorDescription: String? {
             switch self {
             case .unreadableImage: String(localized: "The photo could not be read.")
+            case .subjectUnavailable: String(localized: "A subject mask could not be created. Open Selective, retry detection or reset selective edits before exporting.")
             case .encodingFailed: String(localized: "The photo could not be prepared for saving.")
             }
         }
@@ -31,14 +33,20 @@ actor PhotoRenderer {
 
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let lutStore: LUTStore
+    private let detectSubject: @Sendable (CIImage) throws -> CIImage?
 
     /// Downscaled, oriented sources for interactive editing, by capture id.
     private struct Proxy { let image: CIImage; let maxPixelSize: Int }
     private var proxies: [UUID: Proxy] = [:]
     private var proxyOrder: [UUID] = []
+    private var subjectMasks: [URL: CIImage] = [:]
+    private var maskOrder: [URL] = []
+    private var failedMasks: Set<URL> = []
 
-    init(lutStore: LUTStore = .shared) {
+    init(lutStore: LUTStore = .shared,
+         detectSubject: @escaping @Sendable (CIImage) throws -> CIImage? = { try SelectiveRendering.detect(in: $0) }) {
         self.lutStore = lutStore
+        self.detectSubject = detectSubject
     }
 
     // MARK: - Export
@@ -51,11 +59,13 @@ actor PhotoRenderer {
                 recipe: PhotoRecipe,
                 seed: UInt64 = 0,
                 watermark: Bool,
-                format: ExportFormat) throws -> Data {
+                format: ExportFormat, sourceURL: URL? = nil) throws -> Data {
         guard let original = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
             throw RenderError.unreadableImage
         }
-        var image = render(look, recipe: recipe, seed: seed, to: original)
+        guard var image = render(look, recipe: recipe, seed: seed, to: original, sourceURL: sourceURL) else {
+            throw RenderError.subjectUnavailable
+        }
         if watermark {
             image = Watermark.apply(to: image)
         }
@@ -95,7 +105,8 @@ actor PhotoRenderer {
     /// this size; only exports work at full resolution.
     func preview(id: UUID, sourceURL: URL, look: Look, recipe: PhotoRecipe, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(render(look, recipe: recipe, seed: id.effectsSeed, to: proxy))
+        guard let image = render(look, recipe: recipe, seed: id.effectsSeed, to: proxy, sourceURL: sourceURL) else { return nil }
+        return makeUIImage(image)
     }
 
     /// The photo framed by `crop` but with no look or sliders (for
@@ -117,11 +128,15 @@ actor PhotoRenderer {
     func thumbnails(sourceURL: URL, looks: [Look], recipe: PhotoRecipe = .untouched, seed: UInt64 = 0,
                     maxPixelSize: Int = 220) -> [String: UIImage] {
         guard let small = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return [:] }
-        let framed = PhotoEditing.frame(small, with: recipe.crop)
         var result: [String: UIImage] = [:]
         for look in looks {
-            let graded = render(look, seed: seed, to: framed)
-            result[look.id] = makeUIImage(PhotoEditing.adjust(graded, with: recipe.adjustments, seed: seed))
+            var variant = recipe
+            variant.lookID = look.id
+            variant.strength = 1
+            variant.finish = .none
+            if let image = render(look, recipe: variant, seed: seed, to: small, sourceURL: sourceURL) {
+                result[look.id] = makeUIImage(image)
+            }
         }
         return result
     }
@@ -130,7 +145,8 @@ actor PhotoRenderer {
     func thumbnail(sourceURL: URL, look: Look, recipe: PhotoRecipe, seed: UInt64 = 0,
                    maxPixelSize: Int = 240) -> UIImage? {
         guard let small = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(render(look, recipe: recipe, seed: seed, to: small))
+        guard let image = render(look, recipe: recipe, seed: seed, to: small, sourceURL: sourceURL) else { return nil }
+        return makeUIImage(image)
     }
 
     /// Renders a bundled showcase image (onboarding, paywall) in a look.
@@ -143,8 +159,49 @@ actor PhotoRenderer {
         LookPipeline.apply(look, lut: lutStore.lut(for: look), strength: strength, seed: seed, to: image)
     }
 
-    private func render(_ look: Look, recipe: PhotoRecipe, seed: UInt64, to image: CIImage) -> CIImage {
-        PhotoEditing.apply(recipe, look: look, lut: lutStore.lut(for: look), seed: seed, to: image)
+    private func render(_ look: Look, recipe: PhotoRecipe, seed: UInt64, to image: CIImage, sourceURL: URL? = nil) -> CIImage? {
+        let mask = recipe.selective.isActive ? subjectMask(sourceURL: sourceURL, image: image) : nil
+        guard !recipe.selective.isActive || mask != nil else { return nil }
+        return PhotoEditing.apply(recipe, look: look, lut: lutStore.lut(for: look), seed: seed, to: image, subjectMask: mask)
+    }
+
+    func prepareSubject(sourceURL: URL, crop: PhotoCrop, retry: Bool = false) -> UIImage? {
+        if retry { failedMasks.remove(sourceURL) }
+        guard let source = Self.downsampled(url: sourceURL, maxPixelSize: 1024),
+              let mask = subjectMask(sourceURL: sourceURL, image: source) else { return nil }
+        return makeUIImage(PhotoEditing.frame(mask, with: crop))
+    }
+
+    private func subjectMask(sourceURL: URL?, image: CIImage) -> CIImage? {
+        if let sourceURL, failedMasks.contains(sourceURL) { return nil }
+        let detected: CIImage
+        if let sourceURL, let cached = subjectMasks[sourceURL] { detected = cached }
+        else {
+            let source: CIImage
+            if let sourceURL, let loaded = Self.downsampled(url: sourceURL, maxPixelSize: 1024) { source = loaded }
+            else {
+                let scale = min(1, 1024 / max(image.extent.width, image.extent.height))
+                source = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            }
+            guard let mask = try? detectSubject(source), !mask.extent.isInfinite,
+                  mask.extent.width > 0, mask.extent.height > 0 else {
+                if let sourceURL {
+                    if failedMasks.count >= 32 { failedMasks.removeAll() }
+                    failedMasks.insert(sourceURL)
+                }
+                return nil
+            }
+            detected = mask.transformed(by: CGAffineTransform(translationX: -mask.extent.minX, y: -mask.extent.minY))
+            if let sourceURL {
+                subjectMasks[sourceURL] = detected
+                maskOrder.append(sourceURL)
+                if maskOrder.count > 6 { subjectMasks[maskOrder.removeFirst()] = nil }
+            }
+        }
+        return detected.transformed(by: CGAffineTransform(scaleX: image.extent.width / detected.extent.width,
+                                                         y: image.extent.height / detected.extent.height))
+            .transformed(by: CGAffineTransform(translationX: image.extent.minX, y: image.extent.minY))
+            .cropped(to: image.extent)
     }
 
     func forget(id: UUID) {
