@@ -39,8 +39,8 @@ struct LibraryView: View {
         NavigationStack {
             content
                 .background(Theme.canvas.ignoresSafeArea())
-                .navigationTitle(model.isSelecting ? selectionTitle : String(localized: "Library"))
-                .navigationBarTitleDisplayMode(model.isSelecting ? .inline : .large)
+                .navigationTitle(model.isSelecting ? selectionTitle : "")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
                 .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
                 .navigationDestination(item: $model.editor) { editor in

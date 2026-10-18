@@ -90,7 +90,14 @@ struct RootView: View {
                 .zoomTransition(from: AppModel.libraryZoomID, in: libraryZoom)
         }
         .paywallHost(app, as: .root, onDismiss: { presentationDismissed("paywall") })
-        .sheet(isPresented: $app.isShowingSettings, onDismiss: { app.settingsDismissed(); presentationDismissed("settings") }) {
+        .sheet(isPresented: $app.isShowingSettings, onDismiss: {
+            app.settingsDismissed()
+            // An incoming file takes priority over a queued guide shortcut.
+            let hasIncomingFile = pendingPreset != nil || pendingImportError != nil || app.isImportingPreset
+            presentationDismissed("settings")
+            if hasIncomingFile { app.pendingGuideDestination = nil }
+            else { app.openPendingGuideDestination() }
+        }) {
             SettingsView(app: app, onClose: { app.isShowingSettings = false })
                 .paywallHost(app, as: .settings, onDismiss: { presentationDismissed("paywall") })
         }
