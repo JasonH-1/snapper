@@ -2,15 +2,25 @@ import SwiftUI
 
 /// A standalone, offline reference. Examples never write to the photo library.
 struct GuideView: View {
-    let app: AppModel
-    let onOpen: (GuideDestination) -> Void
+    let library: LookLibrary
+    let onOpen: ((GuideDestination) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var path: [String]
+
+    init(library: LookLibrary, initialTopicID: String? = nil,
+         onOpen: ((GuideDestination) -> Void)? = nil) {
+        self.library = library
+        self.onOpen = onOpen
+        _path = State(initialValue: initialTopicID.flatMap { id in
+            GuideCatalog.topics.contains { $0.id == id } ? [id] : nil
+        } ?? [])
+    }
 
     private var results: [GuideTopic] { GuideCatalog.search(query) }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 if query.isEmpty {
                     Section {
@@ -27,9 +37,7 @@ struct GuideView: View {
                     if !topics.isEmpty {
                         Section(section) {
                             ForEach(topics) { topic in
-                                NavigationLink {
-                                    GuideTopicView(topic: topic, app: app, onOpen: onOpen)
-                                } label: {
+                                NavigationLink(value: topic.id) {
                                     Label {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(topic.title).font(.headline)
@@ -42,6 +50,16 @@ struct GuideView: View {
                             }
                         }
                     }
+                }
+            }
+            .navigationDestination(for: String.self) { id in
+                if let topic = GuideCatalog.topics.first(where: { $0.id == id }) {
+                    GuideTopicView(topic: topic, library: library, onOpen: onOpen)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { dismiss() }
+                            }
+                        }
                 }
             }
             .scrollContentBackground(.hidden)
@@ -64,8 +82,8 @@ struct GuideView: View {
 
 private struct GuideTopicView: View {
     let topic: GuideTopic
-    let app: AppModel
-    let onOpen: (GuideDestination) -> Void
+    let library: LookLibrary
+    let onOpen: ((GuideDestination) -> Void)?
 
     var body: some View {
         ScrollView {
@@ -74,7 +92,7 @@ private struct GuideTopicView: View {
                 Text(topic.title).font(Theme.lookName(.largeTitle)).accessibilityAddTraits(.isHeader)
                 Text(topic.summary).font(.title3).foregroundStyle(.secondary)
                 if [.looks, .brightness, .warmth, .crop].contains(topic.visual) {
-                    GuidePhotoExample(visual: topic.visual, library: app.library)
+                    GuidePhotoExample(visual: topic.visual, library: library)
                 } else {
                     GuideDiagram(visual: topic.visual)
                 }
@@ -90,7 +108,7 @@ private struct GuideTopicView: View {
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
-                if let destination = topic.destination {
+                if let destination = topic.destination, let onOpen {
                     Button { onOpen(destination) } label: {
                         Label(destination.buttonTitle, systemImage: "arrow.up.right")
                     }.buttonStyle(PrimaryButtonStyle())

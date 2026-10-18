@@ -15,6 +15,7 @@ struct LookPickerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var showGuide = false
     @State private var scope: LookDiscovery.Scope = .all
     @State private var occasion: LookOccasion?
     @State private var position: String?
@@ -34,6 +35,20 @@ struct LookPickerView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
+                    Button {
+                        showGuide = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text("Need a guide?").foregroundStyle(.secondary)
+                            Text("Tap here").foregroundStyle(Theme.accent).underline()
+                        }
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open the Looks guide")
+                    .accessibilityHint("Learn about filters, favorites and look strength")
                     if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && scope == .all {
                         occasionDiscovery
                         if occasion == nil { featuredGuidance }
@@ -99,6 +114,9 @@ struct LookPickerView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .fullScreenCover(isPresented: $showGuide) {
+                GuideView(library: library, initialTopicID: "looks")
             }
             .onAppear {
                 if recentIDs == nil { recentIDs = settings.recentLookIDs }
