@@ -202,7 +202,21 @@ struct CameraOptionsPanel: View {
                     .accessibilityAddTraits(model.whiteBalance == preset ? .isSelected : [])
                 }
             }
+            if model.isChangingWhiteBalance {
+                ProgressView("Switching camera…")
+                    .font(.caption)
+                    .tint(.white)
+            } else if let message = model.whiteBalanceError {
+                Text(message).font(.caption).foregroundStyle(.white)
+            } else if model.capabilities.whiteBalanceRequiresMainCamera {
+                Text(model.capabilities.whiteBalanceUsesMainCamera
+                     ? "Main lens only. Zoom is digital; choose Auto to use 0.5× and other lenses."
+                     : "Presets use the 1× main lens. Focus and exposure reset when switching lenses.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
         }
+        .disabled(model.isChangingWhiteBalance || model.isCapturing)
     }
 
     private var proControls: some View {

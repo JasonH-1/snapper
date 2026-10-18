@@ -24,6 +24,8 @@ actor CaptureService {
 
     private var deviceInput: AVCaptureDeviceInput?
     private var position: CameraPosition = .back
+    private var whiteBalanceReturnDevice: AVCaptureDevice?
+    private var whiteBalanceReturnZoom: CGFloat = 1
     private var isConfigured = false
     private var wantsRunning = false
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
@@ -191,26 +193,31 @@ actor CaptureService {
         guard isConfigured else { throw CameraError.notRunning }
         let newPosition = position.toggled
         guard let device = Self.device(for: newPosition) else { throw CameraError.noCamera }
-        let newInput = try AVCaptureDeviceInput(device: device)
+        try replaceInput(with: device, position: newPosition)
+        whiteBalanceReturnDevice = nil
+        eventContinuation.yield(.configured(capabilities(for: device)))
+    }
 
+    /// Restore the existing input if the session rejects the replacement.
+    /// This runs synchronously on the capture queue, so capture cannot interleave.
+    private func replaceInput(with device: AVCaptureDevice, position newPosition: CameraPosition) throws {
+        let newInput = try AVCaptureDeviceInput(device: device)
         session.beginConfiguration()
         let oldInput = deviceInput
         if let oldInput { session.removeInput(oldInput) }
-        if session.canAddInput(newInput) {
-            session.addInput(newInput)
-            deviceInput = newInput
-            position = newPosition
-        } else if let oldInput {
-            session.addInput(oldInput)
+        guard session.canAddInput(newInput) else {
+            if let oldInput { session.addInput(oldInput) }
+            session.commitConfiguration()
+            throw CameraError.configurationFailed
         }
+        session.addInput(newInput)
+        deviceInput = newInput
+        position = newPosition
         configureVideoConnection()
         session.commitConfiguration()
-
-        guard let active = deviceInput?.device else { throw CameraError.configurationFailed }
-        configure(device: active)
-        photoCapture.configure(for: active)
-        observe(device: active)
-        eventContinuation.yield(.configured(capabilities(for: active)))
+        configure(device: device)
+        photoCapture.configure(for: device)
+        observe(device: device)
     }
 
     // MARK: - Focus, exposure, zoom
@@ -250,37 +257,97 @@ actor CaptureService {
         return clamped
     }
 
-    /// Uses temperature/tint on iOS 26, including virtual multi-lens cameras.
-    /// Older systems may only use custom gains when the device explicitly supports them.
-    func setWhiteBalance(_ preset: WhiteBalancePreset) {
-        guard let device = deviceInput?.device else { return }
-        let route = WhiteBalanceControl.route(
-            preset: preset,
-            supportsLocked: device.isWhiteBalanceModeSupported(.locked),
-            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported)
-        guard route != .unsupported else { return }
+    /// Rear presets can use the physical main camera when a virtual camera
+    /// rejects custom gains. Auto restores the prior device and zoom.
+    func setWhiteBalance(_ preset: WhiteBalancePreset) throws {
+        guard let original = deviceInput?.device else { throw CameraError.notRunning }
+        let originalZoom = original.videoZoomFactor * displayZoomMultiplier
+        let originalReturnDevice = whiteBalanceReturnDevice
+        let originalReturnZoom = whiteBalanceReturnZoom
+        var changedInput = false
         do {
-            try device.lockForConfiguration()
-            defer { device.unlockForConfiguration() }
-            switch route {
-            case .automatic:
-                guard device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) else { return }
-                device.whiteBalanceMode = .continuousAutoWhiteBalance
-            case .deviceGains:
-                guard device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
-                      device.isWhiteBalanceModeSupported(.locked),
-                      let kelvin = preset.temperature else { return }
-                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
-                let proposed = device.deviceWhiteBalanceGains(for: values)
-                guard let gains = WhiteBalanceControl.validatedGains(proposed, maximum: device.maxWhiteBalanceGain) else { return }
-                device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+            let main = position == .back ? Self.manualWhiteBalanceCamera() : nil
+            let action = WhiteBalanceControl.cameraAction(
+                preset: preset, isRear: position == .back,
+                currentSupportsManual: Self.supportsManualWhiteBalance(original),
+                mainSupportsManual: main != nil, hasReturnCamera: whiteBalanceReturnDevice != nil)
+            switch action {
+            case .restoreAutomatic:
+                guard let restore = whiteBalanceReturnDevice else { throw CameraError.configurationFailed }
+                try replaceInput(with: restore, position: .back)
+                changedInput = true
+                setZoom(whiteBalanceReturnZoom, animated: false)
+                whiteBalanceReturnDevice = nil
+            case .useMain:
+                guard let main else { throw CameraError.configurationFailed }
+                try replaceInput(with: main, position: .back)
+                changedInput = true
+                whiteBalanceReturnDevice = original
+                whiteBalanceReturnZoom = originalZoom
+            case .keepCurrent:
+                break
             case .unsupported:
-                return
+                throw CameraError.configurationFailed
             }
+            guard let device = deviceInput?.device else { throw CameraError.notRunning }
+            try applyWhiteBalance(preset, to: device)
+            if changedInput { eventContinuation.yield(.configured(capabilities(for: device))) }
             eventContinuation.yield(.whiteBalanceChanged(preset))
         } catch {
-            Logger.camera.error("White balance failed: \(error.localizedDescription, privacy: .public)")
+            // A new camera may expose different capabilities after activation.
+            // Roll back to automatic on the original camera if application fails.
+            if changedInput {
+                do {
+                    try replaceInput(with: original, position: position)
+                    setZoom(originalZoom, animated: false)
+                    whiteBalanceReturnDevice = originalReturnDevice
+                    whiteBalanceReturnZoom = originalReturnZoom
+                } catch {
+                    Logger.camera.error("White balance camera rollback failed: \(error.localizedDescription, privacy: .public)")
+                }
+                if let active = deviceInput?.device {
+                    try? applyWhiteBalance(.auto, to: active)
+                    eventContinuation.yield(.configured(capabilities(for: active)))
+                }
+            }
+            throw error
         }
+    }
+
+    private func applyWhiteBalance(_ preset: WhiteBalancePreset, to device: AVCaptureDevice) throws {
+        try device.lockForConfiguration()
+        defer { device.unlockForConfiguration() }
+        let route = WhiteBalanceControl.route(
+            preset: preset, supportsLocked: device.isWhiteBalanceModeSupported(.locked),
+            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported)
+        switch route {
+        case .automatic:
+            guard device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) else {
+                throw CameraError.configurationFailed
+            }
+            device.whiteBalanceMode = .continuousAutoWhiteBalance
+        case .deviceGains:
+            guard let kelvin = preset.temperature else { throw CameraError.configurationFailed }
+            let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
+            let proposed = device.deviceWhiteBalanceGains(for: values)
+            guard let gains = WhiteBalanceControl.validatedGains(proposed, maximum: device.maxWhiteBalanceGain) else {
+                throw CameraError.configurationFailed
+            }
+            device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+        case .unsupported:
+            throw CameraError.configurationFailed
+        }
+    }
+
+    private static func supportsManualWhiteBalance(_ device: AVCaptureDevice) -> Bool {
+        WhiteBalanceControl.route(preset: .daylight, supportsLocked: device.isWhiteBalanceModeSupported(.locked),
+                                  supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported) != .unsupported
+    }
+
+    private static func manualWhiteBalanceCamera() -> AVCaptureDevice? {
+        guard let main = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              supportsManualWhiteBalance(main) else { return nil }
+        return main
     }
 
     /// Holds the lens at `position` (0 = nearest, 1 = farthest), or returns
@@ -449,9 +516,11 @@ actor CaptureService {
         // Long exposures blur hand-held shots; cap the slider at half a second.
         caps.maxShutter = min(device.activeFormat.maxExposureDuration.seconds, 0.5)
         caps.supportsManualFocus = device.isLockingFocusWithCustomLensPositionSupported
-        caps.supportsWhiteBalance = WhiteBalanceControl.route(
-            preset: .daylight, supportsLocked: device.isWhiteBalanceModeSupported(.locked),
-            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported) != .unsupported
+        let fallbackAvailable = position == .back && Self.manualWhiteBalanceCamera() != nil
+        caps.supportsWhiteBalance = Self.supportsManualWhiteBalance(device) || fallbackAvailable
+        caps.whiteBalanceUsesMainCamera = whiteBalanceReturnDevice != nil
+        caps.whiteBalanceRequiresMainCamera = caps.whiteBalanceUsesMainCamera ||
+            (!Self.supportsManualWhiteBalance(device) && fallbackAvailable)
         caps.photoMegapixels = PhotoCapture.megapixelOptions(for: device)
         return caps
     }

@@ -184,6 +184,8 @@ struct CameraCapabilities: Sendable, Equatable {
     var maxShutter: Double = 0.5
     var supportsManualFocus = false
     var supportsWhiteBalance = false
+    var whiteBalanceRequiresMainCamera = false
+    var whiteBalanceUsesMainCamera = false
     /// Photo sizes the camera can take, in megapixels (e.g. 12, 24, 48).
     var photoMegapixels: [Int] = [12]
 }
