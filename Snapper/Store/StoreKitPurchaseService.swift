@@ -12,11 +12,13 @@ final class StoreKitPurchaseService: PurchaseService {
     }
     private(set) var ownsLifetime = false
     private(set) var hasActiveSubscription = false
+    private(set) var subscriptionWillRenew = false
     private(set) var plans: [SubscriptionPlan] = []
     private(set) var plansState: PlansState = .idle
 
     @ObservationIgnored private var products: [String: Product] = [:]
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
+    @ObservationIgnored private var statusUpdatesTask: Task<Void, Never>?
     @ObservationIgnored private let productIDs: [String]
 
     /// Last known entitlement, so the UI is right at launch before StoreKit
@@ -35,6 +37,13 @@ final class StoreKitPurchaseService: PurchaseService {
         updatesTask = Task { [weak self] in
             for await update in Transaction.updates {
                 await self?.process(update)
+            }
+        }
+        // Turning auto-renew off or back on changes only the renewal info,
+        // which arrives here rather than as a transaction.
+        statusUpdatesTask = Task { [weak self] in
+            for await _ in Product.SubscriptionInfo.Status.updates {
+                await self?.refreshEntitlements()
             }
         }
         Task { await refreshEntitlements() }
@@ -192,6 +201,7 @@ final class StoreKitPurchaseService: PurchaseService {
     func refreshEntitlements() async {
         var lifetime = false
         var subscribed = false
+        var renews = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
                   productIDs.contains(transaction.productID),
@@ -202,13 +212,24 @@ final class StoreKitPurchaseService: PurchaseService {
             }
             if let expiration = transaction.expirationDate, expiration < Date() { continue }
             subscribed = true
+            if await Self.willRenew(transaction) { renews = true }
         }
         if ownsLifetime != lifetime { ownsLifetime = lifetime }
         if hasActiveSubscription != subscribed { hasActiveSubscription = subscribed }
+        if subscriptionWillRenew != renews { subscriptionWillRenew = renews }
         let active = lifetime || subscribed
         if isPremium != active {
             isPremium = active
         }
+    }
+
+    /// Whether the subscription behind `transaction` is set to renew, from its
+    /// group's renewal info. If that can't be read, assume it renews, so the
+    /// person still hears how to cancel it.
+    private static func willRenew(_ transaction: Transaction) async -> Bool {
+        guard let status = await transaction.subscriptionStatus,
+              case .verified(let renewal) = status.renewalInfo else { return true }
+        return renewal.willAutoRenew
     }
 
     private func process(_ update: VerificationResult<Transaction>) async {

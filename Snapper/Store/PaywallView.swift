@@ -172,8 +172,13 @@ struct PaywallView: View {
                 detail: Text("Every current and future look and tool. Lifetime never renews."))
         benefit(symbol: "photo.on.rectangle", title: Text("Everything stays as it is"),
                 detail: Text("Your looks, presets and photos stay just as they are."))
-        benefit(symbol: "calendar.badge.clock", title: Text("Your subscription is separate"),
-                detail: Text("Buying Lifetime doesn't cancel it. Afterwards Snapper shows you where to cancel it so it doesn't renew."))
+        if model.subscriptionWillRenew {
+            benefit(symbol: "calendar.badge.clock", title: Text("Your subscription is separate"),
+                    detail: Text("Buying Lifetime doesn't cancel it. Afterwards Snapper shows you where to cancel it so it doesn't renew."))
+        } else {
+            benefit(symbol: "calendar.badge.clock", title: Text("Your subscription won't renew"),
+                    detail: Text("You've already cancelled it, so once you have Lifetime nothing renews."))
+        }
     }
 
     @ViewBuilder
@@ -301,7 +306,7 @@ struct PaywallView: View {
         }
     }
 
-    /// Shown after Lifetime is bought while a subscription is running.
+    /// Shown after Lifetime is bought while a subscription is set to renew.
     /// Nothing is cancelled for the person: this says so once, plainly, and
     /// offers Manage Subscription.
     private var subscriptionReminder: some View {

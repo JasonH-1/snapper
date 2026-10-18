@@ -9,6 +9,7 @@ final class FakePurchaseService: PurchaseService {
     var isPremium = false
     var ownsLifetime = false
     var hasActiveSubscription = false
+    var subscriptionWillRenew = false
     var plans: [SubscriptionPlan] = []
     var plansState: PlansState = .idle
     var nextOutcome: PurchaseOutcome = .purchased
@@ -30,7 +31,12 @@ final class FakePurchaseService: PurchaseService {
     func purchase(_ plan: SubscriptionPlan) async throws -> PurchaseOutcome {
         if nextOutcome == .purchased {
             isPremium = true
-            if plan.period.renews { hasActiveSubscription = true } else { ownsLifetime = true }
+            if plan.period.renews {
+                hasActiveSubscription = true
+                subscriptionWillRenew = true
+            } else {
+                ownsLifetime = true
+            }
         }
         return nextOutcome
     }
@@ -50,6 +56,16 @@ final class PaywallModelTests: XCTestCase {
         let store = FakePurchaseService()
         store.isPremium = true
         store.hasActiveSubscription = true
+        store.subscriptionWillRenew = true
+        return store
+    }
+
+    /// A subscriber who has turned off auto-renew: still Premium until the
+    /// period ends, but nothing will renew.
+    @MainActor
+    private func makeCancelledSubscriber() -> FakePurchaseService {
+        let store = makeSubscriber()
+        store.subscriptionWillRenew = false
         return store
     }
 
@@ -116,6 +132,38 @@ final class PaywallModelTests: XCTestCase {
     }
 
     @MainActor
+    func testSubscriberWhoAlreadyCancelledIsNotToldToCancelAgain() async {
+        let store = makeCancelledSubscriber()
+        let model = makeModel(store: store, context: .switchToLifetime)
+        await model.load()
+        XCTAssertFalse(model.subscriptionWillRenew, "the switch paywall says the subscription won't renew")
+        await model.purchase()
+        XCTAssertTrue(store.ownsLifetime)
+        XCTAssertTrue(store.hasActiveSubscription, "the cancelled subscription runs to the end of its period")
+        XCTAssertFalse(store.ownsLifetimeWithRenewingSubscription)
+        XCTAssertFalse(model.showsSubscriptionReminder, "there is nothing left to cancel")
+        XCTAssertTrue(model.didUnlock)
+        XCTAssertNil(model.alert)
+    }
+
+    @MainActor
+    func testCancellingAfterLifetimeEndsTheCancelGuidance() async {
+        let store = makeSubscriber()
+        let model = makeModel(store: store, context: .switchToLifetime)
+        await model.load()
+        XCTAssertTrue(model.subscriptionWillRenew)
+        await model.purchase()
+        XCTAssertTrue(store.ownsLifetimeWithRenewingSubscription, "Settings says once where to cancel")
+
+        // The person turns off auto-renew in Manage Subscription.
+        store.subscriptionWillRenew = false
+
+        XCTAssertTrue(store.hasActiveSubscription)
+        XCTAssertTrue(store.isPremium)
+        XCTAssertFalse(store.ownsLifetimeWithRenewingSubscription, "the cancel footer goes away")
+    }
+
+    @MainActor
     func testCancelledSwitchChangesNothing() async {
         let store = makeSubscriber()
         store.nextOutcome = .cancelled
@@ -145,6 +193,17 @@ final class PaywallModelTests: XCTestCase {
         let model = makeModel(store: store, context: .switchToLifetime)
         await model.restore()
         XCTAssertTrue(model.showsSubscriptionReminder)
+        XCTAssertNil(model.alert)
+    }
+
+    @MainActor
+    func testRestoringLifetimeAlongsideACancelledSubscriptionJustUnlocks() async {
+        let store = makeCancelledSubscriber()
+        store.ownsLifetime = true
+        let model = makeModel(store: store, context: .switchToLifetime)
+        await model.restore()
+        XCTAssertFalse(model.showsSubscriptionReminder)
+        XCTAssertTrue(model.didUnlock)
         XCTAssertNil(model.alert)
     }
 

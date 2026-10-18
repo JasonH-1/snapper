@@ -96,7 +96,9 @@ struct SettingsView: View {
                     Image(systemName: "checkmark.seal.fill")
                         .foregroundStyle(Theme.accent)
                 }
-                if !app.store.ownsLifetime || app.store.hasActiveSubscription {
+                // With Lifetime, the subscription is only worth managing while
+                // it will still renew.
+                if !app.store.ownsLifetime || app.store.subscriptionWillRenew {
                     Button("Manage Subscription") { showManageSubscriptions = true }
                 }
                 // A quiet way for subscribers to pay once instead; never prompted.
@@ -152,7 +154,7 @@ struct SettingsView: View {
         } footer: {
             if !app.hasPremium {
                 Text("\(app.library.freeLooks.count - 1) looks, basic editing with highlights and shadows, a date stamp and one personal preset are free. Exports are watermark-free, and any photo can be saved without its Premium parts.")
-            } else if app.store.ownsLifetime && app.store.hasActiveSubscription {
+            } else if app.store.ownsLifetimeWithRenewingSubscription {
                 Text("You own Lifetime, so you can cancel your subscription in Manage Subscription to stop renewals.")
             }
         }

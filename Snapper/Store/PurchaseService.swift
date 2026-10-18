@@ -95,6 +95,11 @@ protocol PurchaseService: AnyObject, Observable {
     /// Whether an auto-renewing plan is active. It keeps renewing even after
     /// Lifetime is bought, until it is cancelled.
     var hasActiveSubscription: Bool { get }
+    /// Whether that subscription is set to renew. It turns false as soon as
+    /// the person turns off auto-renew, while `hasActiveSubscription` stays
+    /// true until the period ends. Use it for copy about cancelling, not for
+    /// what Premium unlocks.
+    var subscriptionWillRenew: Bool { get }
     var plans: [SubscriptionPlan] { get }
     var plansState: PlansState { get }
 
@@ -105,4 +110,13 @@ protocol PurchaseService: AnyObject, Observable {
     /// Syncs with the App Store. Returns whether Premium is active afterwards.
     func restore() async throws -> Bool
     func refreshEntitlements() async
+}
+
+extension PurchaseService {
+    /// Lifetime is owned while a subscription will still renew. Nothing is
+    /// cancelled for the person, so this is when the app may say, once, where
+    /// to cancel it.
+    var ownsLifetimeWithRenewingSubscription: Bool {
+        ownsLifetime && subscriptionWillRenew
+    }
 }
