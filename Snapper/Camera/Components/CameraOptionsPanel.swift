@@ -89,6 +89,7 @@ struct CameraOptionsPanel: View {
                         .foregroundStyle(isSelected ? .black : (isActive(item) ? Theme.accent : .white))
                         .frame(maxWidth: .infinity, minHeight: 38)
                         .glassSurface(in: Capsule(), tint: isSelected ? Theme.accent : nil, interactive: true)
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(item.title))
@@ -196,6 +197,7 @@ struct CameraOptionsPanel: View {
                         .frame(maxWidth: .infinity, minHeight: 46)
                         .glassSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous),
                                       tint: model.whiteBalance == preset ? Theme.accent : nil, interactive: true)
+                        .minimumTapTarget()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(preset.label))
@@ -285,6 +287,7 @@ struct CameraOptionsPanel: View {
                 .foregroundStyle(isChanged ? Theme.accent : .white)
                 .frame(width: 46, height: 30)
                 .glassSurface(in: Capsule(), interactive: true)
+                .minimumTapTarget()
         }
         .buttonStyle(.plain)
     }
@@ -304,6 +307,7 @@ struct CameraOptionsPanel: View {
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, minHeight: 34)
             .glassSurface(in: Capsule(), tint: isOn ? Theme.accent : nil, interactive: true)
+            .minimumTapTarget()
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? .isSelected : [])

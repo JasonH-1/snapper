@@ -139,6 +139,7 @@ struct CameraView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                     .background(Theme.accent, in: Capsule())
+                    .minimumTapTarget()
                 }
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                 .accessibilityHint(Text("Shows Snapper Premium"))
@@ -312,6 +313,7 @@ struct CameraView: View {
                     }
                     .padding(12).frame(maxWidth: .infinity, minHeight: 58)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Browse looks. Current look: \(model.currentLook.name)")
                 Button(action: onOpenPresets) {
@@ -323,6 +325,7 @@ struct CameraView: View {
                     }
                     .padding(12).frame(minHeight: 58)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .contentShape(Rectangle())
                 }
                 .accessibilityHint("Choose or save a personal style")
             }
@@ -345,6 +348,7 @@ struct CameraView: View {
                             .glassSurface(in: Circle(), interactive: true)
                         Text("Flip").font(.caption.weight(.semibold))
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(!model.capabilities.canSwitchCamera)
@@ -404,6 +408,7 @@ struct CameraView: View {
                     .foregroundStyle(.white)
             }
             .frame(width: 64)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Library"))

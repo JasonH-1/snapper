@@ -22,6 +22,7 @@ struct ZoomControl: View {
                         .foregroundStyle(isActive ? Theme.accent : .white)
                         .frame(width: isActive ? 38 : 30, height: isActive ? 38 : 30)
                         .glassSurface(in: Circle(), interactive: true)
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Zoom \(Self.format(preset)) times"))
