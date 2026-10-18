@@ -457,7 +457,7 @@ struct EditorView: View {
         let value = model.value(of: kind)
         let isChanged = abs(value) > 0.004
         return VStack(spacing: 10) {
-            if !model.hasPremiumNow && [.highlights, .shadows, .bloom, .halation, .vignette].contains(kind) {
+            if !model.hasPremiumNow && kind.isPremium {
                 Text("Premium tool · preview free").font(.caption).foregroundStyle(Theme.accent)
             }
             ScrollView(.horizontal, showsIndicators: false) {
@@ -511,7 +511,7 @@ struct EditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if !model.hasPremiumNow {
-                    Label("Premium finishing · preview free", systemImage: "lock.fill")
+                    Label("Premium frames and layouts · preview free. The date stamp is free.", systemImage: "lock.fill")
                         .font(.caption).foregroundStyle(Theme.accent)
                 }
                 Picker("Frame", selection: $model.frame) {
@@ -681,8 +681,31 @@ struct EditorView: View {
             .padding(.horizontal, 16)
 
             if model.isLocked {
-                Text("Preview free. Premium is required to export this look or these edits.")
+                // Never a dead end: the photo can always be saved without its
+                // Premium parts.
+                Button {
+                    model.saveWithoutPremium()
+                } label: {
+                    HStack(spacing: 6) {
+                        if model.isSavingFreeVersion {
+                            ProgressView()
+                        } else {
+                            Image(systemName: model.isFreeVersionSaved ? "checkmark" : "square.and.arrow.down")
+                        }
+                        Text(model.freeSaveTitle)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .minimumTapTarget()
+                }
+                .buttonStyle(PressableButtonStyle())
+                .disabled(model.isSavingFreeVersion || model.isSaving)
+                .accessibilityHint(Text("Saves this photo to Photos for free. The full edit stays in Snapper."))
+                Text("Free, keeping your crop and free edits. The full edit stays in Snapper.")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
             } else if model.savedCount > 0 && !model.hasPremiumNow {
                 Button("Photo saved. Explore Premium styles", action: onShowPaywall)
                     .font(.caption.weight(.semibold))

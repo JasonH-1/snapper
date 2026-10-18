@@ -33,13 +33,41 @@ final class StoreKitPurchaseServiceTests: XCTestCase {
         try skipIfStoreKitTestingUnavailable(service)
 
         XCTAssertEqual(service.plansState, .loaded)
-        XCTAssertEqual(service.plans.map(\.id), [AppConfig.yearlyProductID, AppConfig.monthlyProductID])
+        XCTAssertEqual(service.plans.map(\.id),
+                       [AppConfig.yearlyProductID, AppConfig.monthlyProductID, AppConfig.lifetimeProductID])
         let yearly = try XCTUnwrap(service.plans.first)
         XCTAssertEqual(yearly.period, .year)
         XCTAssertNotNil(yearly.freeTrial, "yearly plan advertises the free trial to eligible people")
         XCTAssertNotNil(yearly.monthlyEquivalent)
         XCTAssertNil(service.plans.last?.freeTrial)
+        XCTAssertEqual(service.plans.last?.period, .lifetime)
         XCTAssertFalse(service.isPremium)
+    }
+
+    @MainActor
+    func testLifetimePurchaseUnlocksPremiumAndRestores() async throws {
+        let session = try makeSession()
+        defer { session.clearTransactions() }
+        let service = StoreKitPurchaseService()
+        await service.loadPlans()
+        try skipIfStoreKitTestingUnavailable(service)
+        let lifetime = try XCTUnwrap(service.plans.first { $0.period == .lifetime })
+        XCTAssertNil(lifetime.freeTrial)
+
+        let outcome = try await service.purchase(lifetime)
+
+        XCTAssertEqual(outcome, .purchased)
+        XCTAssertTrue(service.isPremium)
+        XCTAssertTrue(service.ownsLifetime)
+        XCTAssertFalse(service.hasActiveSubscription)
+
+        // A fresh install with no cached state gets it back from Restore.
+        UserDefaults.standard.removeObject(forKey: "store.cachedPremium")
+        let reinstalled = StoreKitPurchaseService()
+        XCTAssertFalse(reinstalled.isPremium)
+        let restored = try await reinstalled.restore()
+        XCTAssertTrue(restored)
+        XCTAssertTrue(reinstalled.ownsLifetime)
     }
 
     @MainActor

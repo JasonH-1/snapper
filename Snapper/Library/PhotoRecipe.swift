@@ -30,12 +30,28 @@ struct PhotoAdjustments: Hashable, Sendable {
     static let none = PhotoAdjustments()
 
     var isNone: Bool { self == .none }
+    /// Bloom, halation, vignette, the colour mixer, curves or split toning.
+    /// Highlights and shadows are free.
     var requiresPremium: Bool {
+        Kind.allCases.contains { $0.isPremium && abs(self[$0]) > 0.0001 } || colorMixer.isActive || usesToneTools
+    }
+    /// Highlights, shadows, bloom, halation, vignette or the colour mixer,
+    /// which the earliest versions of Snapper can't show.
+    var usesAdvancedSliders: Bool {
         [highlights, shadows, bloom, halation, vignette].contains { abs($0) > 0.0001 } || colorMixer.isActive
-            || usesToneTools
     }
     /// Curves or split toning, which older versions of Snapper can't show.
     var usesToneTools: Bool { curves.isActive || splitToning.isActive }
+
+    /// The same sliders with every Premium tool set back to neutral.
+    var withoutPremium: PhotoAdjustments {
+        var free = self
+        for kind in Kind.allCases where kind.isPremium { free[kind] = 0 }
+        free.colorMixer = ColorMixer()
+        free.curves = .none
+        free.splitToning = .none
+        return free
+    }
     var isValid: Bool {
         Kind.allCases.allSatisfy { self[$0].isFinite && $0.range.contains(self[$0]) } && colorMixer.isValid
             && curves.isValid && splitToning.isValid
@@ -46,6 +62,14 @@ struct PhotoAdjustments: Hashable, Sendable {
         case brightness, contrast, saturation, warmth, fade, grain, highlights, shadows, bloom, halation, vignette
 
         var id: String { rawValue }
+
+        /// Exporting with this slider moved needs Premium.
+        var isPremium: Bool {
+            switch self {
+            case .bloom, .halation, .vignette: true
+            default: false
+            }
+        }
 
         /// The slider's range; fade and grain only add.
         var range: ClosedRange<Double> {
@@ -204,10 +228,28 @@ struct PhotoRecipe: Hashable, Sendable {
     var crop = PhotoCrop.none
     var finish = PhotoFinish.none
     var selective = SelectiveEdits()
-    var requiresPremium: Bool { finish.isActive || adjustments.requiresPremium || selective.isActive }
+    /// Uses Premium tools or finishing. A Premium look is checked separately,
+    /// against the look library.
+    var requiresPremium: Bool { finish.requiresPremium || adjustments.requiresPremium || selective.isActive }
 
     /// A photo with no look and no edits.
     static let untouched = PhotoRecipe(lookID: Look.original.id)
+
+    /// The same edit with every Premium part taken out, so it can always be
+    /// saved: a Premium look goes back to Original, and Premium sliders,
+    /// frames, layouts and selective edits are removed. The crop, the free
+    /// sliders and the date stamp stay.
+    func withoutPremium(lookIsPremium: Bool) -> PhotoRecipe {
+        var free = self
+        if lookIsPremium {
+            free.lookID = Look.original.id
+            free.strength = 1
+        }
+        free.adjustments = adjustments.withoutPremium
+        free.finish = finish.withoutPremium
+        free.selective = SelectiveEdits()
+        return free
+    }
 }
 
 // MARK: - Coding

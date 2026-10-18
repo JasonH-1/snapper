@@ -19,9 +19,11 @@ enum AppConfig {
     static let privacyPolicyURL = URL(string: "https://jasonh-1.github.io/snapper/privacy.html")!
     static let termsOfUseURL = URL(string: "https://jasonh-1.github.io/snapper/terms.html")!
 
-    // MARK: Subscriptions — must match App Store Connect and Config/Snapper.storekit
+    // MARK: Premium products — must match App Store Connect and Config/Snapper.storekit
 
     static let yearlyProductID = "snapper.premium.yearly"
     static let monthlyProductID = "snapper.premium.monthly"
-    static var subscriptionProductIDs: [String] { [yearlyProductID, monthlyProductID] }
+    /// A non-consumable: paid once, never renews, never taken back.
+    static let lifetimeProductID = "snapper.premium.lifetime"
+    static var premiumProductIDs: [String] { [yearlyProductID, monthlyProductID, lifetimeProductID] }
 }

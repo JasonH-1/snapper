@@ -134,7 +134,7 @@ struct CameraView: View {
                 Button(action: onShowPaywall) {
                     HStack(spacing: 6) {
                         Image(systemName: "lock.fill")
-                        Text("Premium to save")
+                        Text("Premium")
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.black)
@@ -144,7 +144,7 @@ struct CameraView: View {
                     .minimumTapTarget()
                 }
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
-                .accessibilityHint(Text("Shows Snapper Premium"))
+                .accessibilityHint(Text("Shows Snapper Premium. Without it, photos save without the Premium look or tools."))
             }
         }
         .padding(.horizontal, 16)

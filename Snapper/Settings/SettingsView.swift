@@ -84,9 +84,11 @@ struct SettingsView: View {
             if app.hasPremium {
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Snapper Premium")
+                        (app.store.ownsLifetime ? Text("Snapper Premium Lifetime") : Text("Snapper Premium"))
                             .font(.headline)
-                        Text("Active — all looks, unlimited presets, batch styling and finishing.")
+                        (app.store.ownsLifetime
+                         ? Text("Yours to keep: every current and future look and tool.")
+                         : Text("Active — all looks, unlimited presets, batch styling and finishing."))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -94,7 +96,9 @@ struct SettingsView: View {
                     Image(systemName: "checkmark.seal.fill")
                         .foregroundStyle(Theme.accent)
                 }
-                Button("Manage Subscription") { showManageSubscriptions = true }
+                if !app.store.ownsLifetime || app.store.hasActiveSubscription {
+                    Button("Manage Subscription") { showManageSubscriptions = true }
+                }
             } else {
                 Button {
                     app.presentPaywall(.upgrade)
@@ -128,7 +132,9 @@ struct SettingsView: View {
             Text("Premium")
         } footer: {
             if !app.hasPremium {
-                Text("Six looks, basic editing and one personal preset are free. All exports are watermark-free.")
+                Text("\(app.library.freeLooks.count - 1) looks, basic editing with highlights and shadows, a date stamp and one personal preset are free. Exports are watermark-free, and any photo can be saved without its Premium parts.")
+            } else if app.store.ownsLifetime && app.store.hasActiveSubscription {
+                Text("You own Lifetime, so you can cancel your subscription in Manage Subscription to stop renewals.")
             }
         }
     }
@@ -314,7 +320,7 @@ struct SettingsView: View {
                     ? RestoreMessage(title: String(localized: "Purchases restored"),
                                      detail: String(localized: "Snapper Premium is active on this iPhone."))
                     : RestoreMessage(title: String(localized: "Nothing to restore"),
-                                     detail: String(localized: "No active Snapper Premium subscription was found for this Apple ID."))
+                                     detail: String(localized: "No Snapper Premium purchase or active subscription was found for this Apple ID."))
             } catch {
                 restoreMessage = RestoreMessage(title: String(localized: "Restore didn't complete"),
                                                 detail: error.localizedDescription)

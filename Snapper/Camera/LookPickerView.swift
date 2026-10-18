@@ -208,7 +208,7 @@ struct LookPickerView: View {
                                 .frame(width: 210).background(Theme.surface)
                                 .clipShape(RoundedRectangle(cornerRadius: 18))
                             }.buttonStyle(PressableButtonStyle())
-                            .accessibilityLabel("\(look.name), \(guide.bestFor)\(look.isPremium && !hasPremium ? ", Premium to save" : "")")
+                            .accessibilityLabel("\(look.name), \(guide.bestFor)\(look.isPremium && !hasPremium ? ", Premium look" : "")")
                         }
                     }
                 }.padding(.bottom, 4)
@@ -290,7 +290,7 @@ private struct LookTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(look.name))
-        .accessibilityValue(isLocked ? Text("Premium to save") : Text("Free"))
+        .accessibilityValue(isLocked ? Text("Premium look") : Text("Free"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .overlay(alignment: .topTrailing) {
             if let toggleFavorite {

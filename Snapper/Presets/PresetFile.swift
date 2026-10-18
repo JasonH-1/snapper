@@ -19,7 +19,7 @@ struct PresetFile: Codable, Equatable, Identifiable, Sendable {
     init(_ preset: SavedPreset) {
         // 3: curves or split toning; 2: other advanced tools; 1: basic sliders.
         // Older apps reject newer versions instead of dropping settings.
-        version = preset.adjustments.usesToneTools ? 3 : preset.adjustments.requiresPremium ? 2 : 1
+        version = preset.adjustments.usesToneTools ? 3 : preset.adjustments.usesAdvancedSliders ? 2 : 1
         name = preset.name
         lookID = preset.lookID
         strength = preset.strength

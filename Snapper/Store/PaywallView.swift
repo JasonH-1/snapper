@@ -49,7 +49,7 @@ struct PaywallView: View {
             case .pending:
                 Text("Your purchase is waiting for approval. Premium unlocks as soon as it's approved.")
             case .nothingToRestore:
-                Text("No active Snapper Premium subscription was found for this Apple ID.")
+                Text("No Snapper Premium purchase or active subscription was found for this Apple ID.")
             case .error(let message):
                 Text(message)
             }
@@ -143,13 +143,15 @@ struct PaywallView: View {
             benefit(symbol: "slider.horizontal.3", title: Text("Make your style repeatable"),
                     detail: Text("Shoot with your personal presets and apply them across a whole photo set."))
             benefit(symbol: "paintpalette", title: Text("Shape light, color and film texture"),
-                    detail: Text("Highlights, shadows, seven color bands, bloom, halation and vignette."))
+                    detail: Text("Curves, seven color bands, split toning, bloom, halation and vignette."))
             benefit(symbol: "person.crop.rectangle", title: Text("Separate subject and background"),
                     detail: Text("Adjust brightness, saturation and warmth separately when a subject can be detected."))
             benefit(symbol: "rectangle.portrait", title: Text("Ready to share"),
-                    detail: Text("Add frames, date stamps and fitted post or story layouts."))
-            benefit(symbol: "calendar.badge.clock", title: Text("Cancel anytime"),
-                    detail: Text("Premium tools and new premium collections released during your subscription. Manage it in Apple ID settings."))
+                    detail: Text("Add frames and fitted post or story layouts."))
+            benefit(symbol: "calendar.badge.clock", title: Text("Cancel anytime, or pay once"),
+                    detail: Text("Subscriptions include new premium collections released while they're active; manage them in Apple ID settings. Lifetime includes every future look and tool."))
+            benefit(symbol: "lock.open", title: Text("Your photos are never locked"),
+                    detail: Text("Without Premium you can still save any photo, without its Premium look or tools."))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -247,7 +249,7 @@ struct PaywallView: View {
             .font(.footnote.weight(.medium))
             .tint(.primary)
 
-            Text("Payment is charged to your Apple ID at confirmation of purchase, or when the free trial ends. The subscription renews automatically at the same price and period unless it is cancelled at least 24 hours before the end of the current period. You can manage or cancel it in your App Store account settings. Any unused part of a free trial is forfeited when you buy a subscription.")
+            Text("Payment is charged to your Apple ID at confirmation of purchase, or when the free trial ends. A subscription renews automatically at the same price and period unless it is cancelled at least 24 hours before the end of the current period. You can manage or cancel it in your App Store account settings. Any unused part of a free trial is forfeited when you buy a subscription. Lifetime is a one-time purchase that never renews.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -262,10 +264,13 @@ struct PaywallView: View {
         if let trial = plan.freeTrial {
             return String(localized: "Start \(trial.shortLabel) Free Trial")
         }
-        return String(localized: "Subscribe")
+        return plan.period.renews ? String(localized: "Subscribe") : String(localized: "Buy Lifetime")
     }
 
     private func billingSummary(for plan: SubscriptionPlan) -> String {
+        if !plan.period.renews {
+            return String(localized: "\(plan.displayPrice) once. No subscription, nothing renews.")
+        }
         if let trial = plan.freeTrial {
             return String(localized: "\(trial.duration) free, then \(plan.displayPrice) per \(plan.period.unitName). Auto-renews; cancel anytime.")
         }
@@ -297,8 +302,8 @@ struct PaywallView: View {
     }
 }
 
-/// One selectable subscription option. The billed amount is the most
-/// prominent price on the card, as App Review requires.
+/// One selectable plan. The billed amount is the most prominent price on
+/// the card, as App Review requires.
 private struct PlanCard: View {
     let plan: SubscriptionPlan
     let isSelected: Bool
@@ -330,7 +335,7 @@ private struct PlanCard: View {
             VStack(alignment: .trailing, spacing: 0) {
                 Text(plan.displayPrice)
                     .font(.title3.weight(.bold))
-                Text("per \(plan.period.unitName)")
+                (plan.period.renews ? Text("per \(plan.period.unitName)") : Text("once"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -349,6 +354,9 @@ private struct PlanCard: View {
     }
 
     private var detail: String {
+        guard plan.period.renews else {
+            return String(localized: "Pay once. Covers all current and future looks and tools.")
+        }
         var parts: [String] = []
         if let monthly = plan.monthlyEquivalent {
             parts.append(String(localized: "\(monthly)/month"))

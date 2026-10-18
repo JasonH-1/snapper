@@ -87,6 +87,16 @@ struct LibraryView: View {
                  ? "It will be removed from Snapper. Copies already saved to your photo library are not affected."
                  : "They will be removed from Snapper. Copies already saved to your photo library are not affected.")
         }
+        .confirmationDialog(lockedExportTitle, isPresented: lockedExportBinding, titleVisibility: .visible,
+                            presenting: model.lockedExport) { pending in
+            Button(pending.action == .save ? "Save Without Premium Looks & Tools" : "Share Without Premium Looks & Tools") {
+                model.exportWithoutPremium(pending)
+            }
+            Button("Unlock Premium") { model.unlock(pending) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Free to save: crops and free edits stay. The full edits stay in Snapper, ready if you unlock Premium.")
+        }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {
             case .photosAccessDenied:
@@ -117,6 +127,15 @@ struct LibraryView: View {
 
     private var deleteBinding: Binding<Bool> {
         Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } })
+    }
+
+    private var lockedExportTitle: Text {
+        let count = model.lockedExport?.lockedCount ?? 0
+        return count == 1 ? Text("1 photo uses a Premium look or tools") : Text("\(count) photos use Premium looks or tools")
+    }
+
+    private var lockedExportBinding: Binding<Bool> {
+        Binding(get: { model.lockedExport != nil }, set: { if !$0 { model.lockedExport = nil } })
     }
 
     private var alertTitle: Text {
