@@ -91,7 +91,7 @@ private struct GuideTopicView: View {
                 Text(topic.section.uppercased()).font(.caption.weight(.bold)).foregroundStyle(Theme.accent)
                 Text(topic.title).font(Theme.lookName(.largeTitle)).accessibilityAddTraits(.isHeader)
                 Text(topic.summary).font(.title3).foregroundStyle(.secondary)
-                if [.looks, .brightness, .warmth, .crop].contains(topic.visual) {
+                if [.looks, .brightness, .warmth, .crop, .color, .film].contains(topic.visual) {
                     GuidePhotoExample(visual: topic.visual, library: library)
                 } else {
                     GuideDiagram(visual: topic.visual)
@@ -151,10 +151,14 @@ private struct GuideDiagram: View {
             [("viewfinder", "1. Frame & focus", "Tap your subject in the preview."),
              ("slider.horizontal.3", "2. Camera Options", "Adjust exposure, focus and white balance where supported."),
              ("circle.inset.filled", "3. Shutter", "Take the photo, then open Library to edit.")]
+        case .selective:
+            [("person.crop.rectangle", "1. Detect", "Snapper finds foreground subjects locally on your iPhone."),
+             ("circle.lefthalf.filled", "2. Check the mask", "White marks the subject; black marks the background."),
+             ("slider.horizontal.3", "3. Choose an area", "Edit Subject or Background. Check the result before exporting.")]
         case .style:
             [("camera.filters", "Look + strength", "Choose the filter and how strongly it appears."),
-             ("slider.horizontal.3", "Adjustments", "Save the light, color, fade and grain settings."),
-             ("square.stack", "Reusable style", "Apply to another photo. Crop and frames stay separate.")]
+             ("slider.horizontal.3", "Adjustments", "Save light, individual colors and film effects."),
+             ("square.stack", "Reusable style", "Apply to another photo. Crop, frames and selective edits stay separate.")]
         default:
             [("photo.on.rectangle", "Snapper Library", "Your original plus editable settings."),
              ("slider.horizontal.3", "Edit & finish", "Change the look, crop or add a frame."),
@@ -197,6 +201,8 @@ private struct GuidePhotoExample: View {
         case .looks: "Look strength"
         case .brightness: "Brightness"
         case .warmth: "Warmth"
+        case .color: "Blue saturation"
+        case .film: "Bloom"
         default: "Square crop"
         }
     }
@@ -247,6 +253,8 @@ private struct GuidePhotoExample: View {
         case .brightness: recipe.adjustments.brightness = amount * 0.6
         case .warmth: recipe.adjustments.warmth = amount * 1.6 - 0.8
         case .crop: recipe.crop.shape = .square
+        case .color: recipe.adjustments.colorMixer[.blue] = ColorMix(saturation: -amount)
+        case .film: recipe.adjustments.bloom = amount
         default: break
         }
         let before = await renderer.original(id: sampleID, sourceURL: url, maxPixelSize: 700)

@@ -23,7 +23,7 @@ final class PresetExchangeTests: XCTestCase {
     func testRejectsMalformedOversizedUnknownAndOutOfRangeFiles() throws {
         let data = try PresetDocument(SavedPreset(name: "Good", recipe: PhotoRecipe(lookID: "cream"))).data
         let original = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let changes: [(String, Any)] = [("version", 2), ("lookID", "missing"), ("strength", -0.1),
+        let changes: [(String, Any)] = [("version", 999), ("lookID", "missing"), ("strength", -0.1),
                                       ("strength", 1.1), ("name", "\n"), ("name", "Bad\nName"),
                                       ("name", String(repeating: "x", count: 41)),
                                       ("adjustments", ["warmth": 10]), ("adjustments", ["grain": -1])]

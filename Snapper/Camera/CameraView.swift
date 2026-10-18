@@ -37,7 +37,9 @@ struct CameraView: View {
 
     private var canShoot: Bool { model.canCapture }
 
-    private var isLocked: Bool { model.currentLook.isPremium && !hasPremium }
+    private var isLocked: Bool {
+        (model.currentLook.isPremium || model.activePreset?.adjustments.requiresPremium == true) && !hasPremium
+    }
 
     private static let topBarHeight: CGFloat = 52
     /// Approximate height of the look caption + shutter row.

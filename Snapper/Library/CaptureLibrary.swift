@@ -189,7 +189,7 @@ final class CaptureLibrary {
         let url = store.url(for: record)
         let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
         return try await renderer.export(source: data, look: look(for: record), recipe: record.recipe,
-                                         seed: record.id.effectsSeed, watermark: watermark, format: format)
+                                         seed: record.id.effectsSeed, watermark: watermark, format: format, sourceURL: url)
     }
 
     /// Saves a capture to the photo library with its current recipe, as HEIF

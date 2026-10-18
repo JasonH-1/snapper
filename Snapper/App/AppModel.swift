@@ -130,9 +130,12 @@ final class AppModel {
             do {
                 let record = try await captures.add(photo, look: look)
                 guard settings.autoSaveToPhotos else { return }
-                if look.isPremium && !hasPremium {
+                if (look.isPremium || record.recipe.requiresPremium) && !hasPremium {
                     guard lockedLooksExplained.insert(look.id).inserted else { return }
-                    show(Toast(message: String(localized: "\(look.name) is a Premium look. Unlock it to save to Photos."),
+                    let message = record.recipe.adjustments.requiresPremium
+                        ? String(localized: "This photo uses Premium edits. It is kept in Snapper Library; unlock Premium to export it.")
+                        : String(localized: "\(look.name) is a Premium look. Unlock it to save to Photos.")
+                    show(Toast(message: message,
                                symbol: "lock.fill", action: .showPaywall, actionTitle: String(localized: "Unlock")))
                     return
                 }
@@ -193,6 +196,12 @@ final class AppModel {
 
     func selectLook(_ look: Look) {
         camera.select(look)
+    }
+
+    func selectCuratedStyle(_ style: CuratedStyle) {
+        guard CuratedCollection.contains(style), library.look(id: style.recipe.lookID) != nil else { return }
+        camera.selectPreset(style.preset)
+        settings.lastPresetID = nil // bundled recipes are not user-saved presets
     }
 
     func openCameraPresets() {

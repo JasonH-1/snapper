@@ -21,7 +21,7 @@ struct SavedPreset: Identifiable, Codable, Hashable, Sendable {
         return !trimmed.isEmpty && trimmed.count <= 40 && !lookID.isEmpty
             && !trimmed.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
             && strength.isFinite && (0...1).contains(strength)
-            && PhotoAdjustments.Kind.allCases.allSatisfy { adjustments[$0].isFinite && $0.range.contains(adjustments[$0]) }
+            && adjustments.isValid
     }
 
     func applying(to recipe: PhotoRecipe) -> PhotoRecipe {
@@ -73,7 +73,7 @@ final class PresetStore {
     /// After a subscription ends, keep every preset and allow the first one.
     /// The person can choose a different free preset without deleting anything.
     func canUse(_ preset: SavedPreset, hasPremium: Bool) -> Bool {
-        !loadFailed && presets.contains(preset) && (hasPremium || presets.first?.id == preset.id)
+        !loadFailed && presets.contains(preset) && (hasPremium || (presets.first?.id == preset.id && !preset.adjustments.requiresPremium))
     }
 
     @discardableResult
