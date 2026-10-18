@@ -4,14 +4,13 @@ import AVFoundation
 /// not imply support for explicit gains, notably on virtual multi-lens cameras.
 enum WhiteBalanceControl {
     enum Route: Equatable {
-        case automatic, temperature, deviceGains, unsupported
+        case automatic, deviceGains, unsupported
     }
 
     static func route(preset: WhiteBalancePreset, supportsLocked: Bool,
-                      supportsCustomGains: Bool, supportsTemperature: Bool) -> Route {
+                      supportsCustomGains: Bool) -> Route {
         guard preset != .auto else { return .automatic }
         guard supportsLocked else { return .unsupported }
-        if supportsTemperature { return .temperature }
         return supportsCustomGains ? .deviceGains : .unsupported
     }
 

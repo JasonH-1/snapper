@@ -257,8 +257,7 @@ actor CaptureService {
         let route = WhiteBalanceControl.route(
             preset: preset,
             supportsLocked: device.isWhiteBalanceModeSupported(.locked),
-            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
-            supportsTemperature: Self.supportsTemperatureWhiteBalance)
+            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported)
         guard route != .unsupported else { return }
         do {
             try device.lockForConfiguration()
@@ -267,12 +266,10 @@ actor CaptureService {
             case .automatic:
                 guard device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) else { return }
                 device.whiteBalanceMode = .continuousAutoWhiteBalance
-            case .temperature:
-                guard #available(iOS 26.0, *), let kelvin = preset.temperature else { return }
-                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
-                device.setWhiteBalanceModeLocked(whiteBalanceTemperatureAndTintValues: values, handler: nil)
             case .deviceGains:
-                guard let kelvin = preset.temperature else { return }
+                guard device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
+                      device.isWhiteBalanceModeSupported(.locked),
+                      let kelvin = preset.temperature else { return }
                 let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: kelvin, tint: 0)
                 let proposed = device.deviceWhiteBalanceGains(for: values)
                 guard let gains = WhiteBalanceControl.validatedGains(proposed, maximum: device.maxWhiteBalanceGain) else { return }
@@ -284,11 +281,6 @@ actor CaptureService {
         } catch {
             Logger.camera.error("White balance failed: \(error.localizedDescription, privacy: .public)")
         }
-    }
-
-    private static var supportsTemperatureWhiteBalance: Bool {
-        if #available(iOS 26.0, *) { return true }
-        return false
     }
 
     /// Holds the lens at `position` (0 = nearest, 1 = farthest), or returns
@@ -459,8 +451,7 @@ actor CaptureService {
         caps.supportsManualFocus = device.isLockingFocusWithCustomLensPositionSupported
         caps.supportsWhiteBalance = WhiteBalanceControl.route(
             preset: .daylight, supportsLocked: device.isWhiteBalanceModeSupported(.locked),
-            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported,
-            supportsTemperature: Self.supportsTemperatureWhiteBalance) != .unsupported
+            supportsCustomGains: device.isLockingWhiteBalanceWithCustomDeviceGainsSupported) != .unsupported
         caps.photoMegapixels = PhotoCapture.megapixelOptions(for: device)
         return caps
     }
