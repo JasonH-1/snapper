@@ -100,7 +100,8 @@ struct PresetsView: View {
                                     .disabled(isPreparingShare)
                                 Button("Share Style Card", systemImage: "photo") {
                                     guard store.canUse(preset, hasPremium: hasPremium),
-                                          hasPremium || (looks.look(id: preset.lookID)?.isPremium == false && currentRecipe?.requiresPremium != true) else { upgrade(); return }
+                                          hasPremium || (looks.look(id: preset.lookID)?.isPremium == false
+                                              && !preset.applying(to: currentRecipe ?? .untouched).requiresPremium) else { upgrade(); return }
                                     share(preset, card: true)
                                 }
                                 .disabled(isPreparingShare || looks.look(id: preset.lookID) == nil)
