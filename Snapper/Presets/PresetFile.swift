@@ -17,7 +17,9 @@ struct PresetFile: Codable, Equatable, Identifiable, Sendable {
     static let maximumBytes = 65_536
 
     init(_ preset: SavedPreset) {
-        version = preset.adjustments.requiresPremium ? 2 : 1
+        // 3: curves or split toning; 2: other advanced tools; 1: basic sliders.
+        // Older apps reject newer versions instead of dropping settings.
+        version = preset.adjustments.usesToneTools ? 3 : preset.adjustments.requiresPremium ? 2 : 1
         name = preset.name
         lookID = preset.lookID
         strength = preset.strength
@@ -40,7 +42,7 @@ struct PresetFile: Codable, Equatable, Identifiable, Sendable {
     static func decode(_ data: Data, looks: LookLibrary) throws -> PresetFile {
         guard data.count <= maximumBytes else { throw FileError.tooLarge }
         guard let file = try? JSONDecoder().decode(Self.self, from: data) else { throw FileError.invalid }
-        guard (1...2).contains(file.version) else { throw FileError.newerVersion }
+        guard (1...3).contains(file.version) else { throw FileError.newerVersion }
         guard looks.look(id: file.lookID) != nil else { throw FileError.unavailableLook }
         let name = file.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 40,

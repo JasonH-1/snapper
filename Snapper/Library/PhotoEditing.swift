@@ -56,6 +56,59 @@ enum PhotoEditing {
         return output.cropped(to: box).transformed(by: CGAffineTransform(translationX: -box.minX, y: -box.minY))
     }
 
+    /// The transform `frame(_:with:)` gives an image of `size` at the
+    /// origin (Core Image coordinates), and the framed size. Used to map
+    /// touches on the framed photo back onto the original.
+    static func frameTransform(for crop: PhotoCrop, imageSize size: CGSize) -> (transform: CGAffineTransform, size: CGSize) {
+        guard !crop.isNone, size.width >= 1, size.height >= 1 else { return (.identity, size) }
+        var transform = CGAffineTransform.identity
+        var frameSize = size
+        if crop.isFlipped {
+            transform = transform.concatenating(CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: size.width, ty: 0))
+        }
+        if crop.quarterTurns != 0 {
+            let rotation = CGAffineTransform(rotationAngle: -CGFloat(crop.quarterTurns) * .pi / 2)
+            let turned = CGRect(origin: .zero, size: size).applying(rotation)
+            transform = transform.concatenating(rotation)
+                .concatenating(CGAffineTransform(translationX: -turned.minX, y: -turned.minY))
+            frameSize = turned.size
+        }
+        if abs(crop.straighten) > 0.001 {
+            let degrees = min(max(crop.straighten, PhotoCrop.straightenRange.lowerBound), PhotoCrop.straightenRange.upperBound)
+            let scale = PhotoCrop.straightenScale(degrees: degrees, size: frameSize)
+            let center = CGPoint(x: frameSize.width / 2, y: frameSize.height / 2)
+            transform = transform.concatenating(CGAffineTransform(translationX: center.x, y: center.y)
+                .rotated(by: -CGFloat(degrees) * .pi / 180)
+                .scaledBy(x: scale, y: scale)
+                .translatedBy(x: -center.x, y: -center.y))
+        }
+        let box = crop.pixelRect(in: frameSize)
+        guard box.width >= 1, box.height >= 1 else { return (transform, frameSize) }
+        return (transform.concatenating(CGAffineTransform(translationX: -box.minX, y: -box.minY)), box.size)
+    }
+
+    /// A point on the framed photo (0…1 from its top left) on the original
+    /// photo of `imageSize` (0…1 from its top left).
+    static func originalPoint(fromFramed point: CGPoint, crop: PhotoCrop, imageSize: CGSize) -> CGPoint {
+        let (transform, framed) = frameTransform(for: crop, imageSize: imageSize)
+        let pixel = CGPoint(x: point.x * framed.width, y: (1 - point.y) * framed.height)
+        let original = pixel.applying(transform.inverted())
+        return CGPoint(x: original.x / max(imageSize.width, 1), y: 1 - original.y / max(imageSize.height, 1))
+    }
+
+    /// The reverse: a point on the original photo on the framed one.
+    static func framedPoint(fromOriginal point: CGPoint, crop: PhotoCrop, imageSize: CGSize) -> CGPoint {
+        let (transform, framed) = frameTransform(for: crop, imageSize: imageSize)
+        let pixel = CGPoint(x: point.x * imageSize.width, y: (1 - point.y) * imageSize.height).applying(transform)
+        return CGPoint(x: pixel.x / max(framed.width, 1), y: 1 - pixel.y / max(framed.height, 1))
+    }
+
+    /// How many framed pixels one original pixel becomes (straightening zooms in).
+    static func frameScale(for crop: PhotoCrop, imageSize: CGSize) -> CGFloat {
+        let transform = frameTransform(for: crop, imageSize: imageSize).transform
+        return max((transform.a * transform.a + transform.b * transform.b).squareRoot(), 0.0001)
+    }
+
     private static func atOrigin(_ image: CIImage) -> CIImage {
         let origin = image.extent.origin
         guard origin != .zero else { return image }
@@ -97,7 +150,9 @@ enum PhotoEditing {
             curve.point4 = CGPoint(x: 1, y: 1)
             output = curve.outputImage ?? output
         }
+        output = ToneRendering.applyCurves(adjustments.curves, to: output)
         output = ColorMixRendering.apply(adjustments.colorMixer, to: output)
+        output = ToneRendering.applySplitToning(adjustments.splitToning, to: output)
         if adjustments.bloom > 0 || adjustments.halation > 0 || adjustments.vignette > 0 {
             var effects = LookEffects.none
             if adjustments.bloom > 0 {

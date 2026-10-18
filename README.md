@@ -33,6 +33,15 @@ See [the release checklist](docs/release-checklist.md) for owner-supplied detail
 - **Optional style cards:** Share Style Card sends a labeled image plus its preset file. From the editor it uses that photo with its crop and finishing kept, using the selected style; elsewhere it uses a clearly labeled sample. Ordinary exports stay clean.
 - Preset files carry only a version, name, look identifier, strength and adjustments. Imports are bounded to 64 KB and reject unknown versions/looks and invalid values. No server or account is added.
 
+## Editing tools
+
+- **Zoom and the selection overlay:** pinch, double-tap or drag on the editor's photo to inspect it (up to 8×; the zoom badge's Fit goes back). Selective › Show Selection lays the selection over the whole photo in red.
+- **Selection brush:** Selective › Refine Selection paints onto (Paint) or off (Erase) the detected subject, with Size and Softness. One finger paints, two fingers zoom and move; each stroke is one undo step. Strokes are stored as points on the original photo, so they follow later crops, turns and flips, and they're drawn the same way for previews and full-resolution exports (`MaskBrush`). Without a detectable subject, Paint the Area starts from an empty selection.
+- **Versions:** the Versions button on the photo keeps named edits of one photo (Warm, Black & White…) together with its Original and As Shot. The version showing keeps every change; an edit that isn't a version yet is kept automatically when switching. Versions can be duplicated, renamed, saved to Photos one by one or all at once, and are kept in `captures.json` with the photo.
+- **Curves and split toning:** Curves edits an RGB curve and one per channel (monotone cubic, applied to sRGB values with `CIColorCurves`); Color › Split Toning tints highlights and shadows with a balance control (an Oklab tint baked into a 33-point cube). Both are Premium to export, preview free, and travel in presets (preset file version 3).
+- **Export options:** the gear next to Save, and Settings › Saving & Sharing, choose HEIF or JPEG, size (Full, 3840, 2048 or 1080 px), quality and whether location stays in the file (GPS, Apple maker notes and IPTC place names are removed when off). The editor shows the real file size by writing the file in the background, and then saves or shares that same file. Photos are saved with a file URL, not in-memory data.
+- **Backup and restore:** Settings › Backup writes a `.snapperbackup` file (originals unchanged, records with edits and versions, presets, favorites) to share, save to Files or AirDrop; opening it in Snapper, or Restore from Backup, adds what isn't already there. The format is documented in `LibraryBackup.swift`; it streams, so Library size isn't limited by memory.
+
 ## Run it on your iPhone
 
 1. Install XcodeGen: `brew install xcodegen`

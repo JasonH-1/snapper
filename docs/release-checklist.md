@@ -68,3 +68,14 @@ Use the checked-in StoreKit configuration locally, then validate real products i
 ### Photographic approval still requires owned real photos
 
 Use `test-photos/` and `python3 tools/lutgen/lutgen.py review` for the existing review workflow; final approval must use real-device exports because LUT-only review does not establish the complete camera result. Compare Boardwalk, Flashbulb, Cream, Afterglow and Halo across daylight, window light, mixed indoor light, flash and dusk, including varied skin tones. Record clipping, skin color, shadow detail, grain scale and preview/export differences. Do not claim photographic superiority from passing code tests.
+
+## Editing tools acceptance (zoom, brush, versions, export, curves, backup)
+
+- [ ] Zoom: pinch, double-tap and drag on the editor photo in every tab except Crop, at 1×, 2.5× and 8×. Past 1.6× the preview must sharpen (a 3600 px render); Fit returns to the whole photo. VoiceOver Zoom In/Out actions work.
+- [ ] Selection overlay and brush on real photos (a person with loose hair, a pet, an object, two people, and a scene with no subject). Paint and erase at several sizes and softness levels while zoomed; a stroke that turns into a pinch must not paint. Undo each stroke. Crop, rotate and flip afterwards: strokes must stay on the same features. Compare the preview with full-size HEIF and JPEG exports at the selection edges.
+- [ ] Paint the Area on a photo where detection fails; export it; relaunch and confirm the painted selection returns without detection.
+- [ ] Versions: make Warm, Black & White and a new edit from Original; switch between them, relaunch, and confirm each kept its edits; an unsaved edit must be kept as a version when switching. Save one version and Save All to Photos with free and Premium looks. Check the grid badge and VoiceOver labels.
+- [ ] Export options: each size and quality for HEIF and JPEG; the measured file size must match the file saved to Photos and shared. With Include Location off, an imported photo with GPS must show no location in Photos' info panel or in Files; with it on, the location must be kept. Check on iOS 26.6/26.7 that saved photos keep their date and camera details.
+- [ ] Curves and split toning: drag, add and remove points on each channel, including endpoints; check the histogram updates; compare preview, camera preset and export. Check skin tones with warm highlights / cool shadows at moderate settings.
+- [ ] Backup: back up a Library of several hundred photos (including versions, brush edits and presets) and AirDrop it to a second iPhone; open it in Snapper cold and while editing; restore, then restore again (nothing doubles). Stop a restore halfway and restore again. Try a backup cut short by a failed copy, and too little free space.
+

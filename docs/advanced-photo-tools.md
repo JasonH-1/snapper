@@ -4,7 +4,7 @@
 
 - Adjust: highlights, shadows, bloom, halation and vignette, in addition to the existing sliders.
 - Color: hue, saturation and luminance for seven overlapping color bands.
-- Selective: on-device foreground detection with separate subject/background brightness, saturation and warmth.
+- Selective: on-device foreground detection with separate subject/background brightness, saturation and warmth, a full-size selection overlay and a Paint/Erase brush to correct it.
 - Collections: Golden Hour, After Dark and Quiet Days, with nine recipes, rendered samples and shooting tips. These combine existing LUTs with the new tools; they are not nine new LUTs.
 - Guide: searchable instructions for all four additions, with interactive color and bloom examples.
 
@@ -16,7 +16,7 @@ Old recipes decode with neutral defaults for the new fields. Recipes store all s
 
 Presets carry global tone, color and film settings. Crop, finishing and selective edits stay with the destination photo. The live camera, editor and export use the same global adjustment pipeline. Effects are additive to any film effects already in the base look.
 
-Selective detection uses Vision's foreground instance mask request on the original's oriented, 1024-pixel proxy, off the main actor. All detected foreground instances form a single subject area. A bounded, memory-only mask cache is shared by preview and export; masks are regenerated after app restart. Masks receive exactly the photo's crop, rotation and flip, then scale for export. There is no mask brush or individual instance selection. Fine hair, transparent objects, small subjects and large exports need device QA; detection can fail. Exports with active selective edits fail explicitly if a mask cannot be generated. Retry or reset is available in Selective.
+Selective detection uses Vision's foreground instance mask request on the original's oriented, 1024-pixel proxy, off the main actor. All detected foreground instances form a single subject area. A bounded, memory-only mask cache is shared by preview and export; masks are regenerated after app restart. Masks receive exactly the photo's crop, rotation and flip, then scale for export. The selection brush (Refine Selection) corrects the detected mask with Paint and Erase strokes stored on the original photo, or paints a selection from scratch when there is no subject; there is no individual instance selection. Fine hair, transparent objects, small subjects and large exports need device QA; detection can fail. Exports with active selective edits fail explicitly if a mask cannot be generated. Retry or reset is available in Selective.
 
 ## Adding a future collection
 

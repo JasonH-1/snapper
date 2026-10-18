@@ -342,6 +342,12 @@ struct LibraryView: View {
                             .padding(6)
                     }
                 }
+                .overlay(alignment: .topLeading) {
+                    if !record.versions.isEmpty && !model.isSelecting {
+                        VersionsBadge(count: record.versions.count)
+                            .padding(6)
+                    }
+                }
                 .overlay(alignment: .bottomLeading) {
                     // Edited since it arrived; the yellow dot means that edit
                     // isn't in Photos yet.
@@ -395,6 +401,10 @@ struct LibraryView: View {
         if record.isImported { parts.append(String(localized: "imported")) }
         if record.isEdited {
             parts.append(record.isSavedWithCurrentRecipe ? String(localized: "edited") : String(localized: "edited, not saved to Photos"))
+        }
+        if !record.versions.isEmpty {
+            let count = record.versions.count
+            parts.append(count == 1 ? String(localized: "1 version") : String(localized: "\(count) versions"))
         }
         parts.append(record.createdAt.formatted(date: .omitted, time: .shortened))
         return parts.joined(separator: ", ")
@@ -556,6 +566,26 @@ private struct CellBadge: View {
                 }
             }
             .accessibilityHidden(true)
+    }
+}
+
+/// How many versions a photo keeps, on its grid cell.
+private struct VersionsBadge: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "square.stack.fill")
+                .font(.system(size: 9, weight: .bold))
+            Text("\(count)")
+                .font(.system(size: 11, weight: .bold).monospacedDigit())
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 7)
+        .frame(height: 24)
+        .background(.black.opacity(0.45), in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1))
+        .accessibilityHidden(true)
     }
 }
 

@@ -23,6 +23,7 @@ final class AppSettings {
         static let volumeShutter = "camera.volumeButtonShutter"
         static let megapixels = "camera.photoMegapixels"
         static let photoFormat = "photos.format"
+        static let exportOptions = "photos.exportOptions"
     }
 
     let presets: PresetStore
@@ -108,9 +109,18 @@ final class AppSettings {
         didSet { defaults.set(photoMegapixels, forKey: Key.megapixels) }
     }
 
+    /// How photos are written when saved or shared: format, size, quality
+    /// and location.
+    var exportOptions: ExportOptions {
+        didSet {
+            if let data = try? JSONEncoder().encode(exportOptions) { defaults.set(data, forKey: Key.exportOptions) }
+        }
+    }
+
     /// The file format photos are saved to the photo library in.
     var photoFormat: PhotoRenderer.ExportFormat {
-        didSet { defaults.set(photoFormat.rawValue, forKey: Key.photoFormat) }
+        get { exportOptions.format }
+        set { exportOptions.format = newValue }
     }
 
     /// What the camera needs to know when the shutter is pressed.
@@ -137,7 +147,14 @@ final class AppSettings {
         mirrorFrontCamera = defaults.object(forKey: Key.mirrorFront) as? Bool ?? true
         volumeButtonShutter = defaults.object(forKey: Key.volumeShutter) as? Bool ?? true
         photoMegapixels = defaults.object(forKey: Key.megapixels) as? Int ?? 24
-        photoFormat = defaults.string(forKey: Key.photoFormat).flatMap(PhotoRenderer.ExportFormat.init(rawValue:)) ?? .heic
+        if let data = defaults.data(forKey: Key.exportOptions),
+           let options = try? JSONDecoder().decode(ExportOptions.self, from: data) {
+            exportOptions = options
+        } else {
+            // Before export options, only the format was a setting.
+            let format = defaults.string(forKey: Key.photoFormat).flatMap(PhotoRenderer.ExportFormat.init(rawValue:)) ?? .heic
+            exportOptions = ExportOptions(format: format)
+        }
     }
 
     func isFavorite(_ look: Look) -> Bool {
@@ -151,6 +168,17 @@ final class AppSettings {
         } else {
             favoriteLookIDs.append(look.id)
         }
+    }
+
+    /// Adds favourites from a backup after the current ones, keeping only
+    /// looks this version of Snapper has.
+    func mergeFavorites(_ ids: [String], library: LookLibrary) {
+        var merged = favoriteLookIDs
+        for id in ids where !merged.contains(id) {
+            guard let look = library.look(id: id), !look.isOriginal else { continue }
+            merged.append(id)
+        }
+        if merged != favoriteLookIDs { favoriteLookIDs = merged }
     }
 
     /// Moves `look` to the front of Recent (Original is never listed).

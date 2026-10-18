@@ -38,7 +38,9 @@ struct SettingsView: View {
                 }
                 premiumSection
                 photosSection
+                exportSection
                 librarySection
+                BackupSection(app: app)
                 cameraSection
                 looksSection
                 supportSection
@@ -142,6 +144,37 @@ struct SettingsView: View {
         }
     }
 
+    private var exportSection: some View {
+        let options = Bindable(app.settings).exportOptions
+        return Section {
+            Picker("Format", selection: options.format) {
+                Text("HEIF").tag(PhotoRenderer.ExportFormat.heic)
+                Text("JPEG").tag(PhotoRenderer.ExportFormat.jpeg)
+            }
+            Picker("Size", selection: options.size) {
+                ForEach(ExportOptions.Size.allCases) { size in
+                    Text(size.title).tag(size)
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Quality")
+                    Spacer()
+                    Text(app.settings.exportOptions.quality, format: .percent.precision(.fractionLength(0)))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: options.quality, in: ExportOptions.qualityRange, step: 0.05)
+                    .accessibilityLabel(Text("Quality"))
+            }
+            Toggle("Include Location", isOn: options.includesLocation)
+        } header: {
+            Text("Saving & Sharing")
+        } footer: {
+            Text("Used when you save or share from the editor or the Library; the editor's export options show the file size for each photo. HEIF files are about half the size of JPEG; JPEG opens everywhere. Photos saved automatically from the camera are always full size.")
+        }
+    }
+
     private var librarySection: some View {
         let savedCount = app.captures.alreadySavedIDs.count
         return Section {
@@ -182,16 +215,12 @@ struct SettingsView: View {
                     Text("\(megapixels) MP").tag(megapixels)
                 }
             }
-            Picker("Format", selection: Bindable(app.settings).photoFormat) {
-                Text("HEIF").tag(PhotoRenderer.ExportFormat.heic)
-                Text("JPEG").tag(PhotoRenderer.ExportFormat.jpeg)
-            }
             Toggle("Mirror Front Camera", isOn: Bindable(app.settings).mirrorFrontCamera)
             Toggle("Volume Buttons Take Photos", isOn: Bindable(app.settings).volumeButtonShutter)
         } header: {
             Text("Camera")
         } footer: {
-            Text("HEIF files are about half the size; JPEG opens everywhere. Shared photos are always JPEG. Mirror Front Camera saves selfies the way the preview shows them. The volume buttons need iOS 18 or later and also work with Camera Control.")
+            Text("Mirror Front Camera saves selfies the way the preview shows them. The volume buttons need iOS 18 or later and also work with Camera Control.")
         }
     }
 

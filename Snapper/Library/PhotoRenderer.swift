@@ -1,4 +1,5 @@
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import ImageIO
 import OSLog
 import UIKit
@@ -10,7 +11,7 @@ import UniformTypeIdentifiers
 /// Looks go through `LookPipeline`, the same code the live preview uses, so
 /// what you saw is what you get. Runs off the main actor.
 actor PhotoRenderer {
-    enum ExportFormat: String, CaseIterable, Sendable {
+    enum ExportFormat: String, Codable, CaseIterable, Sendable {
         case heic
         case jpeg
 
@@ -60,21 +61,20 @@ actor PhotoRenderer {
                 seed: UInt64 = 0,
                 watermark: Bool,
                 format: ExportFormat, sourceURL: URL? = nil) throws -> Data {
-        guard let original = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
-            throw RenderError.unreadableImage
-        }
-        guard var image = render(look, recipe: recipe, seed: seed, to: original, sourceURL: sourceURL) else {
-            throw RenderError.subjectUnavailable
-        }
-        if watermark {
-            image = Watermark.apply(to: image)
-        }
-        image = image.settingProperties(Self.exportProperties(from: original.properties))
+        try export(source: source, look: look, recipe: recipe, seed: seed, watermark: watermark,
+                   options: ExportOptions(format: format), sourceURL: sourceURL)
+    }
 
+    /// Encoded render of `source` with `recipe`, sized, compressed and
+    /// stripped of location as `options` say.
+    func export(source: Data, look: Look, recipe: PhotoRecipe, seed: UInt64 = 0, watermark: Bool,
+                options: ExportOptions, sourceURL: URL? = nil) throws -> Data {
+        let image = try exportImage(source: source, look: look, recipe: recipe, seed: seed, watermark: watermark,
+                                    options: options, sourceURL: sourceURL)
         let colorSpace = LookPipeline.outputColorSpace
-        let quality = [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.92]
+        let quality = [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: options.encoderQuality]
         let data: Data?
-        switch format {
+        switch options.format {
         case .heic:
             data = context.heifRepresentation(of: image, format: .RGBA8, colorSpace: colorSpace, options: quality)
         case .jpeg:
@@ -84,9 +84,75 @@ actor PhotoRenderer {
         return data
     }
 
+    /// Like `export`, but writes the file straight to `url` (no copy of the
+    /// encoded photo in memory). Returns its size in pixels.
+    @discardableResult
+    func exportFile(source: Data, look: Look, recipe: PhotoRecipe, seed: UInt64 = 0, watermark: Bool,
+                    options: ExportOptions, sourceURL: URL? = nil, to url: URL) throws -> CGSize {
+        let image = try exportImage(source: source, look: look, recipe: recipe, seed: seed, watermark: watermark,
+                                    options: options, sourceURL: sourceURL)
+        let colorSpace = LookPipeline.outputColorSpace
+        let quality = [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: options.encoderQuality]
+        do {
+            switch options.format {
+            case .heic:
+                try context.writeHEIFRepresentation(of: image, to: url, format: .RGBA8, colorSpace: colorSpace, options: quality)
+            case .jpeg:
+                try context.writeJPEGRepresentation(of: image, to: url, colorSpace: colorSpace, options: quality)
+            }
+        } catch {
+            throw RenderError.encodingFailed
+        }
+        return image.extent.size
+    }
+
+    /// The pixel size an export with `options` would have, without rendering it.
+    func exportSize(sourceURL: URL, look: Look, recipe: PhotoRecipe, seed: UInt64 = 0, options: ExportOptions) -> CGSize? {
+        guard let original = CIImage(contentsOf: sourceURL, options: [.applyOrientationProperty: true]),
+              let image = render(look, recipe: recipe, seed: seed, to: original, sourceURL: sourceURL) else { return nil }
+        return options.outputSize(for: image.extent.size)
+    }
+
+    private func exportImage(source: Data, look: Look, recipe: PhotoRecipe, seed: UInt64, watermark: Bool,
+                             options: ExportOptions, sourceURL: URL?) throws -> CIImage {
+        guard let original = CIImage(data: source, options: [.applyOrientationProperty: true]) else {
+            throw RenderError.unreadableImage
+        }
+        guard var image = render(look, recipe: recipe, seed: seed, to: original, sourceURL: sourceURL) else {
+            throw RenderError.subjectUnavailable
+        }
+        if watermark {
+            image = Watermark.apply(to: image)
+        }
+        image = Self.resized(image, to: options.outputSize(for: image.extent.size))
+        return image.settingProperties(Self.exportProperties(from: original.properties,
+                                                             includesLocation: options.includesLocation))
+    }
+
+    /// Scales `image` down to exactly `size` pixels with Lanczos resampling
+    /// (sharp, without the aliasing a plain transform gives on iOS). Images
+    /// already that small are returned at the origin, unchanged.
+    static func resized(_ image: CIImage, to size: CGSize) -> CIImage {
+        let extent = image.extent
+        guard !extent.isInfinite, extent.width >= 1, extent.height >= 1, size.width >= 1, size.height >= 1 else { return image }
+        let atOrigin = image.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
+        guard size.width < extent.width.rounded() || size.height < extent.height.rounded() else { return atOrigin }
+        let scaleX = size.width / extent.width, scaleY = size.height / extent.height
+        let filter = CIFilter.lanczosScaleTransform()
+        // Clamped so the edge pixels don't blend with the transparency beyond them.
+        filter.inputImage = atOrigin.clampedToExtent()
+        filter.scale = Float(scaleY)
+        filter.aspectRatio = Float(scaleX / scaleY)
+        guard let output = filter.outputImage else { return atOrigin }
+        return output.cropped(to: CGRect(origin: .zero, size: size))
+    }
+
     /// Keeps camera metadata (date, exposure, lens) but records that the
-    /// pixels are already upright, and drops the embedded thumbnail.
-    private static func exportProperties(from properties: [String: Any]) -> [String: Any] {
+    /// pixels are already upright, drops the embedded thumbnail and sizes
+    /// that no longer apply, and, unless `includesLocation`, every place the
+    /// photo's location can be kept: GPS, Apple's maker notes and IPTC place
+    /// names.
+    static func exportProperties(from properties: [String: Any], includesLocation: Bool = true) -> [String: Any] {
         var result = properties
         result[kCGImagePropertyOrientation as String] = 1
         if var tiff = result[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
@@ -96,6 +162,25 @@ actor PhotoRenderer {
         }
         result.removeValue(forKey: kCGImagePropertyPixelWidth as String)
         result.removeValue(forKey: kCGImagePropertyPixelHeight as String)
+        if var exif = result[kCGImagePropertyExifDictionary as String] as? [String: Any] {
+            // Crop and resizing change these; the encoder records the real size.
+            exif.removeValue(forKey: kCGImagePropertyExifPixelXDimension as String)
+            exif.removeValue(forKey: kCGImagePropertyExifPixelYDimension as String)
+            exif.removeValue(forKey: kCGImagePropertyExifSubjectArea as String)
+            exif.removeValue(forKey: kCGImagePropertyExifSubjectLocation as String)
+            result[kCGImagePropertyExifDictionary as String] = exif
+        }
+        guard !includesLocation else { return result }
+        result.removeValue(forKey: kCGImagePropertyGPSDictionary as String)
+        result.removeValue(forKey: kCGImagePropertyMakerAppleDictionary as String)
+        if var iptc = result[kCGImagePropertyIPTCDictionary as String] as? [String: Any] {
+            let placeKeys = [kCGImagePropertyIPTCCity, kCGImagePropertyIPTCSubLocation, kCGImagePropertyIPTCProvinceState,
+                             kCGImagePropertyIPTCCountryPrimaryLocationCode, kCGImagePropertyIPTCCountryPrimaryLocationName,
+                             kCGImagePropertyIPTCContentLocationCode, kCGImagePropertyIPTCContentLocationName,
+                             kCGImagePropertyIPTCExtLocationCreated, kCGImagePropertyIPTCExtLocationShown]
+            for key in placeKeys { iptc.removeValue(forKey: key as String) }
+            result[kCGImagePropertyIPTCDictionary as String] = iptc
+        }
         return result
     }
 
@@ -105,22 +190,32 @@ actor PhotoRenderer {
     /// this size; only exports work at full resolution.
     func preview(id: UUID, sourceURL: URL, look: Look, recipe: PhotoRecipe, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        guard let image = render(look, recipe: recipe, seed: id.effectsSeed, to: proxy, sourceURL: sourceURL) else { return nil }
+        let source = Self.fitting(proxy, maxPixelSize: maxPixelSize)
+        guard let image = render(look, recipe: recipe, seed: id.effectsSeed, to: source, sourceURL: sourceURL) else { return nil }
         return makeUIImage(image)
+    }
+
+    /// `image` no larger than `maxPixelSize` on its long side: a bigger copy
+    /// may be cached for zooming in, and editing at fit size shouldn't pay for it.
+    private static func fitting(_ image: CIImage, maxPixelSize: Int) -> CIImage {
+        let long = max(image.extent.width, image.extent.height)
+        guard long > CGFloat(maxPixelSize) + 1 else { return image }
+        let scale = CGFloat(maxPixelSize) / long
+        return image.transformed(by: CGAffineTransform(scaleX: scale, y: scale), highQualityDownsample: true)
     }
 
     /// The photo framed by `crop` but with no look or sliders (for
     /// press-and-hold compare).
     func original(id: UUID, sourceURL: URL, crop: PhotoCrop = .none, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(PhotoEditing.frame(proxy, with: crop))
+        return makeUIImage(PhotoEditing.frame(Self.fitting(proxy, maxPixelSize: maxPixelSize), with: crop))
     }
 
     /// The whole photo, unframed and unfiltered, at preview size (the crop
     /// tab draws its own framing over it).
     func uncropped(id: UUID, sourceURL: URL, maxPixelSize: Int = 1800) -> UIImage? {
         guard let proxy = proxy(id: id, sourceURL: sourceURL, maxPixelSize: maxPixelSize) else { return nil }
-        return makeUIImage(proxy)
+        return makeUIImage(Self.fitting(proxy, maxPixelSize: maxPixelSize))
     }
 
     /// Small renders of one photo in many looks, for the look strip: the
@@ -160,7 +255,7 @@ actor PhotoRenderer {
     }
 
     private func render(_ look: Look, recipe: PhotoRecipe, seed: UInt64, to image: CIImage, sourceURL: URL? = nil) -> CIImage? {
-        let mask = recipe.selective.isActive ? subjectMask(sourceURL: sourceURL, image: image) : nil
+        let mask = recipe.selective.isActive ? selectionMask(for: recipe.selective, sourceURL: sourceURL, image: image) : nil
         guard !recipe.selective.isActive || mask != nil else { return nil }
         return PhotoEditing.apply(recipe, look: look, lut: lutStore.lut(for: look), seed: seed, to: image, subjectMask: mask)
     }
@@ -172,32 +267,99 @@ actor PhotoRenderer {
         return makeUIImage(PhotoEditing.frame(mask, with: crop))
     }
 
-    private func subjectMask(sourceURL: URL?, image: CIImage) -> CIImage? {
-        if let sourceURL, failedMasks.contains(sourceURL) { return nil }
-        let detected: CIImage
-        if let sourceURL, let cached = subjectMasks[sourceURL] { detected = cached }
-        else {
-            let source: CIImage
-            if let sourceURL, let loaded = Self.downsampled(url: sourceURL, maxPixelSize: 1024) { source = loaded }
-            else {
-                let scale = min(1, 1024 / max(image.extent.width, image.extent.height))
-                source = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-            }
-            guard let mask = try? detectSubject(source), !mask.extent.isInfinite,
-                  mask.extent.width > 0, mask.extent.height > 0 else {
-                if let sourceURL {
-                    if failedMasks.count >= 32 { failedMasks.removeAll() }
-                    failedMasks.insert(sourceURL)
-                }
-                return nil
-            }
-            detected = mask.transformed(by: CGAffineTransform(translationX: -mask.extent.minX, y: -mask.extent.minY))
-            if let sourceURL {
-                subjectMasks[sourceURL] = detected
-                maskOrder.append(sourceURL)
-                if maskOrder.count > 6 { subjectMasks[maskOrder.removeFirst()] = nil }
-            }
+    /// The selection (detected subject plus brush corrections), framed like
+    /// the photo and tinted, to lay over the editor's photo at full size.
+    /// `background` tints everything outside the subject instead.
+    func selectionOverlay(sourceURL: URL, edits: SelectiveEdits, crop: PhotoCrop, background: Bool,
+                          maxPixelSize: Int = 1400) -> UIImage? {
+        guard let source = Self.downsampled(url: sourceURL, maxPixelSize: maxPixelSize),
+              let mask = selectionMask(for: edits, sourceURL: sourceURL, image: source) else { return nil }
+        // Transparent outside the tinted area.
+        return makeUIImage(SelectiveRendering.overlay(for: PhotoEditing.frame(mask, with: crop), inverted: background))
+    }
+
+    /// The selection for `image` (the unframed original or a copy of it):
+    /// the detected subject, or nothing when painting from scratch, with
+    /// the brush strokes applied, scaled to cover `image`.
+    private func selectionMask(for edits: SelectiveEdits, sourceURL: URL?, image: CIImage) -> CIImage? {
+        var base: CIImage?
+        if edits.usesSubjectDetection {
+            guard let detected = detectedMask(sourceURL: sourceURL, image: image) else { return nil }
+            base = detected
         }
+        let refined: CIImage
+        if edits.strokes.isEmpty {
+            // Nothing detected, nothing painted: an empty selection.
+            refined = base ?? CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: 16, height: 16))
+        } else {
+            guard let painted = paintedMask(for: edits, base: base, sourceURL: sourceURL, image: image) else { return nil }
+            refined = painted
+        }
+        return refined.transformed(by: CGAffineTransform(scaleX: image.extent.width / refined.extent.width,
+                                                         y: image.extent.height / refined.extent.height))
+            .transformed(by: CGAffineTransform(translationX: image.extent.minX, y: image.extent.minY))
+            .cropped(to: image.extent)
+    }
+
+    /// Masks with strokes drawn in, by photo and strokes: drawing them is the
+    /// slow part, and the preview, overlay and export all ask for the same one.
+    private struct PaintedKey: Hashable {
+        let sourceURL: URL?
+        let aspect: Int
+        let strokes: [MaskStroke]
+        let usesSubjectDetection: Bool
+    }
+    private var paintedMasks: [PaintedKey: CIImage] = [:]
+    private var paintedOrder: [PaintedKey] = []
+
+    private func paintedMask(for edits: SelectiveEdits, base: CIImage?, sourceURL: URL?, image: CIImage) -> CIImage? {
+        // Without a source file, the aspect tells different images apart.
+        let aspect = Int((image.extent.width / max(image.extent.height, 1) * 1000).rounded())
+        let key = PaintedKey(sourceURL: sourceURL, aspect: sourceURL == nil ? aspect : 0,
+                             strokes: edits.strokes, usesSubjectDetection: edits.usesSubjectDetection)
+        if let cached = paintedMasks[key] { return cached }
+        // Painting from scratch works at the same size detection would.
+        let scale = min(1, 1024 / max(image.extent.width, image.extent.height, 1))
+        let size = CGSize(width: max(1, (image.extent.width * scale).rounded()),
+                          height: max(1, (image.extent.height * scale).rounded()))
+        guard let painted = MaskBrush.apply(edits.strokes, to: base, size: size, context: context) else { return nil }
+        paintedMasks[key] = painted
+        paintedOrder.append(key)
+        if paintedOrder.count > 6 { paintedMasks[paintedOrder.removeFirst()] = nil }
+        return painted
+    }
+
+    /// The detected subject for `image`, at the size Vision made it (1024 px
+    /// on the long side), with its origin at zero.
+    private func detectedMask(sourceURL: URL?, image: CIImage) -> CIImage? {
+        if let sourceURL, failedMasks.contains(sourceURL) { return nil }
+        if let sourceURL, let cached = subjectMasks[sourceURL] { return cached }
+        let source: CIImage
+        if let sourceURL, let loaded = Self.downsampled(url: sourceURL, maxPixelSize: 1024) { source = loaded }
+        else {
+            let scale = min(1, 1024 / max(image.extent.width, image.extent.height))
+            source = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        }
+        guard let mask = try? detectSubject(source), !mask.extent.isInfinite,
+              mask.extent.width > 0, mask.extent.height > 0 else {
+            if let sourceURL {
+                if failedMasks.count >= 32 { failedMasks.removeAll() }
+                failedMasks.insert(sourceURL)
+            }
+            return nil
+        }
+        let detected = mask.transformed(by: CGAffineTransform(translationX: -mask.extent.minX, y: -mask.extent.minY))
+        if let sourceURL {
+            subjectMasks[sourceURL] = detected
+            maskOrder.append(sourceURL)
+            if maskOrder.count > 6 { subjectMasks[maskOrder.removeFirst()] = nil }
+        }
+        return detected
+    }
+
+    /// The detected subject scaled to cover `image`.
+    private func subjectMask(sourceURL: URL?, image: CIImage) -> CIImage? {
+        guard let detected = detectedMask(sourceURL: sourceURL, image: image) else { return nil }
         return detected.transformed(by: CGAffineTransform(scaleX: image.extent.width / detected.extent.width,
                                                          y: image.extent.height / detected.extent.height))
             .transformed(by: CGAffineTransform(translationX: image.extent.minX, y: image.extent.minY))
@@ -226,6 +388,13 @@ actor PhotoRenderer {
             return nil
         }
         return UIImage(cgImage: cgImage)
+    }
+
+    /// Whether the file records where it was taken (GPS).
+    static func hasLocation(url: URL) -> Bool {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return false }
+        return properties[kCGImagePropertyGPSDictionary] != nil
     }
 
     /// The photo's size in pixels once its orientation is applied (portrait

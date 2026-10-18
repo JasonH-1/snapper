@@ -312,6 +312,60 @@ final class AppModel {
 
     func updateCameraVisibility() {
         camera.setPreviewVisible(libraryScreen == nil && paywall == nil && !isShowingSettings
-                                 && !isShowingLookPicker && !isShowingCameraPresets && !isImportingPreset)
+                                 && !isShowingLookPicker && !isShowingCameraPresets && !isImportingPreset
+                                 && incomingBackup == nil)
+    }
+
+    // MARK: - Backup
+
+    /// A backup opened from Files or AirDrop, waiting for the person to restore it.
+    var incomingBackup: IncomingBackup?
+
+    struct IncomingBackup: Identifiable {
+        let url: URL
+        var id: URL { url }
+    }
+
+    /// Writes a backup of the Library, presets and favourites.
+    func makeLibraryBackup() async throws -> (url: URL, summary: LibraryBackup.Summary) {
+        try await captures.makeBackup(presets: settings.presets.presets, favoriteLookIDs: settings.favoriteLookIDs,
+                                      appVersion: SettingsView.versionString)
+    }
+
+    /// Restores a backup into the Library and says what happened.
+    func restoreLibraryBackup(from url: URL) async throws -> String {
+        let result = try await captures.restoreBackup(from: url)
+        let presets = settings.presets.restore(result.presets)
+        settings.mergeFavorites(result.favoriteLookIDs, library: library)
+        return Self.restoreMessage(photos: result.records.count, presets: presets,
+                                   alreadyThere: result.alreadyInLibrary, unreadable: result.unreadable,
+                                   stopped: result.wasStopped)
+    }
+
+    nonisolated static func restoreMessage(photos: Int, presets: Int, alreadyThere: Int, unreadable: Int,
+                                           stopped: Bool = false) -> String {
+        var parts: [String] = []
+        if stopped {
+            parts.append(String(localized: "Restore stopped. Restore again to add the rest; photos already restored are skipped."))
+        }
+        let photoText = LibraryModel.photoCount(photos)
+        if presets > 0 {
+            parts.append(presets == 1
+                         ? String(localized: "Restored \(photoText) and 1 preset.")
+                         : String(localized: "Restored \(photoText) and \(presets) presets."))
+        } else {
+            parts.append(String(localized: "Restored \(photoText)."))
+        }
+        if alreadyThere == 1 {
+            parts.append(String(localized: "1 photo already in Snapper stayed as it was."))
+        } else if alreadyThere > 1 {
+            parts.append(String(localized: "\(alreadyThere) photos already in Snapper stayed as they were."))
+        }
+        if unreadable == 1 {
+            parts.append(String(localized: "1 photo couldn't be read and was skipped."))
+        } else if unreadable > 1 {
+            parts.append(String(localized: "\(unreadable) photos couldn't be read and were skipped."))
+        }
+        return parts.joined(separator: " ")
     }
 }
