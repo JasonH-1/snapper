@@ -8,11 +8,22 @@ struct LibraryView: View {
     @Bindable var model: LibraryModel
     var onClose: () -> Void
     var onShowPaywall: () -> Void
+    var onShootPreset: ((SavedPreset) -> Bool)?
 
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showDeleteConfirmation = false
     @State private var upgradeAfterPresets = false
+    @State private var finishing: FinishSelection?
+    @State private var upgradeAfterFinish = false
+    @State private var shareAfterFinish = false
+
+    private struct FinishSelection: Identifiable {
+        let id = UUID()
+        let records: [CaptureRecord]
+    }
+    /// Photos waiting on the delete confirmation: the selection, or the one
+    /// photo whose context menu was used (kept apart from the selection).
+    @State private var deleteTarget: Set<UUID>?
     /// Photos grow into the editor from their grid cell and shrink back.
     @Namespace private var photoZoom
 
@@ -27,13 +38,13 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             content
-                .background(Color.black.ignoresSafeArea())
-                .navigationTitle(model.isSelecting ? selectionTitle : String(localized: "Library"))
-                .navigationBarTitleDisplayMode(model.isSelecting ? .inline : .large)
+                .background(Theme.canvas.ignoresSafeArea())
+                .navigationTitle(model.isSelecting ? selectionTitle : "")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
                 .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
                 .navigationDestination(item: $model.editor) { editor in
-                    EditorView(model: editor, onShowPaywall: onShowPaywall)
+                    EditorView(model: editor, onShowPaywall: onShowPaywall, onShootPreset: onShootPreset)
                         .zoomTransition(from: editor.id, in: photoZoom)
                 }
         }
@@ -59,12 +70,22 @@ struct LibraryView: View {
                         onApply: { model.applyPresetToSelection($0) },
                         onUpgrade: { upgradeAfterPresets = true })
         }
-        .confirmationDialog(deleteTitle, isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .sheet(item: $finishing, onDismiss: {
+            if upgradeAfterFinish { upgradeAfterFinish = false; onShowPaywall() }
+            else if shareAfterFinish { shareAfterFinish = false; model.shareSelected() }
+        }) { selected in
+            BatchFinishView(model: model, records: selected.records,
+                            onUpgrade: { upgradeAfterFinish = true },
+                            onShareAfterDismiss: { shareAfterFinish = true })
+        }
+        .confirmationDialog(deleteTitle, isPresented: deleteBinding, titleVisibility: .visible, presenting: deleteTarget) { ids in
             Button("Delete", role: .destructive) {
-                withAnimation { model.deleteSelected() }
+                withAnimation(animation) { model.delete(ids) }
             }
-        } message: {
-            Text("They will be removed from Snapper. Copies already saved to your photo library are not affected.")
+        } message: { ids in
+            Text(ids.count == 1
+                 ? "It will be removed from Snapper. Copies already saved to your photo library are not affected."
+                 : "They will be removed from Snapper. Copies already saved to your photo library are not affected.")
         }
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { alert in
             switch alert {
@@ -91,7 +112,11 @@ struct LibraryView: View {
     }
 
     private var deleteTitle: Text {
-        Text("Delete \(LibraryModel.photoCount(model.selection.count))?")
+        Text("Delete \(LibraryModel.photoCount(deleteTarget?.count ?? 0))?")
+    }
+
+    private var deleteBinding: Binding<Bool> {
+        Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } })
     }
 
     private var alertTitle: Text {
@@ -153,7 +178,7 @@ struct LibraryView: View {
         PhotosPicker(selection: $model.pickerItems, maxSelectionCount: 50, selectionBehavior: .ordered,
                      matching: .images, preferredItemEncoding: .current) {
             // The same icon as the badge on imported photos.
-            Image(systemName: "square.and.arrow.down")
+            Label("Import", systemImage: "plus")
                 .fontWeight(.semibold)
                 .foregroundStyle(.black)
         }
@@ -168,12 +193,26 @@ struct LibraryView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                if !model.isSelecting {
-                    Text(model.summary)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.top, -6)
+                if !model.isSelecting { studioHeader }
+                if model.isSelecting {
+                    Text(model.selection.isEmpty ? "Choose photos to style, frame, or share together." : "Your set is ready. Choose Style to apply a look or add frames.")
+                        .font(.subheadline).foregroundStyle(.secondary).padding(.horizontal, 16)
+                }
+                if let style = model.copiedStyle {
+                    HStack(spacing: 10) {
+                        Image(systemName: "doc.on.clipboard").foregroundStyle(Theme.accent)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Style copied: \(style.name)").font(.subheadline.weight(.semibold))
+                            Text("Paste from a photo’s menu, or select a set.").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if model.isSelecting {
+                            Button("Paste") { model.pasteStyle(to: model.selection) }
+                                .disabled(model.selection.isEmpty || model.isWorking)
+                        }
+                    }
+                    .padding(14).background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 16)
                 }
                 filterChips
                 if model.sections.isEmpty {
@@ -199,6 +238,62 @@ struct LibraryView: View {
             .padding(.bottom, 24)
             .animation(animation, value: model.filter)
         }
+    }
+
+    private var studioHeader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Make it yours.").font(Theme.lookName(.title))
+                Spacer()
+                Text(model.summary).font(.caption).foregroundStyle(.secondary)
+            }
+            if let latest = model.records.first {
+                Button { model.open(latest) } label: {
+                    HStack(spacing: 14) {
+                        Color.white.opacity(0.08).frame(width: 76, height: 88)
+                            .overlay {
+                                if let image = model.thumbnail(for: latest) {
+                                    Image(uiImage: image).resizable().scaledToFill()
+                                }
+                            }.clipped().clipShape(RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("YOUR LATEST PHOTO").font(.caption2.weight(.bold)).foregroundStyle(Theme.accent)
+                            Text(model.captures.look(for: latest).name).font(Theme.lookName(.title3))
+                            Text("Edit, add a frame, and make it ready to share.")
+                                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.up.right").foregroundStyle(Theme.accent)
+                    }
+                    .padding(14).background(Theme.surface, in: RoundedRectangle(cornerRadius: 20))
+                }
+                .buttonStyle(PressableButtonStyle())
+                .onAppear { model.cellAppeared(latest) }
+                .accessibilityLabel("Edit latest photo in \(model.captures.look(for: latest).name)")
+                Button("Copy Style from Latest", systemImage: "doc.on.doc") { model.copyStyle(from: latest) }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+            }
+            HStack(spacing: 10) {
+                PhotosPicker(selection: $model.pickerItems, maxSelectionCount: 50, selectionBehavior: .ordered,
+                             matching: .images, preferredItemEncoding: .current) {
+                    Label("Import Photos", systemImage: "plus")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14)).foregroundStyle(.black)
+                }
+                .disabled(model.importProgress != nil)
+                Button {
+                    withAnimation(animation) { model.isSelecting = true }
+                } label: {
+                    Label("Style a Set", systemImage: "square.stack")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(model.records.isEmpty)
+            }
+            .font(.subheadline.weight(.semibold))
+            .buttonStyle(PressableButtonStyle())
+        }.padding(.horizontal, 16)
     }
 
     private var filterChips: some View {
@@ -277,9 +372,12 @@ struct LibraryView: View {
                 } label: {
                     Label("Edit", systemImage: "slider.horizontal.3")
                 }
+                Button("Copy Style", systemImage: "doc.on.doc") { model.copyStyle(from: record) }
+                if model.copiedStyle != nil {
+                    Button("Paste Style", systemImage: "doc.on.clipboard") { model.pasteStyle(to: [record.id]) }
+                }
                 Button(role: .destructive) {
-                    model.selection = [record.id]
-                    showDeleteConfirmation = true
+                    deleteTarget = [record.id]
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
@@ -379,6 +477,12 @@ struct LibraryView: View {
             barButton("Share", systemImage: "square.and.arrow.up") { model.shareSelected() }
             barButton("Save", systemImage: "square.and.arrow.down") { model.saveSelected() }
             Menu {
+                Button("Finish Photo Set", systemImage: "rectangle.inset.filled") {
+                    finishing = FinishSelection(records: model.selectedRecords)
+                }
+                if model.copiedStyle != nil {
+                    Button("Paste Copied Style", systemImage: "doc.on.clipboard") { model.pasteStyle(to: model.selection) }
+                }
                 Button("Apply a Look", systemImage: "camera.filters") { model.prepareLookChoice() }
                 Button("Apply Personal Preset", systemImage: "slider.horizontal.3") {
                     if model.hasPremiumNow { model.isChoosingPreset = true }
@@ -393,7 +497,7 @@ struct LibraryView: View {
             }
             .tint(.white)
             barButton("Delete", systemImage: "trash", tint: Color(red: 1, green: 0.41, blue: 0.38)) {
-                showDeleteConfirmation = true
+                deleteTarget = model.selection
             }
         }
         .frame(minHeight: 70)

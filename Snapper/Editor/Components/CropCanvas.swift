@@ -12,6 +12,8 @@ struct CropCanvas: View {
     /// Normalised width over height to hold the box to, or nil when free.
     let aspect: CGFloat?
     var onChange: (CGRect) -> Void
+    /// A drag on the box started (true) or ended (false).
+    var onInteraction: (Bool) -> Void = { _ in }
 
     @State private var dragStart: CGRect?
     @State private var isDragging = false
@@ -156,6 +158,7 @@ struct CropCanvas: View {
     private func moveGesture(frame: CGRect) -> some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
+                if dragStart == nil { onInteraction(true) }
                 let start = dragStart ?? rect
                 dragStart = start
                 isDragging = true
@@ -172,12 +175,14 @@ struct CropCanvas: View {
                 dragStart = nil
                 isDragging = false
                 withAnimation(.snapper(Motion.standard, reduceMotion: reduceMotion)) { stretch = .zero }
+                onInteraction(false)
             }
     }
 
     private func resizeGesture(_ handle: CropBox.Handle, frame: CGRect) -> some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
+                if dragStart == nil { onInteraction(true) }
                 let start = dragStart ?? rect
                 dragStart = start
                 isDragging = true
@@ -187,6 +192,7 @@ struct CropCanvas: View {
             .onEnded { _ in
                 dragStart = nil
                 isDragging = false
+                onInteraction(false)
             }
     }
 }

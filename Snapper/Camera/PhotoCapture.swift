@@ -12,6 +12,8 @@ struct CapturedPhoto: Sendable {
     /// Becomes the capture's id. The camera sets it to the frame the live
     /// preview showed, whose seed placed the look's grain and leaks.
     var id = UUID()
+    /// Frozen at shutter press, even if the user changes styles during capture.
+    var style: PhotoRecipe?
 }
 
 /// Wraps AVCapturePhotoOutput. Owned and only used by `CaptureService`, so it

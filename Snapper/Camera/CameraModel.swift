@@ -23,6 +23,10 @@ final class CameraModel {
     private(set) var capabilities = CameraCapabilities()
     private(set) var looks: [Look]
     private(set) var lookIndex = 0
+    private(set) var activePreset: SavedPreset?
+    var captureStyle: PhotoRecipe {
+        activePreset?.applying(to: PhotoRecipe(lookID: currentLook.id)) ?? PhotoRecipe(lookID: currentLook.id)
+    }
     /// Bumped whenever the look changes, to show the look's name briefly.
     private(set) var lookChangeCount = 0
     private(set) var zoom: CGFloat = 1
@@ -39,6 +43,8 @@ final class CameraModel {
     /// Seconds left on the self-timer, while it runs.
     private(set) var countdown: Int?
     private(set) var whiteBalance: WhiteBalancePreset = .auto
+    private(set) var isChangingWhiteBalance = false
+    private(set) var whiteBalanceError: String?
     /// Manual lens position (0 near … 1 far); nil = auto focus.
     private(set) var lensPosition: Float?
     /// Manual ISO and shutter speed; nil = auto exposure.
@@ -55,6 +61,10 @@ final class CameraModel {
         let lower = max(-2, capabilities.minExposureBias)
         let upper = min(2, capabilities.maxExposureBias)
         return lower <= upper ? lower...upper : 0...0
+    }
+
+    var canCapture: Bool {
+        !isChangingWhiteBalance && isPreviewVisible && isAppActive && (status == .running || status == .noCamera)
     }
 
     var currentLook: Look { looks.indices.contains(lookIndex) ? looks[lookIndex] : .original }
@@ -75,8 +85,8 @@ final class CameraModel {
     /// The last metering point, in device coordinates (centre until a tap).
     @ObservationIgnored private var meteringPoint = CGPoint(x: 0.5, y: 0.5)
     @ObservationIgnored private var swipeTarget: Int?
-    @ObservationIgnored private var isPreviewVisible = true
-    @ObservationIgnored private var isAppActive = true
+    private var isPreviewVisible = true
+    private var isAppActive = true
     @ObservationIgnored private var hasStarted = false
 
     /// Called with each new photo and the look it was taken with.
@@ -161,11 +171,13 @@ final class CameraModel {
     /// Pause the camera while another full-screen view covers it.
     func setPreviewVisible(_ visible: Bool) {
         isPreviewVisible = visible
+        if !visible { cancelCountdown() }
         updateRunningState()
     }
 
     func scenePhaseChanged(_ phase: ScenePhase) {
-        isAppActive = phase != .background
+        isAppActive = phase == .active
+        if !isAppActive { cancelCountdown() }
         // Coming back from the Settings app: camera access may have changed.
         if phase == .active, status == .denied || status == .needsPermission {
             renderer.setEnabled(isPreviewVisible)
@@ -209,6 +221,8 @@ final class CameraModel {
             lensPosition = nil
             manualExposure = nil
             exposureBias = min(max(exposureBias, exposureRange.lowerBound), exposureRange.upperBound)
+        case .whiteBalanceChanged(let preset):
+            whiteBalance = preset
         case .running(let running):
             if running {
                 status = .running
@@ -238,9 +252,24 @@ final class CameraModel {
 
     /// Jumps straight to a look (from the look picker).
     func select(_ look: Look) {
-        guard let index = looks.firstIndex(of: look), index != lookIndex else { return }
+        guard let index = looks.firstIndex(of: look) else { return }
+        activePreset = nil
+        swipeTarget = nil
         lookIndex = index
         renderer.show(lookState(for: look))
+        lookChangeCount += 1
+        onLookChange?(look)
+    }
+
+    func selectPreset(_ preset: SavedPreset) {
+        guard let look = library.look(id: preset.lookID), let index = looks.firstIndex(of: look) else { return }
+        activePreset = preset
+        swipeTarget = nil
+        lookIndex = index
+        var state = lookState(for: look)
+        state.strength = preset.strength
+        state.adjustments = preset.adjustments
+        renderer.show(state)
         lookChangeCount += 1
         onLookChange?(look)
     }
@@ -252,8 +281,11 @@ final class CameraModel {
         if let index = looks.firstIndex(of: current) {
             lookIndex = index
         } else {
+            activePreset = nil
+            swipeTarget = nil
             lookIndex = 0
             renderer.show(lookState(for: currentLook))
+            onLookChange?(currentLook)
         }
     }
 
@@ -278,6 +310,7 @@ final class CameraModel {
         let commit = progress > 0.33 || flick
         renderer.finishSwipe(commit: commit)
         if commit {
+            activePreset = nil
             lookIndex = target
             lookChangeCount += 1
             onLookChange?(currentLook)
@@ -307,7 +340,7 @@ final class CameraModel {
     }
 
     func switchCamera() {
-        guard capabilities.canSwitchCamera else { return }
+        guard capabilities.canSwitchCamera, !isChangingWhiteBalance, !isCapturing else { return }
         focusPoint = nil
         Task {
             do {
@@ -321,6 +354,7 @@ final class CameraModel {
     /// Focus and exposure at a tap (and release an AE/AF lock). `point` is in
     /// the preview's coordinates.
     func focus(at point: CGPoint, in size: CGSize) {
+        guard !isChangingWhiteBalance else { return }
         guard status == .running || status == .noCamera, size.width > 0, size.height > 0 else { return }
         let x = min(max(point.x / size.width, 0), 1)
         let y = min(max(point.y / size.height, 0), 1)
@@ -357,6 +391,7 @@ final class CameraModel {
 
     /// Exposure compensation in stops, clamped to `exposureRange`.
     func setExposureBias(_ stops: Float) {
+        guard !isChangingWhiteBalance else { return }
         let clamped = min(max(stops, exposureRange.lowerBound), exposureRange.upperBound)
         guard clamped != exposureBias else { return }
         exposureBias = clamped
@@ -376,6 +411,7 @@ final class CameraModel {
     }
 
     func setZoom(_ value: CGFloat, animated: Bool = false) {
+        guard !isChangingWhiteBalance else { return }
         let clamped = min(max(value, capabilities.minZoom), capabilities.maxZoom)
         zoom = clamped
         pendingZoom = (clamped, animated)
@@ -390,14 +426,34 @@ final class CameraModel {
     }
 
     func setWhiteBalance(_ preset: WhiteBalancePreset) {
-        guard preset != whiteBalance else { return }
-        whiteBalance = preset
-        if status == .noCamera { return updateDemo() }
-        Task { await captureService.setWhiteBalance(preset) }
+        guard !isChangingWhiteBalance, !isCapturing,
+              preset == .auto || capabilities.supportsWhiteBalance else { return }
+        whiteBalanceError = nil
+        if status == .noCamera {
+            whiteBalance = preset
+            return updateDemo()
+        }
+        cancelCountdown()
+        focusPoint = nil
+        isChangingWhiteBalance = true
+        Task {
+            defer { isChangingWhiteBalance = false }
+            // Drain pending controls before replacing the capture device.
+            await zoomTask?.value
+            await exposureTask?.value
+            await manualExposureTask?.value
+            do {
+                try await captureService.setWhiteBalance(preset)
+            } catch {
+                whiteBalanceError = String(localized: "Could not change white balance. Please try again.")
+                Logger.camera.error("White balance failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     /// Switches between auto focus and a manual lens position.
     func setManualFocus(_ manual: Bool) {
+        guard !isChangingWhiteBalance else { return }
         guard manual != (lensPosition != nil) else { return }
         if manual {
             focusPoint = nil
@@ -412,6 +468,7 @@ final class CameraModel {
 
     /// Lens position, 0 (nearest) … 1 (farthest).
     func setLensPosition(_ position: Float) {
+        guard !isChangingWhiteBalance else { return }
         let clamped = min(max(position, 0), 1)
         lensPosition = clamped
         if status == .noCamera { return updateDemo() }
@@ -421,6 +478,7 @@ final class CameraModel {
     /// Switches between auto exposure and manual ISO and shutter speed,
     /// starting from whatever auto exposure had chosen.
     func setManualExposure(_ manual: Bool) {
+        guard !isChangingWhiteBalance else { return }
         guard manual != (manualExposure != nil) else { return }
         guard manual else {
             manualExposure = nil
@@ -453,6 +511,7 @@ final class CameraModel {
     }
 
     private func applyManualExposure(_ manual: ManualExposure) {
+        guard !isChangingWhiteBalance else { return }
         manualExposure = manual
         if status == .noCamera { return updateDemo() }
         pendingManualExposure = manual
@@ -500,6 +559,7 @@ final class CameraModel {
     /// The shutter button: shoots now, starts the self-timer, or cancels a
     /// running countdown.
     func shutterPressed(options: CaptureOptions) {
+        guard canCapture else { cancelCountdown(); return }
         if countdown != nil {
             cancelCountdown()
             return
@@ -528,11 +588,12 @@ final class CameraModel {
     }
 
     func capture(options: CaptureOptions = CaptureOptions()) {
-        guard !isCapturing else { return }
+        guard canCapture, !isCapturing else { return }
         let look = currentLook
+        let style = captureStyle
         shutterCount += 1
         if status == .noCamera {
-            captureDemoPhoto(look: look, id: advanceFrame(), aspect: options.aspect)
+            captureDemoPhoto(look: look, id: advanceFrame(), aspect: options.aspect, style: style)
             return
         }
         guard status == .running else { return }
@@ -546,6 +607,7 @@ final class CameraModel {
                                                                   onShutter: {})
                 photo.id = frameID
                 photo.aspect = options.aspect
+                photo.style = style
                 onCapture?(photo, look)
             } catch {
                 Logger.camera.error("Capture failed: \(error.localizedDescription, privacy: .public)")
@@ -560,7 +622,7 @@ final class CameraModel {
 
     /// In the Simulator the shutter "captures" the demo image so the rest of
     /// the app (review, saving, paywall) can be exercised without a camera.
-    private func captureDemoPhoto(look: Look, id: UUID, aspect: AspectRatio) {
+    private func captureDemoPhoto(look: Look, id: UUID, aspect: AspectRatio, style: PhotoRecipe) {
         guard let url = DemoScene.url, var data = try? Data(contentsOf: url) else { return }
         // Bake the simulated settings in, as the camera would have.
         let adjustments = demoAdjustments
@@ -569,7 +631,7 @@ final class CameraModel {
            let adjusted = CIContext().jpegRepresentation(of: adjustments.apply(to: image), colorSpace: sRGB, options: [:]) {
             data = adjusted
         }
-        onCapture?(CapturedPhoto(data: data, isFrontCamera: false, aspect: aspect, id: id), look)
+        onCapture?(CapturedPhoto(data: data, isFrontCamera: false, aspect: aspect, id: id, style: style), look)
     }
 
     /// Returns the frame the preview is showing and moves on to a fresh one.

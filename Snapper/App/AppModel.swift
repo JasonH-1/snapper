@@ -57,7 +57,11 @@ final class AppModel {
     static let libraryZoomID = "library"
     var paywall: PaywallModel?
     var isShowingSettings = false
+    var pendingGuideDestination: GuideDestination?
     var isShowingLookPicker = false
+    var isShowingCameraPresets = false
+    var upgradeAfterCameraPresets = false
+    var isImportingPreset = false
     var toast: Toast?
 
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -67,9 +71,8 @@ final class AppModel {
 
     var hasPremium: Bool { store.isPremium }
 
-    init(store: any PurchaseService) {
+    init(store: any PurchaseService, settings: AppSettings = AppSettings()) {
         let library = LookLibrary.bundled()
-        let settings = AppSettings()
         let renderer = PhotoRenderer()
         self.library = library
         self.settings = settings
@@ -87,6 +90,34 @@ final class AppModel {
         }
         camera.onLookChange = { [weak self] look in
             self?.settings.lastLookID = look.id
+            self?.settings.lastPresetID = self?.camera.activePreset?.id
+        }
+    }
+
+    @discardableResult
+    func shootWithPreset(_ preset: SavedPreset) -> Bool {
+        guard settings.presets.canUse(preset, hasPremium: hasPremium), library.look(id: preset.lookID) != nil else { return false }
+        camera.selectPreset(preset)
+        libraryScreen?.editor?.finish()
+        libraryScreen = nil
+        updateCameraVisibility()
+        return true
+    }
+
+    /// Keep the selected preset current after edits, deletion or entitlement changes.
+    func synchronizeCameraPreset() {
+        guard let id = settings.lastPresetID else { return }
+        guard let preset = settings.presets.presets.first(where: { $0.id == id }) else {
+            camera.select(camera.currentLook)
+            settings.lastPresetID = nil
+            return
+        }
+        if settings.presets.canUse(preset, hasPremium: hasPremium) {
+            if camera.activePreset != preset { camera.selectPreset(preset) }
+        } else if camera.activePreset != nil {
+            camera.select(camera.currentLook)
+            settings.lastPresetID = id
+            show(Toast(message: String(localized: "This preset needs Premium. Shooting with its base look."), symbol: "lock.fill"))
         }
     }
 
@@ -99,9 +130,12 @@ final class AppModel {
             do {
                 let record = try await captures.add(photo, look: look)
                 guard settings.autoSaveToPhotos else { return }
-                if look.isPremium && !hasPremium {
+                if (look.isPremium || record.recipe.requiresPremium) && !hasPremium {
                     guard lockedLooksExplained.insert(look.id).inserted else { return }
-                    show(Toast(message: String(localized: "\(look.name) is a Premium look. Unlock it to save to Photos."),
+                    let message = record.recipe.adjustments.requiresPremium
+                        ? String(localized: "This photo uses Premium edits. It is kept in Snapper Library; unlock Premium to export it.")
+                        : String(localized: "\(look.name) is a Premium look. Unlock it to save to Photos.")
+                    show(Toast(message: message,
                                symbol: "lock.fill", action: .showPaywall, actionTitle: String(localized: "Unlock")))
                     return
                 }
@@ -164,7 +198,24 @@ final class AppModel {
         camera.select(look)
     }
 
+    func selectCuratedStyle(_ style: CuratedStyle) {
+        guard CuratedCollection.contains(style), library.look(id: style.recipe.lookID) != nil else { return }
+        camera.selectPreset(style.preset)
+        settings.lastPresetID = nil // bundled recipes are not user-saved presets
+    }
+
+    func openCameraPresets() {
+        camera.setPreviewVisible(false)
+        isShowingCameraPresets = true
+    }
+
+    func cameraPresetsDismissed() {
+        isShowingCameraPresets = false
+        updateCameraVisibility()
+    }
+
     func openLookPicker() {
+        camera.setPreviewVisible(false)
         lookThumbnails.load(looks: library.looks, renderer: renderer)
         isShowingLookPicker = true
     }
@@ -239,12 +290,28 @@ final class AppModel {
         updateCameraVisibility()
     }
 
+    /// Called only after Settings has finished dismissing.
+    func openPendingGuideDestination() {
+        guard let destination = pendingGuideDestination else { return }
+        pendingGuideDestination = nil
+        switch destination {
+        case .camera: updateCameraVisibility()
+        case .looks: openLookPicker()
+        case .library: openLibrary()
+        case .styles:
+            camera.setPreviewVisible(false)
+            isShowingCameraPresets = true
+        }
+    }
+
     func lookPickerDismissed() {
         isShowingLookPicker = false
         camera.setLookOrder(settings.orderedLooks(from: library))
+        updateCameraVisibility()
     }
 
-    private func updateCameraVisibility() {
-        camera.setPreviewVisible(libraryScreen == nil && paywall == nil && !isShowingSettings)
+    func updateCameraVisibility() {
+        camera.setPreviewVisible(libraryScreen == nil && paywall == nil && !isShowingSettings
+                                 && !isShowingLookPicker && !isShowingCameraPresets && !isImportingPreset)
     }
 }

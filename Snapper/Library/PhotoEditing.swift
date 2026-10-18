@@ -8,10 +8,16 @@ import CoreImage.CIFilterBuiltins
 /// the sliders, so "Brightness +20" brightens what you see, look included.
 enum PhotoEditing {
     /// Applies the whole recipe: framing, `look` (with its LUT) and the sliders.
-    static func apply(_ recipe: PhotoRecipe, look: Look, lut: CubeLUT?, seed: UInt64, to image: CIImage) -> CIImage {
+    static func apply(_ recipe: PhotoRecipe, look: Look, lut: CubeLUT?, seed: UInt64, to image: CIImage, subjectMask: CIImage? = nil) -> CIImage {
         let framed = frame(image, with: recipe.crop)
         let graded = LookPipeline.apply(look, lut: lut, strength: Float(recipe.strength), seed: seed, to: framed)
-        return PhotoFinishing.apply(recipe.finish, to: adjust(graded, with: recipe.adjustments, seed: seed))
+        let global = adjust(graded, with: recipe.adjustments, seed: seed)
+        let selective: CIImage
+        if recipe.selective.isActive, let subjectMask {
+            let mask = frame(subjectMask, with: recipe.crop)
+            selective = SelectiveRendering.apply(recipe.selective, mask: mask, to: global)
+        } else { selective = global }
+        return PhotoFinishing.apply(recipe.finish, to: selective)
     }
 
     // MARK: - Framing
@@ -60,7 +66,7 @@ enum PhotoEditing {
 
     /// Applies the sliders to an already framed and graded image.
     static func adjust(_ image: CIImage, with adjustments: PhotoAdjustments, seed: UInt64 = 0) -> CIImage {
-        guard !adjustments.isNone, !image.extent.isInfinite else { return image }
+        guard !adjustments.isNone, adjustments.isValid, !image.extent.isInfinite else { return image }
         let extent = image.extent
         var output = image
 
@@ -80,6 +86,31 @@ enum PhotoEditing {
         if abs(adjustments.brightness) > 0.001 || abs(adjustments.contrast) > 0.001 || adjustments.fade > 0.001 {
             output = toned(output, brightness: CGFloat(adjustments.brightness),
                            contrast: CGFloat(adjustments.contrast), fade: CGFloat(adjustments.fade))
+        }
+        if abs(adjustments.highlights) > 0.001 || abs(adjustments.shadows) > 0.001 {
+            let curve = CIFilter.toneCurve()
+            curve.inputImage = output
+            curve.point0 = CGPoint(x: 0, y: 0)
+            curve.point1 = CGPoint(x: 0.25, y: 0.25 + 0.15 * adjustments.shadows)
+            curve.point2 = CGPoint(x: 0.5, y: 0.5)
+            curve.point3 = CGPoint(x: 0.75, y: 0.75 + 0.15 * adjustments.highlights)
+            curve.point4 = CGPoint(x: 1, y: 1)
+            output = curve.outputImage ?? output
+        }
+        output = ColorMixRendering.apply(adjustments.colorMixer, to: output)
+        if adjustments.bloom > 0 || adjustments.halation > 0 || adjustments.vignette > 0 {
+            var effects = LookEffects.none
+            if adjustments.bloom > 0 {
+                effects.glow = .init(threshold: 0.65, radius: 0.018, intensity: adjustments.bloom * 0.7,
+                                     saturation: 0.8, tintHue: 45, tint: 0)
+            }
+            if adjustments.halation > 0 {
+                effects.halation = .init(threshold: 0.7, radius: 0.009, intensity: adjustments.halation * 0.7)
+            }
+            if adjustments.vignette > 0 {
+                effects.vignette = .init(intensity: adjustments.vignette * 0.65, radius: 0.45)
+            }
+            output = LookPipeline.applyEffects(effects, seed: seed, to: output)
         }
         if adjustments.grain > 0.001 {
             let grain = LookEffects.Grain(amount: 0.3 * adjustments.grain, size: 0.0013, roughness: 0.45, color: 0.1)

@@ -4,7 +4,6 @@ import SwiftUI
 struct ZoomControl: View {
     let presets: [CGFloat]
     let zoom: CGFloat
-    let iconRotation: Angle
     let select: (CGFloat) -> Void
 
     private var activePreset: CGFloat? {
@@ -23,7 +22,7 @@ struct ZoomControl: View {
                         .foregroundStyle(isActive ? Theme.accent : .white)
                         .frame(width: isActive ? 38 : 30, height: isActive ? 38 : 30)
                         .glassSurface(in: Circle(), interactive: true)
-                        .rotationEffect(iconRotation)
+                        .minimumTapTarget()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Zoom \(Self.format(preset)) times"))

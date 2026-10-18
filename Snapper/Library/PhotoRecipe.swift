@@ -18,21 +18,33 @@ struct PhotoAdjustments: Hashable, Sendable {
     var warmth = 0.0
     var fade = 0.0
     var grain = 0.0
+    var highlights = 0.0
+    var shadows = 0.0
+    var bloom = 0.0
+    var halation = 0.0
+    var vignette = 0.0
+    var colorMixer = ColorMixer()
 
     static let none = PhotoAdjustments()
 
     var isNone: Bool { self == .none }
+    var requiresPremium: Bool {
+        [highlights, shadows, bloom, halation, vignette].contains { abs($0) > 0.0001 } || colorMixer.isActive
+    }
+    var isValid: Bool {
+        Kind.allCases.allSatisfy { self[$0].isFinite && $0.range.contains(self[$0]) } && colorMixer.isValid
+    }
 
     /// One slider, for the Adjust tab.
     enum Kind: String, CaseIterable, Identifiable, Sendable {
-        case brightness, contrast, saturation, warmth, fade, grain
+        case brightness, contrast, saturation, warmth, fade, grain, highlights, shadows, bloom, halation, vignette
 
         var id: String { rawValue }
 
         /// The slider's range; fade and grain only add.
         var range: ClosedRange<Double> {
             switch self {
-            case .fade, .grain: 0...1
+            case .fade, .grain, .bloom, .halation, .vignette: 0...1
             default: -1...1
             }
         }
@@ -47,9 +59,15 @@ struct PhotoAdjustments: Hashable, Sendable {
             case .warmth: warmth
             case .fade: fade
             case .grain: grain
+            case .highlights: highlights
+            case .shadows: shadows
+            case .bloom: bloom
+            case .halation: halation
+            case .vignette: vignette
             }
         }
         set {
+            guard newValue.isFinite else { return }
             let value = min(max(newValue, kind.range.lowerBound), kind.range.upperBound)
             switch kind {
             case .brightness: brightness = value
@@ -58,6 +76,11 @@ struct PhotoAdjustments: Hashable, Sendable {
             case .warmth: warmth = value
             case .fade: fade = value
             case .grain: grain = value
+            case .highlights: highlights = value
+            case .shadows: shadows = value
+            case .bloom: bloom = value
+            case .halation: halation = value
+            case .vignette: vignette = value
             }
         }
     }
@@ -174,6 +197,8 @@ struct PhotoRecipe: Hashable, Sendable {
     var adjustments = PhotoAdjustments.none
     var crop = PhotoCrop.none
     var finish = PhotoFinish.none
+    var selective = SelectiveEdits()
+    var requiresPremium: Bool { finish.isActive || adjustments.requiresPremium || selective.isActive }
 
     /// A photo with no look and no edits.
     static let untouched = PhotoRecipe(lookID: Look.original.id)
@@ -186,7 +211,7 @@ struct PhotoRecipe: Hashable, Sendable {
 
 extension PhotoAdjustments: Codable {
     private enum CodingKeys: String, CodingKey {
-        case brightness, contrast, saturation, warmth, fade, grain
+        case brightness, contrast, saturation, warmth, fade, grain, highlights, shadows, bloom, halation, vignette, colorMixer
     }
 
     init(from decoder: Decoder) throws {
@@ -197,6 +222,12 @@ extension PhotoAdjustments: Codable {
         warmth = try container.decodeIfPresent(Double.self, forKey: .warmth) ?? 0
         fade = try container.decodeIfPresent(Double.self, forKey: .fade) ?? 0
         grain = try container.decodeIfPresent(Double.self, forKey: .grain) ?? 0
+        highlights = try container.decodeIfPresent(Double.self, forKey: .highlights) ?? 0
+        shadows = try container.decodeIfPresent(Double.self, forKey: .shadows) ?? 0
+        bloom = try container.decodeIfPresent(Double.self, forKey: .bloom) ?? 0
+        halation = try container.decodeIfPresent(Double.self, forKey: .halation) ?? 0
+        vignette = try container.decodeIfPresent(Double.self, forKey: .vignette) ?? 0
+        colorMixer = try container.decodeIfPresent(ColorMixer.self, forKey: .colorMixer) ?? ColorMixer()
     }
 }
 
@@ -217,7 +248,7 @@ extension PhotoCrop: Codable {
 
 extension PhotoRecipe: Codable {
     private enum CodingKeys: String, CodingKey {
-        case lookID, strength, adjustments, crop, finish
+        case lookID, strength, adjustments, crop, finish, selective
     }
 
     init(from decoder: Decoder) throws {
@@ -227,5 +258,6 @@ extension PhotoRecipe: Codable {
         adjustments = try container.decodeIfPresent(PhotoAdjustments.self, forKey: .adjustments) ?? .none
         crop = try container.decodeIfPresent(PhotoCrop.self, forKey: .crop) ?? .none
         finish = try container.decodeIfPresent(PhotoFinish.self, forKey: .finish) ?? .none
+        selective = try container.decodeIfPresent(SelectiveEdits.self, forKey: .selective) ?? SelectiveEdits()
     }
 }
