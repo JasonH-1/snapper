@@ -54,6 +54,26 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
+			<string>app.snapper.backup</string>
+			<key>UTTypeDescription</key>
+			<string>Snapper Library Backup</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>snapperbackup</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/vnd.snapper.backup</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
 			<string>app.snapper.preset</string>
 			<key>UTTypeDescription</key>
 			<string>Snapper Preset</string>
@@ -74,6 +94,18 @@
 	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Snapper Library Backup</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>app.snapper.backup</string>
+			</array>
+		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>Snapper Preset</string>

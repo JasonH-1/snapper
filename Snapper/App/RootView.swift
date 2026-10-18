@@ -11,6 +11,7 @@ struct RootView: View {
     @State private var pendingImportError: String?
     @State private var waitingForDismissals: Set<String> = []
     @State private var upgradeAfterImport = false
+    @State private var pendingBackupURL: URL?
 
     var body: some View {
         Group {
@@ -24,7 +25,7 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
-        .onOpenURL { receivePreset($0) }
+        .onOpenURL { receiveFile($0) }
         .sheet(item: $incomingPreset, onDismiss: {
             app.isImportingPreset = false
             app.updateCameraVisibility()
@@ -33,6 +34,12 @@ struct RootView: View {
         }) { file in
             PresetImportView(file: file, store: app.settings.presets, looks: app.library, hasPremium: app.hasPremium,
                              onUpgrade: { upgradeAfterImport = true })
+        }
+        .sheet(item: $app.incomingBackup, onDismiss: {
+            app.updateCameraVisibility()
+            presentationDismissed("backup")
+        }) { backup in
+            BackupRestoreView(app: app, url: backup.url)
         }
         .alert("Couldn't Open Preset", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })) {
             Button("OK", role: .cancel) {}
@@ -94,6 +101,7 @@ struct RootView: View {
             app.settingsDismissed()
             // An incoming file takes priority over a queued guide shortcut.
             let hasIncomingFile = pendingPreset != nil || pendingImportError != nil || app.isImportingPreset
+                || pendingBackupURL != nil || app.incomingBackup != nil
             presentationDismissed("settings")
             if hasIncomingFile { app.pendingGuideDestination = nil }
             else { app.openPendingGuideDestination() }
@@ -112,6 +120,19 @@ struct RootView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+    }
+
+    /// A file opened in Snapper: a Library backup or a preset.
+    private func receiveFile(_ url: URL) {
+        guard url.isFileURL, url.pathExtension.lowercased() == LibraryBackup.fileExtension else {
+            receivePreset(url)
+            return
+        }
+        pendingPreset = nil
+        pendingImportError = nil
+        pendingBackupURL = url
+        app.camera.cancelCountdown()
+        presentPendingImport()
     }
 
     private func receivePreset(_ url: URL) {
@@ -133,12 +154,18 @@ struct RootView: View {
     }
 
     private func presentPendingImport() {
-        guard pendingPreset != nil || pendingImportError != nil, waitingForDismissals.isEmpty else { return }
+        guard pendingPreset != nil || pendingImportError != nil || pendingBackupURL != nil,
+              waitingForDismissals.isEmpty else { return }
         // Dismiss the topmost surface first, then wait for its callback before
         // dismissing its parent. Never race a guessed animation duration.
         if incomingPreset != nil {
             waitingForDismissals.insert("import")
             incomingPreset = nil
+            return
+        }
+        if app.incomingBackup != nil {
+            waitingForDismissals.insert("backup")
+            app.incomingBackup = nil
             return
         }
         if app.paywall != nil {
@@ -167,7 +194,11 @@ struct RootView: View {
             app.libraryScreen = nil
             return
         }
-        if let file = pendingPreset {
+        if let url = pendingBackupURL {
+            pendingBackupURL = nil
+            app.incomingBackup = AppModel.IncomingBackup(url: url)
+            app.updateCameraVisibility()
+        } else if let file = pendingPreset {
             pendingPreset = nil
             app.isImportingPreset = true
             app.updateCameraVisibility()

@@ -102,6 +102,25 @@ final class PresetStore {
         try persist(presets.filter { $0.id != preset.id })
     }
 
+    /// Adds presets from a backup that aren't here yet (by id), keeping
+    /// their order after the existing ones. Invalid ones are skipped.
+    /// Returns how many were added. As after a subscription ends, every
+    /// preset is kept and the free plan can use the first.
+    @discardableResult
+    func restore(_ incoming: [SavedPreset]) -> Int {
+        guard !loadFailed else { return 0 }
+        let known = Set(presets.map(\.id))
+        var seen = Set<UUID>()
+        let added = incoming.filter { $0.isValid && !known.contains($0.id) && seen.insert($0.id).inserted }
+        guard !added.isEmpty else { return 0 }
+        do {
+            try persist(presets + added)
+            return added.count
+        } catch {
+            return 0
+        }
+    }
+
     func makeFreePreset(_ preset: SavedPreset) throws {
         guard presets.contains(where: { $0.id == preset.id }) else { return }
         try persist([preset] + presets.filter { $0.id != preset.id })

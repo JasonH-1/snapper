@@ -132,6 +132,68 @@ final class CaptureLibrary {
         Task { await refreshThumbnail(for: record) }
     }
 
+    // MARK: - Versions
+
+    enum VersionError: LocalizedError {
+        case limitReached, invalidName
+
+        var errorDescription: String? {
+            switch self {
+            case .limitReached:
+                String(localized: "A photo can keep up to \(PhotoVersion.maxCount) versions. Delete one to save another.")
+            case .invalidName:
+                String(localized: "Give the version a name.")
+            }
+        }
+    }
+
+    /// Keeps `recipe` as a new named version of a photo, and marks it as the
+    /// one showing.
+    @discardableResult
+    func saveVersion(photoID: UUID, name: String, recipe: PhotoRecipe) throws -> PhotoVersion {
+        guard let index = records.firstIndex(where: { $0.id == photoID }) else { throw VersionError.invalidName }
+        guard let name = PhotoVersion.validName(name) else { throw VersionError.invalidName }
+        guard records[index].versions.count < PhotoVersion.maxCount else { throw VersionError.limitReached }
+        let version = PhotoVersion(name: name, recipe: recipe)
+        records[index].versions.append(version)
+        records[index].activeVersionID = version.id
+        persist()
+        return version
+    }
+
+    /// Replaces a version's recipe (Update “Warm” with the current edit).
+    func updateVersion(photoID: UUID, versionID: UUID, recipe: PhotoRecipe) {
+        guard let index = records.firstIndex(where: { $0.id == photoID }),
+              let versionIndex = records[index].versions.firstIndex(where: { $0.id == versionID }) else { return }
+        records[index].versions[versionIndex].recipe = recipe
+        records[index].activeVersionID = versionID
+        persist()
+    }
+
+    func renameVersion(photoID: UUID, versionID: UUID, to name: String) throws {
+        guard let name = PhotoVersion.validName(name) else { throw VersionError.invalidName }
+        guard let index = records.firstIndex(where: { $0.id == photoID }),
+              let versionIndex = records[index].versions.firstIndex(where: { $0.id == versionID }) else { return }
+        records[index].versions[versionIndex].name = name
+        persist()
+    }
+
+    /// Forgets a version; the photo keeps showing whatever it shows now.
+    func deleteVersion(photoID: UUID, versionID: UUID) {
+        guard let index = records.firstIndex(where: { $0.id == photoID }) else { return }
+        records[index].versions.removeAll { $0.id == versionID }
+        if records[index].activeVersionID == versionID { records[index].activeVersionID = nil }
+        persist()
+    }
+
+    /// Notes which version is showing (nil for none), without changing the recipe.
+    func setActiveVersion(photoID: UUID, versionID: UUID?) {
+        guard let index = records.firstIndex(where: { $0.id == photoID }),
+              records[index].activeVersionID != versionID else { return }
+        records[index].activeVersionID = versionID
+        persist()
+    }
+
     func markSaved(id: UUID, recipe: PhotoRecipe? = nil) {
         guard let index = records.firstIndex(where: { $0.id == id }) else { return }
         records[index].savedRecipe = recipe ?? records[index].recipe
@@ -186,54 +248,184 @@ final class CaptureLibrary {
 
     /// Full-resolution render of a capture with its current recipe.
     func export(_ record: CaptureRecord, watermark: Bool, format: PhotoRenderer.ExportFormat) async throws -> Data {
+        try await export(record, watermark: watermark, options: ExportOptions(format: format))
+    }
+
+    /// A render of a capture with `recipe` (its current one by default),
+    /// encoded with `options`.
+    func export(_ record: CaptureRecord, recipe: PhotoRecipe? = nil, watermark: Bool,
+                options: ExportOptions) async throws -> Data {
+        let recipe = recipe ?? record.recipe
         let url = store.url(for: record)
         let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
-        return try await renderer.export(source: data, look: look(for: record), recipe: record.recipe,
-                                         seed: record.id.effectsSeed, watermark: watermark, format: format, sourceURL: url)
+        return try await renderer.export(source: data, look: library.look(id: recipe.lookID) ?? .original, recipe: recipe,
+                                         seed: record.id.effectsSeed, watermark: watermark, options: options, sourceURL: url)
     }
 
-    /// Saves a capture to the photo library with its current recipe, as HEIF
-    /// or JPEG (the Format setting).
+    /// Renders a capture into a temporary file, ready to save or share, and
+    /// reports its real size. `name` replaces the default file name.
+    func prepareExport(_ record: CaptureRecord, recipe: PhotoRecipe? = nil, options: ExportOptions,
+                       watermark: Bool = false, name: String? = nil) async throws -> PreparedExport {
+        let recipe = recipe ?? record.recipe
+        let source = store.url(for: record)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Export", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = folder.appendingPathComponent((name ?? Self.exportName(for: record)) + "." + options.format.fileExtension)
+        let data = try await Task.detached(priority: .userInitiated) {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            return try Data(contentsOf: source)
+        }.value
+        let pixelSize = try await renderer.exportFile(source: data, look: library.look(id: recipe.lookID) ?? .original,
+                                                      recipe: recipe, seed: record.id.effectsSeed, watermark: watermark,
+                                                      options: options, sourceURL: source, to: fileURL)
+        let bytes = try await Task.detached(priority: .userInitiated) {
+            (try FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? NSNumber)?.int64Value ?? 0
+        }.value
+        return PreparedExport(url: fileURL, byteCount: bytes, pixelSize: pixelSize, recipe: recipe, options: options)
+    }
+
+    /// "Snapper-20240602-184012-<id>": dated, and unique per photo.
+    static func exportName(for record: CaptureRecord, suffix: String? = nil) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        var name = "Snapper-\(formatter.string(from: record.takenAt ?? record.createdAt))-\(record.id.uuidString)"
+        if let suffix {
+            let safe = suffix.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: "-")
+            if !safe.isEmpty { name += "-" + String(safe.prefix(30)) }
+        }
+        return name
+    }
+
+    /// Saves a capture to the photo library with `recipe` (its current one
+    /// by default) and the export settings, or a file already prepared.
+    func saveToPhotos(_ record: CaptureRecord, recipe: PhotoRecipe? = nil, watermark: Bool = false,
+                      includeOriginal: Bool, options: ExportOptions, prepared: PreparedExport? = nil) async throws {
+        let export: PreparedExport
+        if let prepared {
+            export = prepared
+        } else {
+            export = try await prepareExport(record, recipe: recipe, options: options, watermark: watermark)
+        }
+        defer { try? FileManager.default.removeItem(at: export.url.deletingLastPathComponent()) }
+        let original = includeOriginal ? store.url(for: record) : nil
+        try await PhotoLibrarySaver.save(fileURL: export.url, originalURL: original)
+        markSaved(id: record.id, recipe: export.recipe)
+    }
+
+    /// Saves with only a format chosen (full size, standard quality).
     func saveToPhotos(_ record: CaptureRecord, watermark: Bool, includeOriginal: Bool,
                       format: PhotoRenderer.ExportFormat = .heic) async throws {
-        let rendered = try await export(record, watermark: watermark, format: format)
-        var original: Data?
-        if includeOriginal {
-            let url = store.url(for: record)
-            original = try? await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
-        }
-        try await PhotoLibrarySaver.save(rendered, original: original)
-        markSaved(id: record.id, recipe: record.recipe)
+        try await saveToPhotos(record, watermark: watermark, includeOriginal: includeOriginal,
+                               options: ExportOptions(format: format))
     }
 
-    /// Writes a JPEG to a temporary file for the share sheet.
-    func exportForSharing(_ record: CaptureRecord, watermark: Bool) async throws -> URL {
-        let urls = try await exportForSharing([record], watermark: watermark)
+    /// Writes a photo to a temporary file for the share sheet.
+    func exportForSharing(_ record: CaptureRecord, watermark: Bool, options: ExportOptions = ExportOptions(format: .jpeg)) async throws -> URL {
+        let urls = try await exportForSharing([record], watermark: watermark, options: options)
         guard let url = urls.first else { throw PhotoRenderer.RenderError.encodingFailed }
         return url
     }
 
-    /// Writes JPEGs of several photos to temporary files for the share sheet,
-    /// in an isolated folder so another share cannot invalidate these URLs.
-    func exportForSharing(_ records: [CaptureRecord], watermark: Bool) async throws -> [URL] {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Share", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try await Task.detached(priority: .userInitiated) {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        }.value
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
+    /// Writes several photos to temporary files for the share sheet, each in
+    /// its own folder so another share cannot invalidate these URLs.
+    func exportForSharing(_ records: [CaptureRecord], watermark: Bool,
+                          options: ExportOptions = ExportOptions(format: .jpeg)) async throws -> [URL] {
         var urls: [URL] = []
         for record in records {
-            let data = try await export(record, watermark: watermark, format: .jpeg)
-            let name = "Snapper-\(formatter.string(from: record.takenAt ?? record.createdAt))-\(record.id.uuidString)"
-            let url = folder.appendingPathComponent(name + ".jpg")
-            try await Task.detached(priority: .userInitiated) {
-                try data.write(to: url, options: .atomic)
-            }.value
-            urls.append(url)
+            urls.append(try await prepareExport(record, options: options, watermark: watermark).url)
         }
         return urls
+    }
+
+    // MARK: - Backup
+
+    /// 0…1 while a backup is being written or restored.
+    private(set) var backupProgress: Double?
+
+    /// Writes a backup of the whole Library (plus `presets` and favourites)
+    /// to a temporary file and returns it, to be shared or saved to Files.
+    func makeBackup(presets: [SavedPreset], favoriteLookIDs: [String], appVersion: String) async throws
+        -> (url: URL, summary: LibraryBackup.Summary) {
+        let records = self.records
+        let store = self.store
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let backups = FileManager.default.temporaryDirectory.appendingPathComponent("Backup", isDirectory: true)
+        let folder = backups.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = folder.appendingPathComponent("Snapper Backup \(formatter.string(from: Date())).\(LibraryBackup.fileExtension)")
+        backupProgress = 0
+        defer { backupProgress = nil }
+        let owner = self
+        let work = Task.detached(priority: .userInitiated) {
+            // Earlier backups were shared already; don't let them fill the disk.
+            try? FileManager.default.removeItem(at: backups)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            do {
+                return try LibraryBackup.write(records: records, store: store, presets: presets, favoriteLookIDs: favoriteLookIDs,
+                                               appVersion: appVersion, to: url) { value in
+                    // Late updates after the work finished are dropped.
+                    Task { @MainActor in if owner.backupProgress != nil { owner.backupProgress = value } }
+                }
+            } catch {
+                try? FileManager.default.removeItem(at: folder)
+                throw error
+            }
+        }
+        let summary = try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
+        return (url, summary)
+    }
+
+    /// Adds the photos in a backup to the Library. Photos already here are
+    /// left alone, so restoring twice changes nothing.
+    func restoreBackup(from url: URL) async throws -> LibraryBackup.RestoreResult {
+        let store = self.store
+        let existing = Set(records.map(\.id))
+        backupProgress = 0
+        defer { backupProgress = nil }
+        let owner = self
+        let work = Task.detached(priority: .userInitiated) { () throws -> LibraryBackup.RestoreResult in
+            try CaptureLibrary.coordinatedRead(of: url) { readURL in
+                try LibraryBackup.restore(from: readURL, into: store, existingIDs: existing) { value in
+                    // Late updates after the work finished are dropped.
+                    Task { @MainActor in if owner.backupProgress != nil { owner.backupProgress = value } }
+                }
+            }
+        }
+        let result = try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
+        let known = Set(records.map(\.id))
+        let added = result.records.filter { !known.contains($0.id) }
+        if !added.isEmpty {
+            records = (records + added).sorted { $0.createdAt > $1.createdAt }
+            persist()
+            for record in records.prefix(12) where thumbnails[record.id] == nil {
+                await refreshThumbnail(for: record)
+            }
+        }
+        return result
+    }
+
+    /// Reads a backup's contents list (to show what it holds before restoring).
+    nonisolated static func backupManifest(at url: URL) async throws -> LibraryBackup.Manifest {
+        try await Task.detached(priority: .userInitiated) {
+            try coordinatedRead(of: url) { try LibraryBackup.readManifest(from: $0) }
+        }.value
+    }
+
+    /// Reads a file picked from Files or opened from another app: with its
+    /// security scope, and coordinated so iCloud Drive downloads it first.
+    nonisolated private static func coordinatedRead<T>(of url: URL, _ body: (URL) throws -> T) throws -> T {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        var coordinationError: NSError?
+        var outcome: Result<T, Error>?
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [.withoutChanges], error: &coordinationError) { readURL in
+            outcome = Result { try body(readURL) }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let outcome else { throw LibraryBackup.BackupError.notABackup }
+        return try outcome.get()
     }
 
     // MARK: - Private

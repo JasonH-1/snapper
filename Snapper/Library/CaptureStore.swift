@@ -13,7 +13,7 @@ struct CaptureRecord: Identifiable, Hashable, Sendable {
     /// When the photo was taken, if it differs (imports, read from their metadata).
     var takenAt: Date?
     /// File name of the original inside the captures folder.
-    let fileName: String
+    var fileName: String
     var source: PhotoSource
     let isFrontCamera: Bool
     var recipe: PhotoRecipe
@@ -21,6 +21,12 @@ struct CaptureRecord: Identifiable, Hashable, Sendable {
     var initialRecipe: PhotoRecipe
     /// The recipe last saved to Photos, if any (to show "Saved").
     var savedRecipe: PhotoRecipe?
+    /// Named edits kept with the photo, oldest first. `recipe` is the one
+    /// showing; it may match one of these or be a new edit.
+    var versions: [PhotoVersion] = []
+    /// The version last switched to or saved, to name what is showing
+    /// ("Warm", or "Warm · Edited" once it has changed).
+    var activeVersionID: UUID?
 
     init(id: UUID = UUID(), createdAt: Date = Date(), takenAt: Date? = nil, fileName: String,
          source: PhotoSource = .camera, isFrontCamera: Bool = false, recipe: PhotoRecipe,
@@ -55,11 +61,19 @@ struct CaptureRecord: Identifiable, Hashable, Sendable {
 
     /// Saved to Photos at least once.
     var isSaved: Bool { savedRecipe != nil }
+
+    /// The version whose recipe is showing: the active one if unchanged,
+    /// else any other that matches.
+    var currentVersion: PhotoVersion? {
+        if let active = versions.first(where: { $0.id == activeVersionID }), active.recipe == recipe { return active }
+        return versions.first { $0.recipe == recipe }
+    }
 }
 
 extension CaptureRecord: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, takenAt, fileName, source, isFrontCamera, recipe, initialRecipe, savedRecipe
+        case versions, activeVersionID
         // Written by builds before the Library (look, strength and shape at the top level).
         case lookID, strength, aspect, savedLookID, savedStrength
     }
@@ -90,6 +104,9 @@ extension CaptureRecord: Codable {
                                           crop: crop)
             }
         }
+        // A damaged version list shouldn't cost the photo itself.
+        versions = (try? container.decodeIfPresent([PhotoVersion].self, forKey: .versions)) ?? []
+        activeVersionID = try? container.decodeIfPresent(UUID.self, forKey: .activeVersionID)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -103,6 +120,8 @@ extension CaptureRecord: Codable {
         try container.encode(recipe, forKey: .recipe)
         try container.encode(initialRecipe, forKey: .initialRecipe)
         try container.encodeIfPresent(savedRecipe, forKey: .savedRecipe)
+        if !versions.isEmpty { try container.encode(versions, forKey: .versions) }
+        try container.encodeIfPresent(activeVersionID, forKey: .activeVersionID)
     }
 }
 

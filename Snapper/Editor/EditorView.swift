@@ -10,6 +10,9 @@ struct EditorView: View {
     @State private var showsPresets = false
     @State private var showsCollections = false
     @State private var upgradeAfterPresets = false
+    @State private var showsVersions = false
+    @State private var showsExportOptions = false
+    @State private var canvasController = CanvasController()
     var onShowPaywall: () -> Void = {}
     var onShootPreset: ((SavedPreset) -> Bool)?
 
@@ -30,10 +33,18 @@ struct EditorView: View {
         .background(Theme.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
-        .sheet(item: $model.shareItem) { item in
+        // While Export is open, it presents the share sheet itself.
+        .sheet(item: showsExportOptions ? .constant(nil) : $model.shareItem) { item in
             ShareSheet(items: [item.url])
                 .presentationDetents([.medium, .large])
                 .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showsVersions) {
+            VersionsView(model: model)
+        }
+        .sheet(isPresented: $showsExportOptions) {
+            ExportOptionsView(model: model)
+                .presentationDetents([.large])
         }
         .sheet(isPresented: $showsCollections) {
             CuratedCollectionsView(library: model.looks, renderer: model.library.renderer) { style in
@@ -194,16 +205,16 @@ struct EditorView: View {
             }
         } else {
             ZStack(alignment: .bottom) {
-                if let image = model.displayImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        // On the photo only, so pressing the compare button doesn't also count.
-                        .contentShape(Rectangle())
-                        .onLongPressGesture(minimumDuration: 0.15, maximumDistance: 40, perform: {}, onPressingChanged: { pressing in
-                            model.isShowingOriginal = pressing
-                        })
+                if model.displayImage != nil {
+                    ZoomableCanvas(image: model.displayImage,
+                                   overlay: model.showsMaskOverlay ? model.maskOverlay : nil,
+                                   brush: model.isBrushActive ? CanvasBrush(diameter: model.brushSize, mode: model.brushMode) : nil,
+                                   controller: canvasController,
+                                   onStroke: { model.handleStroke($0) },
+                                   onPress: { pressing in
+                                       if !model.isBrushActive { model.isShowingOriginal = pressing }
+                                   },
+                                   onZoom: { model.canvasZoom = $0 })
                         .overlay(alignment: .top) {
                             if model.isShowingOriginal {
                                 Text("Original")
@@ -213,19 +224,37 @@ struct EditorView: View {
                                     .glassSurface(in: Capsule(), tint: .black.opacity(0.4))
                                     .padding(.top, 10)
                                     .transition(.opacity)
+                                    .allowsHitTesting(false)
                             }
                         }
+                        .overlay(alignment: .topLeading) { versionsButton }
+                        .overlay(alignment: .topTrailing) { zoomBadge }
                         // Compare sits on the photo it compares.
                         .overlay(alignment: .bottomTrailing) { compareButton }
                         .padding(.horizontal, 16)
+                        .accessibilityElement(children: .contain)
                         .accessibilityLabel(Text("Photo in \(model.currentLook.name)"))
-                        .accessibilityHint(Text("Touch and hold to compare with the original."))
+                        .accessibilityHint(model.isBrushActive
+                                           ? Text("Paint with one finger. Pinch with two fingers to zoom.")
+                                           : Text("Pinch or double-tap to zoom. Touch and hold to compare with the original."))
+                        .accessibilityAction(named: Text("Zoom In")) { canvasController.zoomIn() }
+                        .accessibilityAction(named: Text("Zoom Out")) { canvasController.zoomOut() }
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
-                if model.showsEditsKeptHint {
+                if let notice = model.versionNotice {
+                    Text(notice)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .glassSurface(in: Capsule(), tint: .black.opacity(0.55))
+                        .padding(.bottom, 12)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                } else if model.showsEditsKeptHint {
                     Button {
                         model.dismissEditsKeptHint()
                     } label: {
@@ -244,7 +273,54 @@ struct EditorView: View {
                 }
             }
             .animation(animation, value: model.showsEditsKeptHint)
+            .animation(animation, value: model.versionNotice)
             .animation(.snapper(Motion.quick, reduceMotion: reduceMotion), value: model.isShowingOriginal)
+        }
+    }
+
+    /// Which version is showing; opens the versions.
+    private var versionsButton: some View {
+        Button {
+            showsVersions = true
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "square.stack")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(model.versionLabel ?? String(localized: "Versions"))
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .glassSurface(in: Capsule(), tint: .black.opacity(0.35))
+            .minimumTapTarget()
+        }
+        .buttonStyle(PressableButtonStyle())
+        .padding(6)
+        .accessibilityLabel(Text("Versions"))
+        .accessibilityValue(Text(model.versionLabel ?? String(localized: "No versions")))
+    }
+
+    /// The zoom level while zoomed in; tap to see the whole photo again.
+    @ViewBuilder
+    private var zoomBadge: some View {
+        if model.canvasZoom > 1.05 {
+            Button {
+                canvasController.fit()
+            } label: {
+                Text("\(model.canvasZoom, format: .number.precision(.fractionLength(1)))× · Fit")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .glassSurface(in: Capsule(), tint: .black.opacity(0.35))
+                    .minimumTapTarget()
+            }
+            .buttonStyle(PressableButtonStyle())
+            .padding(6)
+            .transition(.opacity)
+            .accessibilityLabel(Text("Zoomed \(model.canvasZoom, format: .number.precision(.fractionLength(1))) times. Fit photo"))
         }
     }
 
@@ -277,7 +353,8 @@ struct EditorView: View {
         switch model.tab {
         case .looks: looksPanel
         case .adjust: adjustPanel
-        case .color: ColorMixerPanel(model: model)
+        case .curves: CurvesPanel(model: model)
+        case .color: ColorPanel(model: model)
         case .selective: SelectiveEditPanel(model: model)
         case .crop: cropPanel
         case .finish: finishPanel
@@ -589,6 +666,17 @@ struct EditorView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(model.isSaving)
+
+                Button {
+                    showsExportOptions = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.body.weight(.semibold))
+                }
+                .buttonStyle(PrimaryButtonStyle(isProminent: false))
+                .frame(width: 56)
+                .accessibilityLabel(Text("Export Options"))
+                .accessibilityHint(Text("Format, size, quality and location, with the file size"))
             }
             .padding(.horizontal, 16)
 

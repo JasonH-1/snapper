@@ -39,15 +39,23 @@ enum PhotoLibrarySaver {
         }
     }
 
-    /// Saves `photo` (and optionally the unfiltered `original`) as new assets.
-    static func save(_ photo: Data, original: Data? = nil) async throws {
+    /// Saves the photo file at `fileURL` (and optionally the unfiltered
+    /// original at `originalURL`) as new assets. The photo file is moved into
+    /// the library; the original is copied and stays where it is.
+    ///
+    /// Files rather than `Data`: adding image data from memory has been
+    /// reported (Apple Developer Forums) to drop EXIF metadata such as the date
+    /// and location on some iOS 26 releases, while the file route keeps the
+    /// bytes as written.
+    static func save(fileURL: URL, originalURL: URL? = nil) async throws {
         guard await requestAccess() else { throw SaveError.notAuthorized }
         do {
             try await PHPhotoLibrary.shared().performChanges {
-                let request = PHAssetCreationRequest.forAsset()
-                request.addResource(with: .photo, data: photo, options: nil)
-                if let original {
-                    PHAssetCreationRequest.forAsset().addResource(with: .photo, data: original, options: nil)
+                let options = PHAssetResourceCreationOptions()
+                options.shouldMoveFile = true
+                PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: fileURL, options: options)
+                if let originalURL {
+                    PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: originalURL, options: nil)
                 }
             }
         } catch {

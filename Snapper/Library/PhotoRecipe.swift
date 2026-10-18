@@ -24,15 +24,21 @@ struct PhotoAdjustments: Hashable, Sendable {
     var halation = 0.0
     var vignette = 0.0
     var colorMixer = ColorMixer()
+    var curves = ToneCurves.none
+    var splitToning = SplitToning.none
 
     static let none = PhotoAdjustments()
 
     var isNone: Bool { self == .none }
     var requiresPremium: Bool {
         [highlights, shadows, bloom, halation, vignette].contains { abs($0) > 0.0001 } || colorMixer.isActive
+            || usesToneTools
     }
+    /// Curves or split toning, which older versions of Snapper can't show.
+    var usesToneTools: Bool { curves.isActive || splitToning.isActive }
     var isValid: Bool {
         Kind.allCases.allSatisfy { self[$0].isFinite && $0.range.contains(self[$0]) } && colorMixer.isValid
+            && curves.isValid && splitToning.isValid
     }
 
     /// One slider, for the Adjust tab.
@@ -212,6 +218,7 @@ struct PhotoRecipe: Hashable, Sendable {
 extension PhotoAdjustments: Codable {
     private enum CodingKeys: String, CodingKey {
         case brightness, contrast, saturation, warmth, fade, grain, highlights, shadows, bloom, halation, vignette, colorMixer
+        case curves, splitToning
     }
 
     init(from decoder: Decoder) throws {
@@ -228,6 +235,27 @@ extension PhotoAdjustments: Codable {
         halation = try container.decodeIfPresent(Double.self, forKey: .halation) ?? 0
         vignette = try container.decodeIfPresent(Double.self, forKey: .vignette) ?? 0
         colorMixer = try container.decodeIfPresent(ColorMixer.self, forKey: .colorMixer) ?? ColorMixer()
+        curves = try container.decodeIfPresent(ToneCurves.self, forKey: .curves) ?? .none
+        splitToning = try container.decodeIfPresent(SplitToning.self, forKey: .splitToning) ?? .none
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(brightness, forKey: .brightness)
+        try container.encode(contrast, forKey: .contrast)
+        try container.encode(saturation, forKey: .saturation)
+        try container.encode(warmth, forKey: .warmth)
+        try container.encode(fade, forKey: .fade)
+        try container.encode(grain, forKey: .grain)
+        try container.encode(highlights, forKey: .highlights)
+        try container.encode(shadows, forKey: .shadows)
+        try container.encode(bloom, forKey: .bloom)
+        try container.encode(halation, forKey: .halation)
+        try container.encode(vignette, forKey: .vignette)
+        try container.encode(colorMixer, forKey: .colorMixer)
+        // Left out when unused, so files stay readable by earlier builds.
+        if curves.isActive { try container.encode(curves, forKey: .curves) }
+        if splitToning.isActive { try container.encode(splitToning, forKey: .splitToning) }
     }
 }
 

@@ -297,10 +297,11 @@ final class LibraryModel: Identifiable {
         }
         isWorking = true
         let watermark = false
+        let options = settings.exportOptions
         Task {
             defer { isWorking = false }
             do {
-                shareItems = ShareItems(urls: try await captures.exportForSharing(allowed, watermark: watermark))
+                shareItems = ShareItems(urls: try await captures.exportForSharing(allowed, watermark: watermark, options: options))
                 if allowed.count < chosen.count {
                     show(String(localized: "Photos with Premium looks or edits were left out."))
                 }
@@ -321,14 +322,14 @@ final class LibraryModel: Identifiable {
         isWorking = true
         let watermark = false
         let includeOriginal = settings.alsoSaveOriginal
-        let format = settings.photoFormat
+        let options = settings.exportOptions
         Task {
             defer { isWorking = false }
             var saved = 0
             do {
                 for record in allowed {
                     try await captures.saveToPhotos(record, watermark: watermark, includeOriginal: includeOriginal,
-                                                    format: format)
+                                                    options: options)
                     saved += 1
                 }
                 let skipped = chosen.count - allowed.count
