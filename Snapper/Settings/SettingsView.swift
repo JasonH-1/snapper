@@ -99,6 +99,25 @@ struct SettingsView: View {
                 if !app.store.ownsLifetime || app.store.hasActiveSubscription {
                     Button("Manage Subscription") { showManageSubscriptions = true }
                 }
+                // A quiet way for subscribers to pay once instead; never prompted.
+                if app.store.hasActiveSubscription && !app.store.ownsLifetime {
+                    Button {
+                        app.presentPaywall(.switchToLifetime)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Switch to Lifetime")
+                                Text("Pay once and keep every current and future look and tool.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "infinity")
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
             } else {
                 Button {
                     app.presentPaywall(.upgrade)

@@ -70,6 +70,7 @@ Run `xcodegen generate` again whenever you add, remove or rename files. The `.xc
 - **Debug › StoreKit › Manage Transactions** lets you refund, expire or cancel a subscription and watch the app re-lock.
 - With `Snapper.storekit` open, **Editor** lets you speed up renewals, turn on Ask to Buy (tests the "pending" path) and fail transactions (tests the error alerts).
 - **Offline restore:** buy, turn on Airplane Mode, then use Settings › Restore Purchases. Entitlements cached on the device still unlock Premium.
+- **Switching to Lifetime:** buy a subscription, then use Settings › Switch to Lifetime. Buying Lifetime never cancels the subscription; the app says it keeps renewing and offers Manage Subscription.
 
 **Against App Store Connect (sandbox):** in Edit Scheme › Run › Options, set StoreKit Configuration to *None*. Sign in with a Sandbox Apple Account on the iPhone (Settings › Developer › Sandbox Apple Account on iOS 18 and later; Settings › App Store on iOS 17), then run from Xcode or TestFlight.
 

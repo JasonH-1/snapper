@@ -41,8 +41,16 @@ final class FakePurchaseService: PurchaseService {
 
 final class PaywallModelTests: XCTestCase {
     @MainActor
-    private func makeModel(store: FakePurchaseService) -> PaywallModel {
-        PaywallModel(context: .upgrade, store: store, library: .bundled(), renderer: PhotoRenderer(), photoURL: nil)
+    private func makeModel(store: FakePurchaseService, context: PaywallContext = .upgrade) -> PaywallModel {
+        PaywallModel(context: context, store: store, library: .bundled(), renderer: PhotoRenderer(), photoURL: nil)
+    }
+
+    @MainActor
+    private func makeSubscriber() -> FakePurchaseService {
+        let store = FakePurchaseService()
+        store.isPremium = true
+        store.hasActiveSubscription = true
+        return store
     }
 
     @MainActor
@@ -64,6 +72,7 @@ final class PaywallModelTests: XCTestCase {
         await model.load()
         await model.purchase()
         XCTAssertTrue(model.didUnlock)
+        XCTAssertFalse(model.showsSubscriptionReminder)
         XCTAssertNil(model.alert)
     }
 
@@ -80,6 +89,63 @@ final class PaywallModelTests: XCTestCase {
         XCTAssertTrue(model.didUnlock)
         XCTAssertTrue(store.ownsLifetime)
         XCTAssertFalse(store.hasActiveSubscription)
+    }
+
+    @MainActor
+    func testSwitchToLifetimeOffersOnlyLifetimePreselected() async {
+        let model = makeModel(store: makeSubscriber(), context: .switchToLifetime)
+        await model.load()
+        XCTAssertTrue(model.offersOnlyLifetime)
+        XCTAssertEqual(model.plans.map(\.id), ["lifetime"], "a subscriber isn't offered another subscription")
+        XCTAssertEqual(model.selectedPlanID, "lifetime")
+        XCTAssertEqual(model.selectedPlan?.period, .lifetime)
+        XCTAssertNotEqual(model.title, makeModel(store: makeSubscriber()).title)
+    }
+
+    @MainActor
+    func testSubscriberBuyingLifetimeIsToldTheSubscriptionKeepsRenewing() async {
+        let store = makeSubscriber()
+        let model = makeModel(store: store, context: .switchToLifetime)
+        await model.load()
+        await model.purchase()
+        XCTAssertTrue(store.ownsLifetime)
+        XCTAssertTrue(store.hasActiveSubscription, "nothing is cancelled automatically")
+        XCTAssertTrue(model.showsSubscriptionReminder)
+        XCTAssertFalse(model.didUnlock, "the paywall stays open to show the reminder")
+        XCTAssertNil(model.alert)
+    }
+
+    @MainActor
+    func testCancelledSwitchChangesNothing() async {
+        let store = makeSubscriber()
+        store.nextOutcome = .cancelled
+        let model = makeModel(store: store, context: .switchToLifetime)
+        await model.load()
+        await model.purchase()
+        XCTAssertFalse(store.ownsLifetime)
+        XCTAssertFalse(model.showsSubscriptionReminder)
+        XCTAssertFalse(model.didUnlock)
+        XCTAssertNil(model.alert)
+    }
+
+    @MainActor
+    func testRestoringOnlyASubscriptionDoesNotCountAsLifetime() async {
+        let store = makeSubscriber()
+        let model = makeModel(store: store, context: .switchToLifetime)
+        await model.restore()
+        XCTAssertFalse(model.didUnlock)
+        XCTAssertFalse(model.showsSubscriptionReminder)
+        if case .nothingToRestore = model.alert {} else { XCTFail("expected the nothing-to-restore alert") }
+    }
+
+    @MainActor
+    func testRestoringLifetimeAlongsideASubscriptionShowsTheReminder() async {
+        let store = makeSubscriber()
+        store.ownsLifetime = true
+        let model = makeModel(store: store, context: .switchToLifetime)
+        await model.restore()
+        XCTAssertTrue(model.showsSubscriptionReminder)
+        XCTAssertNil(model.alert)
     }
 
     @MainActor

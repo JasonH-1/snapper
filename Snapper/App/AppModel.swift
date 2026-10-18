@@ -9,12 +9,15 @@ enum PaywallContext: Identifiable {
     case lockedLook(Look, before: UIImage?, after: UIImage?)
     /// Tapped an upgrade entry point (camera badge, settings, watermark note).
     case upgrade
+    /// A subscriber chose Switch to Lifetime in Settings: only Lifetime is offered.
+    case switchToLifetime
 
     var id: String {
         switch self {
         case .intro: "intro"
         case .lockedLook(let look, _, _): "locked-\(look.id)"
         case .upgrade: "upgrade"
+        case .switchToLifetime: "switch-to-lifetime"
         }
     }
 }
