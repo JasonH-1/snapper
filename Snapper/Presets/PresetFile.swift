@@ -17,7 +17,7 @@ struct PresetFile: Codable, Equatable, Identifiable, Sendable {
     static let maximumBytes = 65_536
 
     init(_ preset: SavedPreset) {
-        version = 1
+        version = preset.adjustments.requiresPremium ? 2 : 1
         name = preset.name
         lookID = preset.lookID
         strength = preset.strength
@@ -40,15 +40,13 @@ struct PresetFile: Codable, Equatable, Identifiable, Sendable {
     static func decode(_ data: Data, looks: LookLibrary) throws -> PresetFile {
         guard data.count <= maximumBytes else { throw FileError.tooLarge }
         guard let file = try? JSONDecoder().decode(Self.self, from: data) else { throw FileError.invalid }
-        guard file.version == 1 else { throw FileError.newerVersion }
+        guard (1...2).contains(file.version) else { throw FileError.newerVersion }
         guard looks.look(id: file.lookID) != nil else { throw FileError.unavailableLook }
         let name = file.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 40,
               !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
               file.strength.isFinite, (0...1).contains(file.strength),
-              PhotoAdjustments.Kind.allCases.allSatisfy({
-                  file.adjustments[$0].isFinite && $0.range.contains(file.adjustments[$0])
-              }) else { throw FileError.invalid }
+              file.adjustments.isValid else { throw FileError.invalid }
         var result = file
         result.name = name
         return result

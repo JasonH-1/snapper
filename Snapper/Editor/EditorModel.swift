@@ -8,7 +8,7 @@ import SwiftUI
 @Observable
 final class EditorModel: Identifiable, Hashable {
     enum Tab: String, CaseIterable, Identifiable {
-        case looks, adjust, crop, finish
+        case looks, adjust, color, selective, crop, finish
 
         var id: String { rawValue }
 
@@ -16,6 +16,8 @@ final class EditorModel: Identifiable, Hashable {
             switch self {
             case .looks: "camera.filters"
             case .adjust: "slider.horizontal.3"
+            case .color: "slider.horizontal.below.square.filled.and.square"
+            case .selective: "person.crop.rectangle"
             case .crop: "crop.rotate"
             case .finish: "rectangle.inset.filled"
             }
@@ -25,6 +27,8 @@ final class EditorModel: Identifiable, Hashable {
             switch self {
             case .looks: "Looks"
             case .adjust: "Adjust"
+            case .color: "Color"
+            case .selective: "Selective"
             case .crop: "Crop"
             case .finish: "Finish"
             }
@@ -69,6 +73,9 @@ final class EditorModel: Identifiable, Hashable {
 
     /// The edited photo at screen size.
     private(set) var preview: UIImage?
+    private(set) var subjectMaskPreview: UIImage?
+    private(set) var isDetectingSubject = false
+    private(set) var subjectDetectionFailed = false
     /// The photo framed but with no look or sliders, for press-and-hold compare.
     private(set) var original: UIImage?
     /// For the Crop tab: mirrored and turned, with the look and sliders, but
@@ -123,6 +130,7 @@ final class EditorModel: Identifiable, Hashable {
         var lookID: String
         var strength: Double
         var adjustments: PhotoAdjustments
+        var selective: SelectiveEdits
         var quarterTurns: Int
         var isFlipped: Bool
     }
@@ -155,7 +163,7 @@ final class EditorModel: Identifiable, Hashable {
 
     var record: CaptureRecord? { library.record(id: id) }
     var currentLook: Look { looks.look(id: recipe.lookID) ?? .original }
-    var isLocked: Bool { (currentLook.isPremium || recipe.finish.isActive) && !hasPremium() }
+    var isLocked: Bool { (currentLook.isPremium || recipe.requiresPremium) && !hasPremium() }
     var hasPremiumNow: Bool { hasPremium() }
     var isImported: Bool { record?.isImported ?? false }
     var isEdited: Bool { record.map { recipe != $0.initialRecipe } ?? false }
@@ -275,6 +283,44 @@ final class EditorModel: Identifiable, Hashable {
 
     func resetValue(of kind: PhotoAdjustments.Kind) {
         step { $0.adjustments[kind] = 0 }
+    }
+
+    func setColorMix(_ value: ColorMix, for band: ColorBand) {
+        guard value.isValid else { return }
+        update { $0.adjustments.colorMixer[band] = value }
+    }
+    func resetColorMix() { step { $0.adjustments.colorMixer = ColorMixer() } }
+    func setSelective(_ value: Double, key: WritableKeyPath<SelectiveAdjustment, Double>, background: Bool) {
+        guard value.isFinite, subjectMaskPreview != nil else { return }
+        let safe = min(max(value, -1), 1)
+        update {
+            if background { $0.selective.background[keyPath: key] = safe }
+            else { $0.selective.subject[keyPath: key] = safe }
+        }
+    }
+    func resetSelective() { step { $0.selective = SelectiveEdits() } }
+    func prepareSelective(retry: Bool = false) async {
+        guard let record, !isDetectingSubject else { return }
+        isDetectingSubject = true
+        subjectDetectionFailed = false
+        subjectMaskPreview = nil
+        let crop = recipe.crop
+        let mask = await library.renderer.prepareSubject(sourceURL: library.url(for: record), crop: crop, retry: retry)
+        isDetectingSubject = false
+        guard recipe.crop == crop else {
+            await prepareSelective(retry: retry)
+            return
+        }
+        subjectMaskPreview = mask
+        subjectDetectionFailed = mask == nil
+    }
+    func applyCuratedStyle(_ style: CuratedStyle) {
+        guard CuratedCollection.contains(style), looks.look(id: style.recipe.lookID) != nil else { return }
+        step {
+            $0.lookID = style.recipe.lookID
+            $0.strength = style.recipe.strength
+            $0.adjustments = style.recipe.adjustments
+        }
     }
 
     // MARK: - Crop
@@ -497,7 +543,7 @@ final class EditorModel: Identifiable, Hashable {
 
         if tab == .crop {
             let key = CropBaseKey(lookID: recipe.lookID, strength: recipe.strength, adjustments: recipe.adjustments,
-                                  quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)
+                                  selective: recipe.selective, quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)
             if key != cropBaseKey || cropBase == nil {
                 var base = recipe
                 base.crop = PhotoCrop(shape: .free, quarterTurns: recipe.crop.quarterTurns, isFlipped: recipe.crop.isFlipped)

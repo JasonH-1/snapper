@@ -282,7 +282,7 @@ final class LibraryModel: Identifiable {
     }
 
     private func isLocked(_ record: CaptureRecord) -> Bool {
-        (captures.look(for: record).isPremium || record.recipe.finish.isActive) && !hasPremium()
+        (captures.look(for: record).isPremium || record.recipe.requiresPremium) && !hasPremium()
     }
 
     // MARK: - Batch actions

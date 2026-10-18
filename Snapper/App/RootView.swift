@@ -106,7 +106,7 @@ struct RootView: View {
                            selectedID: app.camera.currentLook.id,
                            hasPremium: app.hasPremium,
                            settings: app.settings,
-                           thumbnails: app.lookThumbnails) { look in
+                           thumbnails: app.lookThumbnails, onSelectStyle: { app.selectCuratedStyle($0) }) { look in
                 app.selectLook(look)
             }
             .presentationDetents([.medium, .large])
