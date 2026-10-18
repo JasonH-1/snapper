@@ -313,6 +313,11 @@ final class EditorModel: Identifiable, Hashable {
         }
         subjectMaskPreview = mask
         subjectDetectionFailed = mask == nil
+        if mask != nil {
+            scheduleRender()
+            thumbnailsRecipe = nil
+            if tab == .looks { refreshLookThumbnails() }
+        }
     }
     func applyCuratedStyle(_ style: CuratedStyle) {
         guard CuratedCollection.contains(style), looks.look(id: style.recipe.lookID) != nil else { return }
@@ -321,6 +326,7 @@ final class EditorModel: Identifiable, Hashable {
             $0.strength = style.recipe.strength
             $0.adjustments = style.recipe.adjustments
         }
+        refreshLookThumbnails()
     }
 
     // MARK: - Crop

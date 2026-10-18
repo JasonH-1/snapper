@@ -302,7 +302,7 @@ final class LibraryModel: Identifiable {
             do {
                 shareItems = ShareItems(urls: try await captures.exportForSharing(allowed, watermark: watermark))
                 if allowed.count < chosen.count {
-                    show(String(localized: "Photos with Premium looks or finishing were left out."))
+                    show(String(localized: "Photos with Premium looks or edits were left out."))
                 }
             } catch {
                 alert = .error(error.localizedDescription)
@@ -333,7 +333,7 @@ final class LibraryModel: Identifiable {
                 }
                 let skipped = chosen.count - allowed.count
                 show(skipped > 0
-                     ? String(localized: "Saved \(Self.photoCount(saved)). Premium looks and finishing need Premium to save.")
+                     ? String(localized: "Saved \(Self.photoCount(saved)). Premium looks and edits need Premium to save.")
                      : String(localized: "Saved \(Self.photoCount(saved)) to Photos"))
                 isSelecting = false
             } catch PhotoLibrarySaver.SaveError.notAuthorized {

@@ -73,24 +73,24 @@ struct EditorView: View {
 
     private var toolNavigation: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: 4) {
-            ForEach(EditorModel.Tab.allCases) { tab in
-                Button {
-                    withAnimation(animation) { model.tab = tab }
-                } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: tab.symbol).font(.body.weight(.semibold))
-                        Text(tab.title).font(.caption.weight(.semibold))
+            HStack(spacing: 4) {
+                ForEach(EditorModel.Tab.allCases) { tab in
+                    Button {
+                        withAnimation(animation) { model.tab = tab }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: tab.symbol).font(.body.weight(.semibold))
+                            Text(tab.title).font(.caption.weight(.semibold))
+                        }
+                        .frame(minWidth: 66, minHeight: 58)
+                        .contentShape(Rectangle())
+                        .foregroundStyle(model.tab == tab ? Color.black : Color.primary)
+                        .background(model.tab == tab ? Theme.accent : .clear, in: RoundedRectangle(cornerRadius: 14))
                     }
-                    .frame(minWidth: 66, minHeight: 58)
-                    .contentShape(Rectangle())
-                    .foregroundStyle(model.tab == tab ? Color.black : Color.primary)
-                    .background(model.tab == tab ? Theme.accent : .clear, in: RoundedRectangle(cornerRadius: 14))
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
             }
-        }
         }
         .padding(5)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 19))
@@ -385,14 +385,14 @@ struct EditorView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                ForEach(PhotoAdjustments.Kind.allCases) { tool in
-                    AdjustToolButton(kind: tool, isSelected: model.adjustTool == tool,
-                                     isChanged: abs(model.value(of: tool)) > 0.004,
-                                     showsTitle: !dynamicTypeSize.isAccessibilitySize) {
-                        model.adjustTool = tool
+                    ForEach(PhotoAdjustments.Kind.allCases) { tool in
+                        AdjustToolButton(kind: tool, isSelected: model.adjustTool == tool,
+                                         isChanged: abs(model.value(of: tool)) > 0.004,
+                                         showsTitle: !dynamicTypeSize.isAccessibilitySize) {
+                            model.adjustTool = tool
+                        }
+                        .frame(width: 64)
                     }
-                    .frame(width: 64)
-                }
                 }
             }
             .padding(.horizontal, 12)
