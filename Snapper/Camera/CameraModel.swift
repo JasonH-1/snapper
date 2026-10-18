@@ -43,6 +43,8 @@ final class CameraModel {
     /// Seconds left on the self-timer, while it runs.
     private(set) var countdown: Int?
     private(set) var whiteBalance: WhiteBalancePreset = .auto
+    private(set) var isChangingWhiteBalance = false
+    private(set) var whiteBalanceError: String?
     /// Manual lens position (0 near … 1 far); nil = auto focus.
     private(set) var lensPosition: Float?
     /// Manual ISO and shutter speed; nil = auto exposure.
@@ -62,7 +64,7 @@ final class CameraModel {
     }
 
     var canCapture: Bool {
-        isPreviewVisible && isAppActive && (status == .running || status == .noCamera)
+        !isChangingWhiteBalance && isPreviewVisible && isAppActive && (status == .running || status == .noCamera)
     }
 
     var currentLook: Look { looks.indices.contains(lookIndex) ? looks[lookIndex] : .original }
@@ -338,7 +340,7 @@ final class CameraModel {
     }
 
     func switchCamera() {
-        guard capabilities.canSwitchCamera else { return }
+        guard capabilities.canSwitchCamera, !isChangingWhiteBalance, !isCapturing else { return }
         focusPoint = nil
         Task {
             do {
@@ -352,6 +354,7 @@ final class CameraModel {
     /// Focus and exposure at a tap (and release an AE/AF lock). `point` is in
     /// the preview's coordinates.
     func focus(at point: CGPoint, in size: CGSize) {
+        guard !isChangingWhiteBalance else { return }
         guard status == .running || status == .noCamera, size.width > 0, size.height > 0 else { return }
         let x = min(max(point.x / size.width, 0), 1)
         let y = min(max(point.y / size.height, 0), 1)
@@ -388,6 +391,7 @@ final class CameraModel {
 
     /// Exposure compensation in stops, clamped to `exposureRange`.
     func setExposureBias(_ stops: Float) {
+        guard !isChangingWhiteBalance else { return }
         let clamped = min(max(stops, exposureRange.lowerBound), exposureRange.upperBound)
         guard clamped != exposureBias else { return }
         exposureBias = clamped
@@ -407,6 +411,7 @@ final class CameraModel {
     }
 
     func setZoom(_ value: CGFloat, animated: Bool = false) {
+        guard !isChangingWhiteBalance else { return }
         let clamped = min(max(value, capabilities.minZoom), capabilities.maxZoom)
         zoom = clamped
         pendingZoom = (clamped, animated)
@@ -421,18 +426,34 @@ final class CameraModel {
     }
 
     func setWhiteBalance(_ preset: WhiteBalancePreset) {
-        guard preset == .auto || capabilities.supportsWhiteBalance else { return }
+        guard !isChangingWhiteBalance, !isCapturing,
+              preset == .auto || capabilities.supportsWhiteBalance else { return }
+        whiteBalanceError = nil
         if status == .noCamera {
             whiteBalance = preset
             return updateDemo()
         }
-        // Publish the selection only after the device accepts it. Queue Auto
-        // even if it is still selected while a previous preset is pending.
-        Task { await captureService.setWhiteBalance(preset) }
+        cancelCountdown()
+        focusPoint = nil
+        isChangingWhiteBalance = true
+        Task {
+            defer { isChangingWhiteBalance = false }
+            // Drain pending controls before replacing the capture device.
+            await zoomTask?.value
+            await exposureTask?.value
+            await manualExposureTask?.value
+            do {
+                try await captureService.setWhiteBalance(preset)
+            } catch {
+                whiteBalanceError = String(localized: "Could not change white balance. Please try again.")
+                Logger.camera.error("White balance failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     /// Switches between auto focus and a manual lens position.
     func setManualFocus(_ manual: Bool) {
+        guard !isChangingWhiteBalance else { return }
         guard manual != (lensPosition != nil) else { return }
         if manual {
             focusPoint = nil
@@ -447,6 +468,7 @@ final class CameraModel {
 
     /// Lens position, 0 (nearest) … 1 (farthest).
     func setLensPosition(_ position: Float) {
+        guard !isChangingWhiteBalance else { return }
         let clamped = min(max(position, 0), 1)
         lensPosition = clamped
         if status == .noCamera { return updateDemo() }
@@ -456,6 +478,7 @@ final class CameraModel {
     /// Switches between auto exposure and manual ISO and shutter speed,
     /// starting from whatever auto exposure had chosen.
     func setManualExposure(_ manual: Bool) {
+        guard !isChangingWhiteBalance else { return }
         guard manual != (manualExposure != nil) else { return }
         guard manual else {
             manualExposure = nil
@@ -488,6 +511,7 @@ final class CameraModel {
     }
 
     private func applyManualExposure(_ manual: ManualExposure) {
+        guard !isChangingWhiteBalance else { return }
         manualExposure = manual
         if status == .noCamera { return updateDemo() }
         pendingManualExposure = manual
