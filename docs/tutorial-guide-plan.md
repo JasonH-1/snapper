@@ -1,6 +1,6 @@
 # Snapper tutorial and guide plan
 
-Status: proposed guide; not implemented by this change. Based on the current camera, Library, editor, presets and Settings code. The accompanying UI change removes the collapsing Library navigation title while retaining the selection count and toolbar actions.
+Status: the standalone searchable Guide is implemented in Settings with 16 topics, labeled diagrams, interactive sample-photo comparisons and shortcuts to Camera, Looks, Library and My Styles. The optional guided walkthrough and contextual tips remain future phases. Based on the current camera, Library, editor, presets and Settings code. The accompanying UI change removes the collapsing Library navigation title while retaining the selection count and toolbar actions.
 
 ## Experience
 

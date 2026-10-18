@@ -57,6 +57,7 @@ final class AppModel {
     static let libraryZoomID = "library"
     var paywall: PaywallModel?
     var isShowingSettings = false
+    var pendingGuideDestination: GuideDestination?
     var isShowingLookPicker = false
     var isShowingCameraPresets = false
     var upgradeAfterCameraPresets = false
@@ -278,6 +279,20 @@ final class AppModel {
         isShowingSettings = false
         camera.setLookOrder(settings.orderedLooks(from: library))
         updateCameraVisibility()
+    }
+
+    /// Called only after Settings has finished dismissing.
+    func openPendingGuideDestination() {
+        guard let destination = pendingGuideDestination else { return }
+        pendingGuideDestination = nil
+        switch destination {
+        case .camera: updateCameraVisibility()
+        case .looks: openLookPicker()
+        case .library: openLibrary()
+        case .styles:
+            camera.setPreviewVisible(false)
+            isShowingCameraPresets = true
+        }
     }
 
     func lookPickerDismissed() {
