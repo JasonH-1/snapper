@@ -7,31 +7,39 @@ struct PaywallView: View {
     var onClose: () -> Void
 
     @State private var slideTimer: Task<Void, Never>?
+    @State private var showManageSubscriptions = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             background
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
-                    hero
-                    header
-                    benefits
-                    plans
-                    footer
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
-            }
-            // The button and its price summary stay on screen on every iPhone size.
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                callToAction
+            if model.showsSubscriptionReminder {
+                subscriptionReminder
+                    .transition(.opacity)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 22) {
+                        hero
+                        header
+                        benefits
+                        plans
+                        footer
+                    }
                     .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-                    .background(.bar)
+                    .padding(.bottom, 24)
+                }
+                // The button and its price summary stay on screen on every iPhone size.
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    callToAction
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .background(.bar)
+                }
+                closeButton
             }
-            closeButton
         }
+        .animation(.easeInOut(duration: 0.3), value: model.showsSubscriptionReminder)
+        .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
         .task {
             await model.load()
         }
@@ -41,15 +49,20 @@ struct PaywallView: View {
             if unlocked { onClose() }
         }
         .sensoryFeedback(.success, trigger: model.didUnlock)
+        .sensoryFeedback(.success, trigger: model.showsSubscriptionReminder)
         .sensoryFeedback(.selection, trigger: model.selectedPlanID)
         .alert(alertTitle, isPresented: alertBinding, presenting: model.alert) { _ in
             Button("OK", role: .cancel) {}
         } message: { alert in
             switch alert {
             case .pending:
-                Text("Your purchase is waiting for approval. Premium unlocks as soon as it's approved.")
+                model.offersOnlyLifetime
+                    ? Text("Your purchase is waiting for approval. Lifetime unlocks as soon as it's approved.")
+                    : Text("Your purchase is waiting for approval. Premium unlocks as soon as it's approved.")
             case .nothingToRestore:
-                Text("No active Snapper Premium subscription was found for this Apple ID.")
+                model.offersOnlyLifetime
+                    ? Text("No Lifetime purchase was found for this Apple ID. Your subscription is still active.")
+                    : Text("No Snapper Premium purchase or active subscription was found for this Apple ID.")
             case .error(let message):
                 Text(message)
             }
@@ -128,7 +141,9 @@ struct PaywallView: View {
             Text(model.title)
                 .font(Theme.lookTitle(size: 30))
                 .multilineTextAlignment(.center)
-            Text("All \(model.totalLookCount) looks, advanced photo tools and reusable styles.")
+            (model.offersOnlyLifetime
+             ? Text("Pay once and keep every look and tool, including the ones still to come.")
+             : Text("All \(model.totalLookCount) looks, advanced photo tools and reusable styles."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -138,23 +153,50 @@ struct PaywallView: View {
 
     private var benefits: some View {
         VStack(alignment: .leading, spacing: 14) {
-            benefit(symbol: "camera.filters", title: Text("\(model.premiumLookCount) premium looks"),
-                    detail: Text("Every collection, complete. Preview them live, keep the ones you love."))
-            benefit(symbol: "slider.horizontal.3", title: Text("Make your style repeatable"),
-                    detail: Text("Shoot with your personal presets and apply them across a whole photo set."))
-            benefit(symbol: "paintpalette", title: Text("Shape light, color and film texture"),
-                    detail: Text("Highlights, shadows, seven color bands, bloom, halation and vignette."))
-            benefit(symbol: "person.crop.rectangle", title: Text("Separate subject and background"),
-                    detail: Text("Adjust brightness, saturation and warmth separately when a subject can be detected."))
-            benefit(symbol: "rectangle.portrait", title: Text("Ready to share"),
-                    detail: Text("Add frames, date stamps and fitted post or story layouts."))
-            benefit(symbol: "calendar.badge.clock", title: Text("Cancel anytime"),
-                    detail: Text("Premium tools and new premium collections released during your subscription. Manage it in Apple ID settings."))
+            if model.offersOnlyLifetime {
+                lifetimeBenefits
+            } else {
+                premiumBenefits
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(.secondarySystemBackground),
                     in: RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
+    }
+
+    /// For a subscriber: what changes, and that the subscription is theirs to cancel.
+    @ViewBuilder
+    private var lifetimeBenefits: some View {
+        benefit(symbol: "infinity", title: Text("Pay once"),
+                detail: Text("Every current and future look and tool. Lifetime never renews."))
+        benefit(symbol: "photo.on.rectangle", title: Text("Everything stays as it is"),
+                detail: Text("Your looks, presets and photos stay just as they are."))
+        if model.subscriptionWillRenew {
+            benefit(symbol: "calendar.badge.clock", title: Text("Your subscription is separate"),
+                    detail: Text("Buying Lifetime doesn't cancel it. Afterwards Snapper shows you where to cancel it so it doesn't renew."))
+        } else {
+            benefit(symbol: "calendar.badge.clock", title: Text("Your subscription won't renew"),
+                    detail: Text("You've already cancelled it, so once you have Lifetime nothing renews."))
+        }
+    }
+
+    @ViewBuilder
+    private var premiumBenefits: some View {
+        benefit(symbol: "camera.filters", title: Text("\(model.premiumLookCount) premium looks"),
+                detail: Text("Every collection, complete. Preview them live, keep the ones you love."))
+        benefit(symbol: "slider.horizontal.3", title: Text("Make your style repeatable"),
+                detail: Text("Shoot with your personal presets and apply them across a whole photo set."))
+        benefit(symbol: "paintpalette", title: Text("Shape light, color and film texture"),
+                detail: Text("Curves, seven color bands, split toning, bloom, halation and vignette."))
+        benefit(symbol: "person.crop.rectangle", title: Text("Separate subject and background"),
+                detail: Text("Adjust brightness, saturation and warmth separately when a subject can be detected."))
+        benefit(symbol: "rectangle.portrait", title: Text("Ready to share"),
+                detail: Text("Add frames and fitted post or story layouts."))
+        benefit(symbol: "calendar.badge.clock", title: Text("Cancel anytime, or pay once"),
+                detail: Text("Subscriptions include new premium collections released while they're active; manage them in Apple ID settings. Lifetime includes every future look and tool."))
+        benefit(symbol: "lock.open", title: Text("Your photos are never locked"),
+                detail: Text("Without Premium you can still save any photo, without its Premium look or tools."))
     }
 
     private func benefit(symbol: String, title: Text, detail: Text) -> some View {
@@ -188,7 +230,14 @@ struct PaywallView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 120)
         default:
-            if model.plans.isEmpty {
+            if model.plans.isEmpty, model.store.plansState == .loaded {
+                // The store answered without the plan this paywall offers.
+                Text(PurchaseError.productsUnavailable.localizedDescription)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else if model.plans.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else {
@@ -247,11 +296,59 @@ struct PaywallView: View {
             .font(.footnote.weight(.medium))
             .tint(.primary)
 
-            Text("Payment is charged to your Apple ID at confirmation of purchase, or when the free trial ends. The subscription renews automatically at the same price and period unless it is cancelled at least 24 hours before the end of the current period. You can manage or cancel it in your App Store account settings. Any unused part of a free trial is forfeited when you buy a subscription.")
+            (model.offersOnlyLifetime
+             ? Text("Payment is charged to your Apple ID at confirmation of purchase. Lifetime is a one-time purchase that never renews. It doesn't cancel your current subscription, which renews automatically unless it is cancelled at least 24 hours before the end of the current period. You can manage or cancel it in your App Store account settings.")
+             : Text("Payment is charged to your Apple ID at confirmation of purchase, or when the free trial ends. A subscription renews automatically at the same price and period unless it is cancelled at least 24 hours before the end of the current period. You can manage or cancel it in your App Store account settings. Any unused part of a free trial is forfeited when you buy a subscription. Lifetime is a one-time purchase that never renews."))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Shown after Lifetime is bought while a subscription is set to renew.
+    /// Nothing is cancelled for the person: this says so once, plainly, and
+    /// offers Manage Subscription.
+    private var subscriptionReminder: some View {
+        GeometryReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
+                    VStack(spacing: 8) {
+                        Text("Lifetime is yours")
+                            .font(Theme.lookTitle(size: 30))
+                        Text("Every current and future look and tool, paid once.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .multilineTextAlignment(.center)
+                    benefit(symbol: "arrow.triangle.2.circlepath", title: Text("Your subscription keeps renewing"),
+                            detail: Text("Buying Lifetime doesn't cancel it, so it renews until you cancel it in Manage Subscription. Premium stays unlocked either way."))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color(.secondarySystemBackground),
+                                    in: RoundedRectangle(cornerRadius: Theme.cardCornerRadius, style: .continuous))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 24)
+                // Centred when it fits; scrolls at the largest text sizes.
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 10) {
+                Button("Manage Subscription") { showManageSubscriptions = true }
+                    .buttonStyle(PrimaryButtonStyle())
+                Button("Done", action: onClose)
+                    .buttonStyle(PrimaryButtonStyle(isProminent: false))
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
         }
     }
 
@@ -262,10 +359,16 @@ struct PaywallView: View {
         if let trial = plan.freeTrial {
             return String(localized: "Start \(trial.shortLabel) Free Trial")
         }
-        return String(localized: "Subscribe")
+        return plan.period.renews ? String(localized: "Subscribe") : String(localized: "Buy Lifetime")
     }
 
     private func billingSummary(for plan: SubscriptionPlan) -> String {
+        if !plan.period.renews {
+            // A subscriber's own subscription still renews, so don't say nothing does.
+            return model.offersOnlyLifetime
+                ? String(localized: "\(plan.displayPrice) once. Lifetime never renews.")
+                : String(localized: "\(plan.displayPrice) once. No subscription, nothing renews.")
+        }
         if let trial = plan.freeTrial {
             return String(localized: "\(trial.duration) free, then \(plan.displayPrice) per \(plan.period.unitName). Auto-renews; cancel anytime.")
         }
@@ -297,8 +400,8 @@ struct PaywallView: View {
     }
 }
 
-/// One selectable subscription option. The billed amount is the most
-/// prominent price on the card, as App Review requires.
+/// One selectable plan. The billed amount is the most prominent price on
+/// the card, as App Review requires.
 private struct PlanCard: View {
     let plan: SubscriptionPlan
     let isSelected: Bool
@@ -330,7 +433,7 @@ private struct PlanCard: View {
             VStack(alignment: .trailing, spacing: 0) {
                 Text(plan.displayPrice)
                     .font(.title3.weight(.bold))
-                Text("per \(plan.period.unitName)")
+                (plan.period.renews ? Text("per \(plan.period.unitName)") : Text("once"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -349,6 +452,9 @@ private struct PlanCard: View {
     }
 
     private var detail: String {
+        guard plan.period.renews else {
+            return String(localized: "Pay once. Covers all current and future looks and tools.")
+        }
         var parts: [String] = []
         if let monthly = plan.monthlyEquivalent {
             parts.append(String(localized: "\(monthly)/month"))

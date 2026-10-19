@@ -44,6 +44,16 @@ struct PhotoFinish: Hashable, Codable, Sendable {
     var dateStamp: String?
     static let none = PhotoFinish()
     var isActive: Bool { frame != .none || layout != .original || dateStamp != nil }
+    /// Frames and layouts are Premium; the classic date stamp is free.
+    var requiresPremium: Bool { frame != .none || layout != .original }
+
+    /// The same finish with only its free part, the date stamp.
+    var withoutPremium: PhotoFinish {
+        var free = self
+        free.frame = .none
+        free.layout = .original
+        return free
+    }
 
     struct Geometry {
         let canvas: CGRect

@@ -1,17 +1,21 @@
 import Foundation
 import Observation
 
-/// A subscription plan as the app presents it. Deliberately free of StoreKit
-/// types so another purchase backend (e.g. RevenueCat) can supply plans too.
+/// A Premium plan as the app presents it: a subscription, or the one-time
+/// Lifetime unlock. Deliberately free of StoreKit types so another purchase
+/// backend (e.g. RevenueCat) can supply plans too.
 struct SubscriptionPlan: Identifiable, Hashable, Sendable {
     enum Period: Sendable, Hashable {
         case week, month, year
+        /// Paid once; never renews.
+        case lifetime
 
         var unitName: String {
             switch self {
             case .week: String(localized: "week")
             case .month: String(localized: "month")
             case .year: String(localized: "year")
+            case .lifetime: String(localized: "lifetime")
             }
         }
 
@@ -20,8 +24,11 @@ struct SubscriptionPlan: Identifiable, Hashable, Sendable {
             case .week: String(localized: "Weekly")
             case .month: String(localized: "Monthly")
             case .year: String(localized: "Yearly")
+            case .lifetime: String(localized: "Lifetime")
             }
         }
+
+        var renews: Bool { self != .lifetime }
     }
 
     struct FreeTrial: Sendable, Hashable {
@@ -58,7 +65,7 @@ enum PurchaseError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .productsUnavailable:
-            String(localized: "Subscriptions aren't available right now. Please try again later.")
+            String(localized: "Premium plans aren't available right now. Please try again later.")
         case .verificationFailed:
             String(localized: "The purchase couldn't be verified. You haven't been charged twice; try Restore Purchases.")
         case .network:
@@ -83,6 +90,16 @@ enum PlansState: Equatable, Sendable {
 protocol PurchaseService: AnyObject, Observable {
     /// Whether Premium is active (including during a free trial or grace period).
     var isPremium: Bool { get }
+    /// Whether the one-time Lifetime unlock is owned.
+    var ownsLifetime: Bool { get }
+    /// Whether an auto-renewing plan is active. It keeps renewing even after
+    /// Lifetime is bought, until it is cancelled.
+    var hasActiveSubscription: Bool { get }
+    /// Whether that subscription is set to renew. It turns false as soon as
+    /// the person turns off auto-renew, while `hasActiveSubscription` stays
+    /// true until the period ends. Use it for copy about cancelling, not for
+    /// what Premium unlocks.
+    var subscriptionWillRenew: Bool { get }
     var plans: [SubscriptionPlan] { get }
     var plansState: PlansState { get }
 
@@ -93,4 +110,13 @@ protocol PurchaseService: AnyObject, Observable {
     /// Syncs with the App Store. Returns whether Premium is active afterwards.
     func restore() async throws -> Bool
     func refreshEntitlements() async
+}
+
+extension PurchaseService {
+    /// Lifetime is owned while a subscription will still renew. Nothing is
+    /// cancelled for the person, so this is when the app may say, once, where
+    /// to cancel it.
+    var ownsLifetimeWithRenewingSubscription: Bool {
+        ownsLifetime && subscriptionWillRenew
+    }
 }

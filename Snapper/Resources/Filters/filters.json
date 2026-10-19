@@ -294,7 +294,7 @@
       "name": "Signal",
       "collection": "overclock",
       "lut": "signal.cube",
-      "tier": "premium",
+      "tier": "free",
       "effects": {
         "chromatic_aberration": {
           "amount": 0.0015
@@ -409,7 +409,7 @@
       "name": "Instant",
       "collection": "darkroom",
       "lut": "instant.cube",
-      "tier": "premium",
+      "tier": "free",
       "effects": {
         "halation": {
           "threshold": 0.8,

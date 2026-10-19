@@ -97,6 +97,7 @@ final class EditorModel: Identifiable, Hashable {
     var activeCategory: LookCategory?
 
     private(set) var isSaving = false
+    private(set) var isSavingFreeVersion = false
     private(set) var isPreparingShare = false
     private(set) var savedCount = 0
     var alert: Alert?
@@ -165,7 +166,7 @@ final class EditorModel: Identifiable, Hashable {
 
     var record: CaptureRecord? { library.record(id: id) }
     var currentLook: Look { looks.look(id: recipe.lookID) ?? .original }
-    var isLocked: Bool { (currentLook.isPremium || recipe.requiresPremium) && !hasPremium() }
+    var isLocked: Bool { needsPremium(recipe) }
     var hasPremiumNow: Bool { hasPremium() }
     var isImported: Bool { record?.isImported ?? false }
     var isEdited: Bool { record.map { recipe != $0.initialRecipe } ?? false }
@@ -718,9 +719,11 @@ final class EditorModel: Identifiable, Hashable {
     }
 
     /// Whether exporting `recipe` needs Premium the person doesn't have.
+    /// Premium edits made while Premium was active stay exportable.
     func needsPremium(_ recipe: PhotoRecipe) -> Bool {
-        let look = looks.look(id: recipe.lookID) ?? .original
-        return (look.isPremium || recipe.requiresPremium) && !hasPremium()
+        guard !hasPremium() else { return false }
+        guard let record else { return library.usesPremium(recipe) }
+        return library.needsPremium(recipe, of: record)
     }
 
     /// Saves one version to Photos with the export settings.
@@ -1091,7 +1094,7 @@ final class EditorModel: Identifiable, Hashable {
 
     func save() {
         commit()
-        guard let record, !isSaving else { return }
+        guard let record, !isSaving, !isSavingFreeVersion else { return }
         if isLocked {
             requestPremium(currentLook, original, preview)
             return
@@ -1105,6 +1108,46 @@ final class EditorModel: Identifiable, Hashable {
             defer { isSaving = false }
             do {
                 try await library.saveToPhotos(record, includeOriginal: includeOriginal, options: options, prepared: prepared)
+                savedCount += 1
+            } catch PhotoLibrarySaver.SaveError.notAuthorized {
+                alert = .photosAccessDenied
+            } catch {
+                alert = .error(error.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: - Saving without Premium
+
+    /// The current edit without its Premium look and tools, which can always
+    /// be saved.
+    var freeRecipe: PhotoRecipe { library.freeVersion(of: recipe) }
+
+    /// "Save Without Sunburn", naming what saving for free leaves out.
+    var freeSaveTitle: String {
+        let parts = library.premiumParts(of: recipe)
+        switch (parts.look, parts.usesTools) {
+        case (let look?, false): return String(localized: "Save Without \(look.name)")
+        case (let look?, true): return String(localized: "Save Without \(look.name) & Premium Tools")
+        case (nil, _): return String(localized: "Save Without Premium Tools")
+        }
+    }
+
+    var isFreeVersionSaved: Bool { record?.savedRecipe == freeRecipe }
+
+    /// Saves the photo without its Premium parts, so no photo is ever stuck
+    /// behind Premium. The full edit stays on the photo in Snapper.
+    func saveWithoutPremium() {
+        commit()
+        guard let record, !isSaving, !isSavingFreeVersion else { return }
+        isSavingFreeVersion = true
+        let recipe = freeRecipe
+        let includeOriginal = settings.alsoSaveOriginal
+        let options = settings.exportOptions
+        Task {
+            defer { isSavingFreeVersion = false }
+            do {
+                try await library.saveToPhotos(record, recipe: recipe, includeOriginal: includeOriginal, options: options)
                 savedCount += 1
             } catch PhotoLibrarySaver.SaveError.notAuthorized {
                 alert = .photosAccessDenied

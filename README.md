@@ -6,9 +6,9 @@ An iPhone camera and photo editor with live film looks and reusable personal sty
 
 - **Live preview through every look:** Core Image + Metal, 30 fps, off the main thread. Swipe the preview to change looks, with a live split as you drag.
 - **What you see is what you save:** the preview, the full-resolution photo and every export go through the same pipeline (`LookPipeline`).
-- **41 original looks in five collections:** Disposable, Neon Nights, Soft Portrait, Overclock and Darkroom. Six are free.
+- **41 original looks in five collections:** Disposable, Neon Nights, Soft Portrait, Overclock and Darkroom. Eight are free, at least one in every collection.
 - **Looks are data:** each look is a 33-point `.cube` file listed in `filters.json`, plus optional effects (sky gradient, glow, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, noise, film grain, vignette) drawn after it. A Python tool generates and quality-checks them.
-- **StoreKit 2:** monthly and yearly plans (7-day trial on yearly). There are no accounts and no backend; the Apple ID is the account.
+- **StoreKit 2:** monthly and yearly plans (7-day trial on yearly) and a one-time Lifetime unlock. There are no accounts and no backend; the Apple ID is the account.
 
 Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6 on `macos-latest`.
 
@@ -18,9 +18,10 @@ Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6
 
 - **Personal presets:** Looks › Presets saves the look, strength and light/colour adjustments. Rename, duplicate or delete from each preset's menu. One preset is free; Premium unlocks unlimited presets. After expiry all presets remain stored, and the user can choose which one is their free preset.
 - **Batch styling:** Library › Select › Style applies a look or a complete personal preset (Premium). Crops, frames and date stamps are preserved. Undo Last Batch skips photos edited again since the batch.
-- **Finish:** adjustable white, cream, black or instant-photo borders; a confirmed date stamp; fitted square, portrait-post and story canvases. Preview free; export requires Premium. Originals remain untouched and the same renderer powers previews and exports. Finished canvases are capped at 8192 pixels on the longest edge.
+- **Finish:** adjustable white, cream, black or instant-photo borders; a confirmed date stamp; fitted square, portrait-post and story canvases. The date stamp is free; frames and layouts preview free and need Premium to export. Originals remain untouched and the same renderer powers previews and exports. Finished canvases are capped at 8192 pixels on the longest edge.
 - **Featured looks:** the look picker includes sample thumbnails and shooting guidance for Boardwalk, Flashbulb, Cream, Afterglow and Halo. This does not replace real-device photographic approval.
-- **Free experience:** all allowed exports are watermark-free. Onboarding no longer opens a paywall. The first automatic save may show an optional upgrade toast, and the editor offers an upgrade after saving.
+- **Free experience:** all exports are watermark-free, and highlights, shadows and the date stamp are free. Onboarding no longer opens a paywall. The first automatic save may show an optional upgrade toast, and the editor offers an upgrade after saving.
+- **No photo is ever locked:** a photo shot or edited with a previewed Premium look or tool can always be saved without those parts (the editor's *Save Without …* button; Library batch save and share ask first; automatic save does it and says so). Its full edit stays in Snapper. Premium edits made while Premium is active are remembered per photo (`CaptureRecord.premiumEdits`) and stay exportable after a subscription ends.
 
 See [the release checklist](docs/release-checklist.md) for owner-supplied details, photographic acceptance, StoreKit tests and device checks still needed before public release.
 
@@ -65,14 +66,15 @@ Run `xcodegen generate` again whenever you add, remove or rename files. The `.xc
 ## Test purchases
 
 **Locally, no App Store Connect needed.** The `Snapper` scheme runs with `Config/Snapper.storekit`, so purchases are simulated on device or in the Simulator.
-- Plans: `snapper.premium.monthly` ($3.99/month) and `snapper.premium.yearly` ($19.99/year, 1-week free trial).
+- Plans: `snapper.premium.monthly` ($3.99/month), `snapper.premium.yearly` ($19.99/year, 1-week free trial) and `snapper.premium.lifetime` ($39.99 once, non-consumable).
 - **Debug › StoreKit › Manage Transactions** lets you refund, expire or cancel a subscription and watch the app re-lock.
 - With `Snapper.storekit` open, **Editor** lets you speed up renewals, turn on Ask to Buy (tests the "pending" path) and fail transactions (tests the error alerts).
 - **Offline restore:** buy, turn on Airplane Mode, then use Settings › Restore Purchases. Entitlements cached on the device still unlock Premium.
+- **Switching to Lifetime:** buy a subscription, then use Settings › Switch to Lifetime. Buying Lifetime never cancels the subscription; the app says it keeps renewing and offers Manage Subscription. Once auto-renew is off (Manage Subscription, or Debug › StoreKit › Manage Transactions), that guidance goes away, though Premium and the subscription last until the period ends.
 
 **Against App Store Connect (sandbox):** in Edit Scheme › Run › Options, set StoreKit Configuration to *None*. Sign in with a Sandbox Apple Account on the iPhone (Settings › Developer › Sandbox Apple Account on iOS 18 and later; Settings › App Store on iOS 17), then run from Xcode or TestFlight.
 
-**Unit tests:** `StoreKitPurchaseServiceTests` uses `SKTestSession` with the same `.storekit` file to check plan loading, the trial and a purchase. Run them from Xcode (⌘U). Hosted CI runners can't configure StoreKit's test daemon, so CI skips those two tests and covers the paywall's purchase, pending and restore paths through `PaywallModelTests`, which uses a fake backend.
+**Unit tests:** `StoreKitPurchaseServiceTests` uses `SKTestSession` with the same `.storekit` file to check plan loading, the trial, a subscription purchase and a Lifetime purchase and restore. Run them from Xcode (⌘U). Hosted CI runners can't configure StoreKit's test daemon, so CI skips those tests and covers the paywall's purchase, pending and restore paths through `PaywallModelTests`, which uses a fake backend.
 
 ## Filters
 
@@ -125,14 +127,15 @@ A unit test renders reference colours through the app's Core Image pipeline and 
    | Premium Monthly | `snapper.premium.monthly` | 1 month | $3.99 | none |
 
    Give each one a display name and description, and a review screenshot of the paywall (the Simulator works).
-4. If you change product IDs or prices, update `AppConfig.swift` and `Config/Snapper.storekit` to match.
-5. **First submission:** submit the subscriptions together with app version 1.0. Select them on the version page under *In-App Purchases and Subscriptions*.
-6. **App Information:**
+4. **Monetization › In-App Purchases:** add a **Non-Consumable** with reference name *Premium Lifetime*, product ID `snapper.premium.lifetime` and price $39.99. Its description should say it covers all current and future looks and tools. Never move what it unlocks behind a subscription later.
+5. If you change product IDs or prices, update `AppConfig.swift` and `Config/Snapper.storekit` to match.
+6. **First submission:** submit the subscriptions and the Lifetime purchase together with app version 1.0. Select them on the version page under *In-App Purchases and Subscriptions*.
+7. **App Information:**
    - Privacy Policy URL: `https://jasonh-1.github.io/snapper/privacy.html`
    - Support URL: `https://jasonh-1.github.io/snapper/support.html`
    - Add `Terms of Use: https://jasonh-1.github.io/snapper/terms.html` to the app description. Apple requires a Terms link in the metadata for auto-renewable subscriptions.
-7. **App Privacy:** choose *Data Not Collected*. The app has no analytics, ads or tracking, and the privacy manifest is in `Snapper/Resources/PrivacyInfo.xcprivacy`.
-8. **GitHub Pages:** in the repo, go to Settings › Pages, choose *Deploy from a branch*, then `main` and `/docs`.
+8. **App Privacy:** choose *Data Not Collected*. The app has no analytics, ads or tracking, and the privacy manifest is in `Snapper/Resources/PrivacyInfo.xcprivacy`.
+9. **GitHub Pages:** in the repo, go to Settings › Pages, choose *Deploy from a branch*, then `main` and `/docs`.
 
 ## Before you submit
 
@@ -141,7 +144,7 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 - [ ] Replace `Snapper/Resources/Showcase/*.jpg` with your own high-resolution photos (1600 px or more) shot with consent. They appear in onboarding, on the paywall, and in the Simulator. The current ones are small public-domain stand-ins.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
-- [ ] App Review notes: "Onboarding opens the camera immediately. Six looks and one personal preset are free, with watermark-free exports. Premium looks and finishing can be previewed free; saving or sharing them requires Premium. Presets are under Looks › Presets; batch presets are under Library › Select › Style; frames and layouts are in Finish. The paywall has an × close button. Use a sandbox account to test the subscription."
+- [ ] App Review notes: "Onboarding opens the camera immediately. Eight looks, highlights, shadows, the date stamp and one personal preset are free, with watermark-free exports. Premium looks and tools can be previewed free; saving them as they are requires Premium, and any photo can be saved for free without its Premium parts. Presets are under Looks › Presets; batch presets are under Library › Select › Style; frames and layouts are in Finish. The paywall has an × close button. Use a sandbox account to test the subscriptions and the Lifetime purchase."
 
 ## How it's built
 

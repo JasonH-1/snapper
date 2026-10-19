@@ -27,6 +27,9 @@ struct CaptureRecord: Identifiable, Hashable, Sendable {
     /// The version last switched to or saved, to name what is showing
     /// ("Warm", or "Warm · Edited" once it has changed).
     var activeVersionID: UUID?
+    /// Edits with a Premium look or tools that were made while Premium was
+    /// active. They stay exportable after Premium ends.
+    var premiumEdits: [PhotoRecipe] = []
 
     init(id: UUID = UUID(), createdAt: Date = Date(), takenAt: Date? = nil, fileName: String,
          source: PhotoSource = .camera, isFrontCamera: Bool = false, recipe: PhotoRecipe,
@@ -73,7 +76,7 @@ struct CaptureRecord: Identifiable, Hashable, Sendable {
 extension CaptureRecord: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, takenAt, fileName, source, isFrontCamera, recipe, initialRecipe, savedRecipe
-        case versions, activeVersionID
+        case versions, activeVersionID, premiumEdits
         // Written by builds before the Library (look, strength and shape at the top level).
         case lookID, strength, aspect, savedLookID, savedStrength
     }
@@ -107,6 +110,7 @@ extension CaptureRecord: Codable {
         // A damaged version list shouldn't cost the photo itself.
         versions = (try? container.decodeIfPresent([PhotoVersion].self, forKey: .versions)) ?? []
         activeVersionID = try? container.decodeIfPresent(UUID.self, forKey: .activeVersionID)
+        premiumEdits = (try? container.decodeIfPresent([PhotoRecipe].self, forKey: .premiumEdits)) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -122,6 +126,7 @@ extension CaptureRecord: Codable {
         try container.encodeIfPresent(savedRecipe, forKey: .savedRecipe)
         if !versions.isEmpty { try container.encode(versions, forKey: .versions) }
         try container.encodeIfPresent(activeVersionID, forKey: .activeVersionID)
+        if !premiumEdits.isEmpty { try container.encode(premiumEdits, forKey: .premiumEdits) }
     }
 }
 

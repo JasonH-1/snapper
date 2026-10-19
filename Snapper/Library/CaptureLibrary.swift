@@ -18,8 +18,12 @@ final class CaptureLibrary {
     var latestThumbnail: UIImage? { latest.flatMap { thumbnails[$0.id] } }
 
     @ObservationIgnored let renderer: PhotoRenderer
+    /// Whether Premium is active, set by the app. Premium edits made while it
+    /// is are remembered so they stay exportable after Premium ends.
+    @ObservationIgnored var hasPremium: () -> Bool = { false }
     @ObservationIgnored private let store: CaptureStore
     @ObservationIgnored private let library: LookLibrary
+    @ObservationIgnored private let photoSaver: @Sendable (URL, URL?) async throws -> Void
     @ObservationIgnored private var pendingCaptures = 0
     @ObservationIgnored private var persistTask: Task<Void, Never>?
     @ObservationIgnored private var thumbnailRequests: Set<UUID> = []
@@ -30,10 +34,14 @@ final class CaptureLibrary {
     /// their grid cell comes back on screen.
     static let maxThumbnails = 180
 
-    init(library: LookLibrary, renderer: PhotoRenderer, store: CaptureStore = .default) {
+    /// - Parameter photoSaver: adds a rendered file (and optionally the
+    ///   original) to Photos; tests replace it.
+    init(library: LookLibrary, renderer: PhotoRenderer, store: CaptureStore = .default,
+         photoSaver: @escaping @Sendable (URL, URL?) async throws -> Void = PhotoLibrarySaver.save(fileURL:originalURL:)) {
         self.library = library
         self.renderer = renderer
         self.store = store
+        self.photoSaver = photoSaver
     }
 
     func load() async {
@@ -53,6 +61,46 @@ final class CaptureLibrary {
 
     func look(for record: CaptureRecord) -> Look {
         library.look(id: record.lookID) ?? .original
+    }
+
+    // MARK: - Premium
+
+    /// Whether `recipe` uses a Premium look or Premium tools.
+    func usesPremium(_ recipe: PhotoRecipe) -> Bool {
+        (library.look(id: recipe.lookID)?.isPremium ?? false) || recipe.requiresPremium
+    }
+
+    /// Whether exporting `recipe` of `record` needs Premium: it uses a Premium
+    /// look or tools and wasn't made while Premium was active.
+    func needsPremium(_ recipe: PhotoRecipe, of record: CaptureRecord) -> Bool {
+        usesPremium(recipe) && !record.premiumEdits.contains(recipe)
+    }
+
+    /// `recipe` without its Premium look and tools, which anyone can save.
+    func freeVersion(of recipe: PhotoRecipe) -> PhotoRecipe {
+        recipe.withoutPremium(lookIsPremium: library.look(id: recipe.lookID)?.isPremium ?? false)
+    }
+
+    /// What saving `recipe` without Premium leaves out: the look, if it is a
+    /// Premium one, and whether Premium tools are used.
+    func premiumParts(of recipe: PhotoRecipe) -> (look: Look?, usesTools: Bool) {
+        let look = library.look(id: recipe.lookID).flatMap { $0.isPremium ? $0 : nil }
+        return (look, recipe.requiresPremium)
+    }
+
+    /// While Premium is active, remembers every Premium edit the photo holds
+    /// (the current one, the one it arrived with and its versions). Nothing
+    /// is forgotten while Premium is off, so going back to such an edit later
+    /// still exports.
+    private func notePremiumEdits(at index: Int) {
+        guard hasPremium() else { return }
+        let record = records[index]
+        var kept: [PhotoRecipe] = []
+        for recipe in [record.recipe, record.initialRecipe] + record.versions.map(\.recipe)
+            where usesPremium(recipe) && !kept.contains(recipe) {
+            kept.append(recipe)
+        }
+        records[index].premiumEdits = kept
     }
 
     // MARK: - Adding
@@ -78,9 +126,10 @@ final class CaptureLibrary {
         recipe.lookID = look.id
         recipe.crop = PhotoCrop(shape: CropShape(cameraAspect: photo.aspect))
         recipe.finish = .none
-        let record = CaptureRecord(id: id, fileName: fileName, source: .camera, isFrontCamera: photo.isFrontCamera,
-                                   recipe: recipe)
-        records.insert(record, at: 0)
+        records.insert(CaptureRecord(id: id, fileName: fileName, source: .camera, isFrontCamera: photo.isFrontCamera,
+                                     recipe: recipe), at: 0)
+        notePremiumEdits(at: 0)
+        let record = records[0]
         await refreshThumbnail(for: record)
         persist()
         return record
@@ -127,6 +176,7 @@ final class CaptureLibrary {
     func updateRecipe(id: UUID, _ recipe: PhotoRecipe) {
         guard let index = records.firstIndex(where: { $0.id == id }), records[index].recipe != recipe else { return }
         records[index].recipe = recipe
+        notePremiumEdits(at: index)
         persist()
         let record = records[index]
         Task { await refreshThumbnail(for: record) }
@@ -157,6 +207,7 @@ final class CaptureLibrary {
         let version = PhotoVersion(name: name, recipe: recipe)
         records[index].versions.append(version)
         records[index].activeVersionID = version.id
+        notePremiumEdits(at: index)
         persist()
         return version
     }
@@ -167,6 +218,7 @@ final class CaptureLibrary {
               let versionIndex = records[index].versions.firstIndex(where: { $0.id == versionID }) else { return }
         records[index].versions[versionIndex].recipe = recipe
         records[index].activeVersionID = versionID
+        notePremiumEdits(at: index)
         persist()
     }
 
@@ -197,6 +249,7 @@ final class CaptureLibrary {
     func markSaved(id: UUID, recipe: PhotoRecipe? = nil) {
         guard let index = records.firstIndex(where: { $0.id == id }) else { return }
         records[index].savedRecipe = recipe ?? records[index].recipe
+        notePremiumEdits(at: index)
         persist()
     }
 
@@ -309,7 +362,7 @@ final class CaptureLibrary {
         }
         defer { try? FileManager.default.removeItem(at: export.url.deletingLastPathComponent()) }
         let original = includeOriginal ? store.url(for: record) : nil
-        try await PhotoLibrarySaver.save(fileURL: export.url, originalURL: original)
+        try await photoSaver(export.url, original)
         markSaved(id: record.id, recipe: export.recipe)
     }
 

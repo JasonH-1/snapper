@@ -35,6 +35,10 @@ final class PaywallModel: Identifiable {
     private(set) var isPurchasing = false
     private(set) var isRestoring = false
     private(set) var didUnlock = false
+    /// Lifetime is now owned while a subscription is still set to renew.
+    /// Nothing is cancelled for the person, so the paywall stays open to say
+    /// the subscription keeps renewing until they cancel it.
+    private(set) var showsSubscriptionReminder = false
     var alert: Alert?
 
     @ObservationIgnored private let library: LookLibrary
@@ -51,7 +55,18 @@ final class PaywallModel: Identifiable {
         self.photoURL = photoURL
     }
 
-    var plans: [SubscriptionPlan] { store.plans }
+    /// Subscribers switching to Lifetime are offered only Lifetime.
+    var offersOnlyLifetime: Bool {
+        if case .switchToLifetime = context { true } else { false }
+    }
+
+    /// Whether the subscriber's current subscription will renew. Once they
+    /// have turned off auto-renew there is nothing left to tell them to cancel.
+    var subscriptionWillRenew: Bool { store.subscriptionWillRenew }
+
+    var plans: [SubscriptionPlan] {
+        offersOnlyLifetime ? store.plans.filter { !$0.period.renews } : store.plans
+    }
 
     var selectedPlan: SubscriptionPlan? {
         plans.first { $0.id == selectedPlanID } ?? plans.first
@@ -79,6 +94,8 @@ final class PaywallModel: Identifiable {
                 : String(localized: "Export your edits with Premium")
         case .intro, .upgrade:
             String(localized: "Your style, in every photo")
+        case .switchToLifetime:
+            String(localized: "Keep Premium for good")
         }
     }
 
@@ -89,7 +106,7 @@ final class PaywallModel: Identifiable {
         await loadSlides()
         await plansTask.value
         if selectedPlanID == nil {
-            selectedPlanID = store.plans.first?.id
+            selectedPlanID = plans.first?.id
         }
     }
 
@@ -141,7 +158,11 @@ final class PaywallModel: Identifiable {
         do {
             switch try await store.purchase(plan) {
             case .purchased:
-                didUnlock = store.isPremium
+                if store.ownsLifetimeWithRenewingSubscription {
+                    showsSubscriptionReminder = true
+                } else {
+                    didUnlock = store.isPremium
+                }
             case .pending:
                 alert = .pending
             case .cancelled:
@@ -158,9 +179,14 @@ final class PaywallModel: Identifiable {
         isRestoring = true
         defer { isRestoring = false }
         do {
-            if try await store.restore() {
+            let isPremium = try await store.restore()
+            if store.ownsLifetimeWithRenewingSubscription {
+                showsSubscriptionReminder = true
+            } else if isPremium && (!offersOnlyLifetime || store.ownsLifetime) {
                 didUnlock = true
             } else {
+                // Nothing found or, when switching to Lifetime, only the
+                // subscription the person already has.
                 alert = .nothingToRestore
             }
         } catch {

@@ -31,7 +31,10 @@ These looks are featured with tips, not newly validated against human subjects. 
 
 - [ ] Test the oldest supported available iPhone plus a recent model, in portrait/landscape and at the largest accessibility text sizes.
 - [ ] Time cold launch, first usable preview and shutter-to-save. Run repeated shots for 10 minutes and check heat, memory, dropped frames and interruptions. Capture a baseline before accepting regressions.
-- [ ] Check all six free looks export without a watermark through automatic save, editor save/share and batch save/share.
+- [ ] Check all eight free looks export without a watermark through automatic save, editor save/share and batch save/share.
+- [ ] Without Premium, shoot with a Premium look and with a Premium preset: automatic save adds the photo without them, and the editor's Save Without button and the Library's batch dialog save it too.
+- [ ] Buy Lifetime in sandbox, delete and reinstall, then Restore Purchases. Expire a subscription and confirm photos edited while it was active still save as edited.
+- [ ] As a monthly or yearly subscriber, open Settings › Switch to Lifetime and buy it. The paywall offers only Lifetime, then says the subscription keeps renewing and offers Manage Subscription; nothing is cancelled automatically. Afterwards Settings shows Lifetime and no longer offers the switch. Turn off auto-renew: Settings drops the cancel footer and the Manage Subscription row while Premium stays. A subscriber who already turned off auto-renew sees "Your subscription won't renew" on the switch paywall and gets no reminder after buying.
 - [ ] On a fresh install, onboarding opens the camera; no automatic purchase screen blocks the first photo. Denied Photos access must not trigger a successful-save offer.
 - [ ] Save a preset, relaunch, rename, duplicate, delete and apply it. Crops, rotations and frames must stay unchanged. An invalid name must not erase anything.
 - [ ] Apply a preset to a mixed portrait/landscape batch. Undo it. Edit one photo after the batch and verify batch undo preserves that later edit.

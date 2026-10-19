@@ -63,6 +63,17 @@ final class LibraryModel: Identifiable {
         let urls: [URL]
     }
 
+    /// A batch save or share that includes photos needing Premium, waiting
+    /// for the person to save them without their Premium parts or unlock.
+    struct LockedExport: Identifiable {
+        enum Action { case save, share }
+
+        let id = UUID()
+        let action: Action
+        let records: [CaptureRecord]
+        let lockedCount: Int
+    }
+
     /// Progress while picked photos are copied in.
     struct ImportProgress: Equatable {
         var total: Int
@@ -92,6 +103,7 @@ final class LibraryModel: Identifiable {
     var editor: EditorModel?
     var alert: Alert?
     var shareItems: ShareItems?
+    var lockedExport: LockedExport?
     var isChoosingLook = false
     var isChoosingPreset = false
     /// Session-only color clipboard; never includes crop, frame, or date.
@@ -281,29 +293,76 @@ final class LibraryModel: Identifiable {
         records.filter { selection.contains($0.id) }
     }
 
-    private func isLocked(_ record: CaptureRecord) -> Bool {
-        (captures.look(for: record).isPremium || record.recipe.requiresPremium) && !hasPremium()
+    func isLocked(_ record: CaptureRecord) -> Bool {
+        !hasPremium() && captures.needsPremium(record.recipe, of: record)
     }
 
     // MARK: - Batch actions
 
+    /// Shares the selection, first asking about any photos that need Premium.
     func shareSelected() {
-        let chosen = selectedRecords
-        let allowed = chosen.filter { !isLocked($0) }
         guard !isWorking else { return }
-        guard !allowed.isEmpty else {
-            if let first = chosen.first { requestPremium(captures.look(for: first), nil, captures.thumbnails[first.id]) }
+        let chosen = selectedRecords
+        let locked = chosen.filter(isLocked).count
+        guard locked == 0 else {
+            lockedExport = LockedExport(action: .share, records: chosen, lockedCount: locked)
             return
         }
+        share(chosen)
+    }
+
+    /// Saves the selection, first asking about any photos that need Premium.
+    func saveSelected() {
+        guard !isWorking else { return }
+        let chosen = selectedRecords
+        let locked = chosen.filter(isLocked).count
+        guard locked == 0 else {
+            lockedExport = LockedExport(action: .save, records: chosen, lockedCount: locked)
+            return
+        }
+        save(chosen)
+    }
+
+    /// Goes ahead with a waiting batch, saving or sharing the photos that
+    /// need Premium without their Premium looks and tools.
+    func exportWithoutPremium(_ pending: LockedExport) {
+        lockedExport = nil
+        let records = pending.records.compactMap { captures.record(id: $0.id) }
+        switch pending.action {
+        case .save: save(records)
+        case .share: share(records)
+        }
+    }
+
+    /// Shows Premium for a waiting batch instead.
+    func unlock(_ pending: LockedExport) {
+        lockedExport = nil
+        if let first = pending.records.first(where: isLocked) {
+            requestPremium(captures.look(for: first), nil, captures.thumbnails[first.id])
+        }
+    }
+
+    /// What to export for `record`: its edit, or the edit without its Premium
+    /// parts when it needs Premium.
+    private func exportRecipe(for record: CaptureRecord) -> PhotoRecipe? {
+        isLocked(record) ? captures.freeVersion(of: record.recipe) : nil
+    }
+
+    private func share(_ records: [CaptureRecord]) {
+        guard !isWorking, !records.isEmpty else { return }
         isWorking = true
-        let watermark = false
         let options = settings.exportOptions
+        let freeCount = records.filter(isLocked).count
         Task {
             defer { isWorking = false }
             do {
-                shareItems = ShareItems(urls: try await captures.exportForSharing(allowed, watermark: watermark, options: options))
-                if allowed.count < chosen.count {
-                    show(String(localized: "Photos with Premium looks or edits were left out."))
+                var urls: [URL] = []
+                for record in records {
+                    urls.append(try await captures.prepareExport(record, recipe: exportRecipe(for: record), options: options).url)
+                }
+                shareItems = ShareItems(urls: urls)
+                if freeCount > 0 {
+                    show(String(localized: "\(Self.photoCount(freeCount)) shared without Premium looks or tools."))
                 }
             } catch {
                 alert = .error(error.localizedDescription)
@@ -311,30 +370,24 @@ final class LibraryModel: Identifiable {
         }
     }
 
-    func saveSelected() {
-        let chosen = selectedRecords
-        let allowed = chosen.filter { !isLocked($0) }
-        guard !isWorking else { return }
-        guard !allowed.isEmpty else {
-            if let first = chosen.first { requestPremium(captures.look(for: first), nil, captures.thumbnails[first.id]) }
-            return
-        }
+    private func save(_ records: [CaptureRecord]) {
+        guard !isWorking, !records.isEmpty else { return }
         isWorking = true
-        let watermark = false
         let includeOriginal = settings.alsoSaveOriginal
         let options = settings.exportOptions
         Task {
             defer { isWorking = false }
             var saved = 0
+            var savedFree = 0
             do {
-                for record in allowed {
-                    try await captures.saveToPhotos(record, watermark: watermark, includeOriginal: includeOriginal,
-                                                    options: options)
+                for record in records {
+                    let recipe = exportRecipe(for: record)
+                    try await captures.saveToPhotos(record, recipe: recipe, includeOriginal: includeOriginal, options: options)
                     saved += 1
+                    if recipe != nil { savedFree += 1 }
                 }
-                let skipped = chosen.count - allowed.count
-                show(skipped > 0
-                     ? String(localized: "Saved \(Self.photoCount(saved)). Premium looks and edits need Premium to save.")
+                show(savedFree > 0
+                     ? String(localized: "Saved \(Self.photoCount(saved)). \(savedFree) without Premium looks or tools.")
                      : String(localized: "Saved \(Self.photoCount(saved)) to Photos"))
                 isSelecting = false
             } catch PhotoLibrarySaver.SaveError.notAuthorized {

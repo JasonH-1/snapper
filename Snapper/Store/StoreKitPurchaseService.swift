@@ -10,18 +10,22 @@ final class StoreKitPurchaseService: PurchaseService {
     private(set) var isPremium: Bool {
         didSet { UserDefaults.standard.set(isPremium, forKey: Self.cacheKey) }
     }
+    private(set) var ownsLifetime = false
+    private(set) var hasActiveSubscription = false
+    private(set) var subscriptionWillRenew = false
     private(set) var plans: [SubscriptionPlan] = []
     private(set) var plansState: PlansState = .idle
 
     @ObservationIgnored private var products: [String: Product] = [:]
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
+    @ObservationIgnored private var statusUpdatesTask: Task<Void, Never>?
     @ObservationIgnored private let productIDs: [String]
 
     /// Last known entitlement, so the UI is right at launch before StoreKit
     /// answers. StoreKit's verified entitlements always win.
     private static let cacheKey = "store.cachedPremium"
 
-    init(productIDs: [String] = AppConfig.subscriptionProductIDs) {
+    init(productIDs: [String] = AppConfig.premiumProductIDs) {
         self.productIDs = productIDs
         isPremium = UserDefaults.standard.bool(forKey: Self.cacheKey)
     }
@@ -33,6 +37,13 @@ final class StoreKitPurchaseService: PurchaseService {
         updatesTask = Task { [weak self] in
             for await update in Transaction.updates {
                 await self?.process(update)
+            }
+        }
+        // Turning auto-renew off or back on changes only the renewal info,
+        // which arrives here rather than as a transaction.
+        statusUpdatesTask = Task { [weak self] in
+            for await _ in Product.SubscriptionInfo.Status.updates {
+                await self?.refreshEntitlements()
             }
         }
         Task { await refreshEntitlements() }
@@ -52,9 +63,9 @@ final class StoreKitPurchaseService: PurchaseService {
                     loaded.append(plan)
                 }
             }
-            // Yearly first, then by price.
+            // Yearly first, then by price (monthly, then lifetime).
             loaded.sort { lhs, rhs in
-                if lhs.period != rhs.period { return lhs.period == .year }
+                if (lhs.period == .year) != (rhs.period == .year) { return lhs.period == .year }
                 return lhs.price < rhs.price
             }
             guard !loaded.isEmpty else {
@@ -71,7 +82,16 @@ final class StoreKitPurchaseService: PurchaseService {
     }
 
     private func makePlan(from product: Product) async -> SubscriptionPlan? {
-        guard let subscription = product.subscription else { return nil }
+        guard let subscription = product.subscription else {
+            guard product.type == .nonConsumable else { return nil }
+            return SubscriptionPlan(id: product.id,
+                                    displayName: product.displayName,
+                                    displayPrice: product.displayPrice,
+                                    price: product.price,
+                                    period: .lifetime,
+                                    freeTrial: nil,
+                                    monthlyEquivalent: nil)
+        }
         let period = Self.period(of: subscription.subscriptionPeriod)
         var trial: SubscriptionPlan.FreeTrial?
         if let offer = subscription.introductoryOffer,
@@ -176,18 +196,40 @@ final class StoreKitPurchaseService: PurchaseService {
 
     // MARK: - Entitlements
 
+    /// Premium is active while Lifetime is owned or a subscription is current.
+    /// Lifetime has no expiry, so only a refund (revocation) takes it away.
     func refreshEntitlements() async {
-        var active = false
+        var lifetime = false
+        var subscribed = false
+        var renews = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
                   productIDs.contains(transaction.productID),
                   transaction.revocationDate == nil else { continue }
+            if transaction.productType == .nonConsumable {
+                lifetime = true
+                continue
+            }
             if let expiration = transaction.expirationDate, expiration < Date() { continue }
-            active = true
+            subscribed = true
+            if await Self.willRenew(transaction) { renews = true }
         }
+        if ownsLifetime != lifetime { ownsLifetime = lifetime }
+        if hasActiveSubscription != subscribed { hasActiveSubscription = subscribed }
+        if subscriptionWillRenew != renews { subscriptionWillRenew = renews }
+        let active = lifetime || subscribed
         if isPremium != active {
             isPremium = active
         }
+    }
+
+    /// Whether the subscription behind `transaction` is set to renew, from its
+    /// group's renewal info. If that can't be read, assume it renews, so the
+    /// person still hears how to cancel it.
+    private static func willRenew(_ transaction: Transaction) async -> Bool {
+        guard let status = await transaction.subscriptionStatus,
+              case .verified(let renewal) = status.renewalInfo else { return true }
+        return renewal.willAutoRenew
     }
 
     private func process(_ update: VerificationResult<Transaction>) async {

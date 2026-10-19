@@ -9,12 +9,15 @@ enum PaywallContext: Identifiable {
     case lockedLook(Look, before: UIImage?, after: UIImage?)
     /// Tapped an upgrade entry point (camera badge, settings, watermark note).
     case upgrade
+    /// A subscriber chose Switch to Lifetime in Settings: only Lifetime is offered.
+    case switchToLifetime
 
     var id: String {
         switch self {
         case .intro: "intro"
         case .lockedLook(let look, _, _): "locked-\(look.id)"
         case .upgrade: "upgrade"
+        case .switchToLifetime: "switch-to-lifetime"
         }
     }
 }
@@ -81,6 +84,7 @@ final class AppModel {
         self.camera = CameraModel(library: library)
         self.captures = CaptureLibrary(library: library, renderer: renderer)
 
+        captures.hasPremium = { [weak self] in self?.hasPremium ?? false }
         camera.setLookOrder(settings.orderedLooks(from: library))
         if let id = settings.lastLookID, let look = library.look(id: id) {
             camera.select(look)
@@ -130,21 +134,25 @@ final class AppModel {
             do {
                 let record = try await captures.add(photo, look: look)
                 guard settings.autoSaveToPhotos else { return }
-                if (look.isPremium || record.recipe.requiresPremium) && !hasPremium {
-                    guard lockedLooksExplained.insert(look.id).inserted else { return }
-                    let message = record.recipe.adjustments.requiresPremium
-                        ? String(localized: "This photo uses Premium edits. It is kept in Snapper Library; unlock Premium to export it.")
-                        : String(localized: "\(look.name) is a Premium look. Unlock it to save to Photos.")
-                    show(Toast(message: message,
-                               symbol: "lock.fill", action: .showPaywall, actionTitle: String(localized: "Unlock")))
-                    return
-                }
                 guard PhotoLibrarySaver.isAuthorized || PhotoLibrarySaver.canAsk else {
                     warnAboutPhotosAccess()
                     return
                 }
-                try await captures.saveToPhotos(record, watermark: false, includeOriginal: settings.alsoSaveOriginal,
-                                                format: settings.photoFormat)
+                // A shot with a previewed Premium look or tools is still saved,
+                // without those parts; the Library keeps the full edit.
+                let isLocked = !hasPremium && captures.needsPremium(record.recipe, of: record)
+                try await captures.saveToPhotos(record, recipe: isLocked ? captures.freeVersion(of: record.recipe) : nil,
+                                                includeOriginal: settings.alsoSaveOriginal,
+                                                options: ExportOptions(format: settings.photoFormat))
+                if isLocked {
+                    guard lockedLooksExplained.insert(look.id).inserted else { return }
+                    let message = captures.premiumParts(of: record.recipe).look != nil
+                        ? String(localized: "Saved to Photos without \(look.name), a Premium look. Snapper Library keeps the full look.")
+                        : String(localized: "Saved to Photos without its Premium tools. Snapper Library keeps the full edit.")
+                    show(Toast(message: message,
+                               symbol: "lock.fill", action: .showPaywall, actionTitle: String(localized: "Unlock")))
+                    return
+                }
                 if !hasPremium && !settings.hasSeenIntroPaywall {
                     settings.hasSeenIntroPaywall = true
                     show(Toast(message: String(localized: "Photo saved. Make your next style your own."),
