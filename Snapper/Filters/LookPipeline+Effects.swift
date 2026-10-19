@@ -27,6 +27,14 @@ extension LookPipeline {
         if let gradient = effects.gradient {
             output = applyGradient(gradient, strength: strength, to: output)
         }
+        // Smear before flash: it streaks the scene's own lights, not faces
+        // the flash has brightened.
+        if let smear = effects.smear {
+            output = applySmear(smear, strength: strength, unit: unit, to: output)
+        }
+        if let flash = effects.flash {
+            output = applyFlash(flash, strength: strength, to: output)
+        }
         if let glow = effects.glow {
             output = applyGlow(glow, strength: strength, unit: unit, to: output)
         }
@@ -48,6 +56,10 @@ extension LookPipeline {
         }
         if let scanlines = effects.scanlines {
             output = applyScanlines(scanlines, strength: strength, unit: unit, to: output)
+        }
+        // Before noise and grain, so the sharpening doesn't crunch them too.
+        if let sharpen = effects.sharpen {
+            output = applySharpen(sharpen, strength: strength, unit: unit, to: output)
         }
         if let noise = effects.noise {
             output = applyNoise(noise, strength: strength, unit: unit, seed: seed, to: output)
@@ -72,16 +84,6 @@ extension LookPipeline {
         guard exposure > 0.001 || tint > 0.001 else { return image }
         let extent = image.extent
 
-        // Per-channel gains: brighter, and towards a unit-luminance tint colour.
-        let gain = pow(2, exposure)
-        let color = LookEffects.tintColor(hue: gradient.tintHue)
-        let adjust = CIFilter.colorMatrix()
-        adjust.inputImage = image
-        adjust.rVector = CIVector(x: gain * (1 - tint + tint * CGFloat(color.r)), y: 0, z: 0, w: 0)
-        adjust.gVector = CIVector(x: 0, y: gain * (1 - tint + tint * CGFloat(color.g)), z: 0, w: 0)
-        adjust.bVector = CIVector(x: 0, y: 0, z: gain * (1 - tint + tint * CGFloat(color.b)), w: 0)
-        adjust.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
-
         // White at the top edge, black at `size` of the height.
         let size = CGFloat(min(max(gradient.size, 0.01), 1))
         let ramp = CIFilter.linearGradient()
@@ -91,10 +93,97 @@ extension LookPipeline {
         ramp.color1 = CIColor(red: 0, green: 0, blue: 0)
 
         let blend = CIFilter.blendWithMask()
-        blend.inputImage = adjust.outputImage
+        blend.inputImage = exposed(image, stops: exposure, tintHue: gradient.tintHue, tint: tint)
         blend.backgroundImage = image
         blend.maskImage = ramp.outputImage?.cropped(to: extent)
         return blend.outputImage ?? image
+    }
+
+    /// Direct on-camera flash: the middle of the frame (a little above
+    /// centre, where faces usually are) is brightened and cooled, and the
+    /// light falls off quickly to a darker background.
+    private static func applyFlash(_ flash: LookEffects.Flash, strength: CGFloat, to image: CIImage) -> CIImage {
+        let lift = CGFloat(flash.exposure) * strength
+        let drop = CGFloat(flash.falloff) * strength
+        let tint = CGFloat(min(max(flash.tint, 0), 1)) * strength
+        guard lift > 0.001 || drop > 0.001 || tint > 0.001 else { return image }
+        let extent = image.extent
+
+        // White where the flash lands, black where it has fallen off.
+        let reach = CGFloat(min(max(flash.radius, 0.05), 2)) * hypot(extent.width, extent.height) / 2
+        let mask = CIFilter.radialGradient()
+        mask.center = CGPoint(x: extent.midX, y: extent.midY + extent.height * 0.08)
+        mask.radius0 = Float(reach * 0.15)
+        mask.radius1 = Float(reach)
+        mask.color0 = CIColor(red: 1, green: 1, blue: 1)
+        mask.color1 = CIColor(red: 0, green: 0, blue: 0)
+
+        let blend = CIFilter.blendWithMask()
+        blend.inputImage = exposed(image, stops: lift, tintHue: flash.tintHue, tint: tint)
+        blend.backgroundImage = scaled(image, by: pow(2, -drop))
+        blend.maskImage = mask.outputImage?.cropped(to: extent)
+        return blend.outputImage ?? image
+    }
+
+    /// CCD smear: light above the threshold is stretched into vertical
+    /// streaks and screened back over the image. It is blurred at a quarter
+    /// of the size, which looks the same for such long, soft streaks.
+    private static func applySmear(_ smear: LookEffects.Smear, strength: CGFloat, unit: CGFloat, to image: CIImage) -> CIImage {
+        let intensity = CGFloat(smear.intensity) * strength
+        let length = CGFloat(smear.length) * unit
+        guard intensity > 0.001, length > 2 else { return image }
+        let extent = image.extent
+        let threshold = CGFloat(min(max(smear.threshold, 0), 0.99))
+        let gain = 1 / (1 - threshold)
+
+        let bright = CIFilter.colorMatrix()
+        bright.inputImage = image
+        bright.rVector = CIVector(x: gain, y: 0, z: 0, w: 0)
+        bright.gVector = CIVector(x: 0, y: gain, z: 0, w: 0)
+        bright.bVector = CIVector(x: 0, y: 0, z: gain, w: 0)
+        bright.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
+        bright.biasVector = CIVector(x: -threshold * gain, y: -threshold * gain, z: -threshold * gain, w: 0)
+        guard var light = clamped(bright.outputImage) else { return image }
+        if smear.tint > 0.001 {
+            light = tinted(light, hue: smear.tintHue, amount: CGFloat(min(smear.tint, 1)))
+        }
+
+        let factor: CGFloat = 0.25
+        let blur = CIFilter.motionBlur()
+        blur.inputImage = light.clampedToExtent().transformed(by: CGAffineTransform(scaleX: factor, y: factor))
+        blur.radius = Float(length * factor)
+        blur.angle = .pi / 2
+        guard let streaks = blur.outputImage?
+            .transformed(by: CGAffineTransform(scaleX: 1 / factor, y: 1 / factor))
+            .cropped(to: extent) else { return image }
+        return screened(scaled(streaks, by: intensity), over: image)
+    }
+
+    /// Unsharp mask, strong enough to leave the bright and dark edge halos
+    /// of an old digital camera's processing.
+    private static func applySharpen(_ sharpen: LookEffects.Sharpen, strength: CGFloat, unit: CGFloat,
+                                     to image: CIImage) -> CIImage {
+        let amount = CGFloat(sharpen.amount) * strength
+        guard amount > 0.001 else { return image }
+        let filter = CIFilter.unsharpMask()
+        filter.inputImage = image.clampedToExtent()
+        filter.radius = Float(max(CGFloat(sharpen.radius) * unit, 0.5))
+        filter.intensity = Float(amount)
+        return filter.outputImage?.cropped(to: image.extent) ?? image
+    }
+
+    /// The image `stops` brighter and pulled towards a unit-luminance tint
+    /// colour by `tint` (0…1), as per-channel gains.
+    private static func exposed(_ image: CIImage, stops: CGFloat, tintHue: Double, tint: CGFloat) -> CIImage {
+        let gain = pow(2, stops)
+        let color = LookEffects.tintColor(hue: tintHue)
+        let adjust = CIFilter.colorMatrix()
+        adjust.inputImage = image
+        adjust.rVector = CIVector(x: gain * (1 - tint + tint * CGFloat(color.r)), y: 0, z: 0, w: 0)
+        adjust.gVector = CIVector(x: 0, y: gain * (1 - tint + tint * CGFloat(color.g)), z: 0, w: 0)
+        adjust.bVector = CIVector(x: 0, y: 0, z: gain * (1 - tint + tint * CGFloat(color.b)), w: 0)
+        adjust.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
+        return adjust.outputImage ?? image
     }
 
     /// Keeps only light above the threshold, in its own (more saturated)

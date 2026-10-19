@@ -33,12 +33,13 @@ final class FreeTierTests: XCTestCase {
 
     func testEveryCollectionHasAFreeLook() throws {
         let library = LookLibrary.bundled()
-        for collection in ["disposable", "neon", "soft", "overclock", "darkroom"] {
+        for collection in ["disposable", "neon", "soft", "overclock", "darkroom", "digicam"] {
             XCTAssertTrue(library.freeLooks.contains { $0.collectionID == collection }, collection)
         }
         XCTAssertEqual(library.look(id: "instant")?.tier, .free)
         XCTAssertEqual(library.look(id: "signal")?.tier, .free)
-        XCTAssertEqual(library.freeLooks.count - 1, 8, "eight free looks besides Original")
+        XCTAssertEqual(library.look(id: "pocket")?.tier, .free)
+        XCTAssertEqual(library.freeLooks.count - 1, 9, "nine free looks besides Original")
     }
 
     func testFreeVersionRemovesOnlyThePremiumParts() {

@@ -55,6 +55,11 @@ final class PaywallModel: Identifiable {
         self.photoURL = photoURL
     }
 
+    /// The offer at the end of onboarding, which says plainly how to skip it.
+    var isIntro: Bool {
+        if case .intro = context { true } else { false }
+    }
+
     /// Subscribers switching to Lifetime are offered only Lifetime.
     var offersOnlyLifetime: Bool {
         if case .switchToLifetime = context { true } else { false }
@@ -92,7 +97,9 @@ final class PaywallModel: Identifiable {
             look.isPremium
                 ? String(localized: "Keep \(look.name) with Premium")
                 : String(localized: "Export your edits with Premium")
-        case .intro, .upgrade:
+        case .intro:
+            String(localized: "Try every look and tool")
+        case .upgrade:
             String(localized: "Your style, in every photo")
         case .switchToLifetime:
             String(localized: "Keep Premium for good")
@@ -127,9 +134,10 @@ final class PaywallModel: Identifiable {
         slides = result
     }
 
-    /// One premium look from each collection, each on a different photo.
+    /// One premium look from each collection, each on a different photo,
+    /// newest collection first.
     private func showcasePairs() -> [(Look, URL)] {
-        let preferred = ["sunburn", "neon", "peach", "lantern", "honey", "arcade"]
+        let preferred = ["afterparty", "sunburn", "neon", "peach", "lantern", "honey", "arcade"]
         var looks = preferred.compactMap(library.look(id:)).filter(\.isPremium)
         if looks.isEmpty { looks = Array(library.premiumLooks.prefix(3)) }
         var seenCollections = Set<String>()

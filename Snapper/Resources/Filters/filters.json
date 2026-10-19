@@ -25,6 +25,11 @@
       "id": "darkroom",
       "name": "Darkroom",
       "tagline": "Grain, halation and faded colour from old film and shoebox prints."
+    },
+    {
+      "id": "digicam",
+      "name": "Digicam",
+      "tagline": "Harsh flash, cool skin and crunchy pixels from a 2000s pocket camera."
     }
   ],
   "looks": [
@@ -483,6 +488,169 @@
         "vignette": {
           "intensity": 0.7,
           "radius": 0.7
+        }
+      }
+    },
+    {
+      "id": "pocket",
+      "name": "Pocket",
+      "collection": "digicam",
+      "lut": "pocket.cube",
+      "tier": "free",
+      "effects": {
+        "flash": {
+          "exposure": 0.25,
+          "falloff": 0.4,
+          "radius": 0.9,
+          "tint_hue": 240.0,
+          "tint": 0.05
+        },
+        "sharpen": {
+          "amount": 0.5,
+          "radius": 0.0015
+        },
+        "grain": {
+          "amount": 0.08,
+          "size": 0.0012,
+          "roughness": 0.2,
+          "color": 0.8
+        }
+      }
+    },
+    {
+      "id": "afterparty",
+      "name": "Afterparty",
+      "collection": "digicam",
+      "lut": "afterparty.cube",
+      "tier": "premium",
+      "effects": {
+        "flash": {
+          "exposure": 0.55,
+          "falloff": 1.6,
+          "radius": 0.65,
+          "tint_hue": 240.0,
+          "tint": 0.12
+        },
+        "smear": {
+          "threshold": 0.96,
+          "length": 0.2,
+          "intensity": 0.9,
+          "tint_hue": 300.0,
+          "tint": 0.2
+        },
+        "sharpen": {
+          "amount": 0.6,
+          "radius": 0.0015
+        },
+        "grain": {
+          "amount": 0.12,
+          "size": 0.0012,
+          "roughness": 0.3,
+          "color": 0.9
+        }
+      }
+    },
+    {
+      "id": "y2k",
+      "name": "Y2K",
+      "collection": "digicam",
+      "lut": "y2k.cube",
+      "tier": "premium",
+      "effects": {
+        "chromatic_aberration": {
+          "amount": 0.002
+        },
+        "sharpen": {
+          "amount": 0.7,
+          "radius": 0.0015
+        },
+        "grain": {
+          "amount": 0.06,
+          "size": 0.0012,
+          "roughness": 0.2,
+          "color": 0.8
+        }
+      }
+    },
+    {
+      "id": "memorycard",
+      "name": "Memory Card",
+      "collection": "digicam",
+      "lut": "memorycard.cube",
+      "tier": "premium",
+      "effects": {
+        "flash": {
+          "exposure": 0.3,
+          "falloff": 0.3,
+          "radius": 1.0,
+          "tint_hue": 240.0,
+          "tint": 0.05
+        },
+        "sharpen": {
+          "amount": 0.35,
+          "radius": 0.0015
+        },
+        "grain": {
+          "amount": 0.06,
+          "size": 0.0012,
+          "roughness": 0.2,
+          "color": 0.8
+        }
+      }
+    },
+    {
+      "id": "fluoro",
+      "name": "Fluoro",
+      "collection": "digicam",
+      "lut": "fluoro.cube",
+      "tier": "premium",
+      "effects": {
+        "flash": {
+          "exposure": 0.45,
+          "falloff": 0.9,
+          "radius": 0.8,
+          "tint_hue": 240.0,
+          "tint": 0.1
+        },
+        "sharpen": {
+          "amount": 0.5,
+          "radius": 0.0015
+        },
+        "grain": {
+          "amount": 0.1,
+          "size": 0.0012,
+          "roughness": 0.3,
+          "color": 0.8
+        }
+      }
+    },
+    {
+      "id": "lowbatt",
+      "name": "Low Batt",
+      "collection": "digicam",
+      "lut": "lowbatt.cube",
+      "tier": "premium",
+      "effects": {
+        "smear": {
+          "threshold": 0.93,
+          "length": 0.25,
+          "intensity": 1.2,
+          "tint_hue": 300.0,
+          "tint": 0.3
+        },
+        "sharpen": {
+          "amount": 0.4,
+          "radius": 0.0015
+        },
+        "grain": {
+          "amount": 0.22,
+          "size": 0.0016,
+          "roughness": 0.4,
+          "color": 1.0
+        },
+        "vignette": {
+          "intensity": 0.3,
+          "radius": 0.85
         }
       }
     }

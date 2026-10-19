@@ -52,7 +52,7 @@ struct OnboardingView: View {
             .padding(.horizontal, 24)
 
             pageText(title: Text("Find your look"),
-                     detail: Text("See your scene through each look before you take the shot. Start with eight free looks and save without a watermark."))
+                     detail: Text("See your scene through each look before you take the shot. Start with nine free looks and save without a watermark."))
         }
         .padding(.top, 24)
     }

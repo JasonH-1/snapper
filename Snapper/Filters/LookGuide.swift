@@ -1,6 +1,6 @@
 import Foundation
 
-/// Shooting guidance for the five featured looks. These are creative starting
+/// Shooting guidance for the featured looks. These are creative starting
 /// points, not claims that any filter can repair poor exposure or blur.
 struct LookGuide: Identifiable, Sendable {
     let id: String
@@ -17,6 +17,8 @@ struct LookGuide: Identifiable, Sendable {
                   tip: String(localized: "Include a bright sign or warm light in the scene. Hold steady and avoid underexposing faces.")),
         LookGuide(id: "halo", bestFor: String(localized: "Backlight · glowing highlights · film texture"),
                   tip: String(localized: "Try bright edges against a darker background. Use a lower strength when the glow feels too strong.")),
+        LookGuide(id: "pocket", bestFor: String(localized: "Flash · friends · 2000s digicam"),
+                  tip: String(localized: "Turn on the flash and get close. Add the date stamp when you finish the photo for the full digicam look.")),
     ]
     static func forLook(_ id: String) -> LookGuide? { featured.first { $0.id == id } }
 }

@@ -33,13 +33,16 @@
 # Lengths are fractions of the photo's shorter side. Omitted values use the
 # defaults in effects.py:
 #   gradient              size, exposure, tint_hue, tint   (graduated filter from the top)
+#   flash                 exposure, falloff, radius, tint_hue, tint   (direct on-camera flash)
 #   glow                  threshold, radius, intensity, saturation, tint_hue, tint
+#   smear                 threshold, length, intensity, tint_hue, tint   (CCD vertical streaks)
 #   halation              threshold, radius, intensity   (red-orange film halo)
 #   chromatic_aberration  amount
 #   chroma_bleed          radius
 #   glitch                slices, shift, rgb_split
 #   light_leak            intensity, size, tint_hue   (side/height vary per photo)
 #   scanlines             spacing, intensity
+#   sharpen               amount, radius   (crunchy in-camera sharpening)
 #   noise                 amount, size
 #   grain                 amount, size, roughness, color   (film grain)
 #   vignette              intensity, radius
@@ -63,6 +66,10 @@ tagline = "Neon glow, broken signals and chrome-edged colour from a future that 
 [collections.darkroom]
 name = "Darkroom"
 tagline = "Grain, halation and faded colour from old film and shoebox prints."
+
+[collections.digicam]
+name = "Digicam"
+tagline = "Harsh flash, cool skin and crunchy pixels from a 2000s pocket camera."
 
 # ---------------------------------------------------------------- Disposable
 
@@ -753,3 +760,179 @@ color = 0
 [look.effects.vignette]
 intensity = 0.7
 radius = 0.7
+
+# ---------------------------------------------------------------- Digicam
+# A 2000s compact digital camera: cool, pale skin, punchy blues, hard
+# digital highlight clipping, over-sharpened edges and colour noise. The
+# flash and smear effects carry most of the character.
+
+[[look]]
+id = "pocket"
+name = "Pocket"
+collection = "digicam"
+description = "The signature: cool, bright and crisp, like a camera from a 2005 handbag."
+temperature = -0.08
+tint = 0.02
+contrast = 0.2
+highlight_rolloff = 0.15
+saturation = 1.08
+hue_sat = { blue = 1.15, red = 1.05 }
+shadow_tint = { hue = 230, amount = 0.02 }
+skin_protect = 0.6
+
+[look.effects.flash]
+exposure = 0.25
+falloff = 0.4
+radius = 0.9
+tint = 0.05
+
+[look.effects.sharpen]
+amount = 0.5
+
+[look.effects.grain]
+amount = 0.08
+roughness = 0.2
+color = 0.8
+
+[[look]]
+id = "afterparty"
+name = "Afterparty"
+collection = "digicam"
+description = "Direct flash at night: bright faces, a black background, streaking lights."
+temperature = -0.1
+contrast = 0.35
+highlight_rolloff = 0.1
+saturation = 1.05
+shadow_tint = { hue = 250, amount = 0.03 }
+
+[look.effects.flash]
+exposure = 0.55
+falloff = 1.6
+radius = 0.65
+tint = 0.12
+
+[look.effects.smear]
+threshold = 0.96
+length = 0.2
+intensity = 0.9
+
+[look.effects.sharpen]
+amount = 0.6
+
+[look.effects.grain]
+amount = 0.12
+roughness = 0.3
+color = 0.9
+
+[[look]]
+id = "y2k"
+name = "Y2K"
+collection = "digicam"
+description = "Sunny-day digital: electric blues, punchy reds and clipped whites."
+temperature = -0.05
+contrast = 0.25
+highlight_rolloff = 0.1
+vibrance = 0.2
+saturation = 1.12
+hue_sat = { blue = 1.25, aqua = 1.2, red = 1.1, green = 1.05 }
+hue_shift = { blue = -8, green = 6 }
+
+[look.effects.chromatic_aberration]
+amount = 0.002
+
+[look.effects.sharpen]
+amount = 0.7
+
+[look.effects.grain]
+amount = 0.06
+roughness = 0.2
+color = 0.8
+
+[[look]]
+id = "memorycard"
+name = "Memory Card"
+collection = "digicam"
+description = "Airy and pastel: lifted, cool-pink and softly flashed."
+exposure = 0.15
+highlight_rolloff = 0.65
+contrast = -0.05
+curve = [[0, 0.06], [0.5, 0.55], [1, 0.97]]
+saturation = 0.9
+temperature = -0.08
+tint = 0.04
+highlight_tint = { hue = 340, amount = 0.02 }
+shadow_tint = { hue = 255, amount = 0.02 }
+
+[look.effects.flash]
+exposure = 0.3
+falloff = 0.3
+radius = 1.0
+tint = 0.05
+
+[look.effects.sharpen]
+amount = 0.35
+
+[look.effects.grain]
+amount = 0.06
+roughness = 0.2
+color = 0.8
+
+[[look]]
+id = "fluoro"
+name = "Fluoro"
+collection = "digicam"
+description = "Office-party flash under green strip lights."
+tint = -0.3
+temperature = -0.05
+contrast = 0.2
+highlight_rolloff = 0.2
+saturation = 0.95
+shadow_tint = { hue = 150, amount = 0.045 }
+highlight_tint = { hue = 120, amount = 0.015 }
+skin_protect = 0.4
+
+[look.effects.flash]
+exposure = 0.45
+falloff = 0.9
+radius = 0.8
+tint = 0.1
+
+[look.effects.sharpen]
+amount = 0.5
+
+[look.effects.grain]
+amount = 0.1
+roughness = 0.3
+color = 0.8
+
+[[look]]
+id = "lowbatt"
+name = "Low Batt"
+collection = "digicam"
+description = "A dying camera at 2am: dim, noisy, purple shadows and streaking lights."
+exposure = -0.2
+black = 0.03
+contrast = 0.15
+saturation = 0.85
+shadow_tint = { hue = 300, amount = 0.04 }
+highlight_tint = { hue = 200, amount = 0.015 }
+shadow_desat = 0.1
+
+[look.effects.smear]
+threshold = 0.93
+length = 0.25
+intensity = 1.2
+tint = 0.3
+
+[look.effects.sharpen]
+amount = 0.4
+
+[look.effects.grain]
+amount = 0.22
+size = 0.0016
+roughness = 0.4
+color = 1.0
+
+[look.effects.vignette]
+intensity = 0.3
+radius = 0.85

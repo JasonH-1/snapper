@@ -274,6 +274,15 @@ struct PaywallView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
+            // At the end of onboarding, skipping is as plain as subscribing.
+            if model.isIntro {
+                Button("Not Now", action: onClose)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityHint(Text("Start shooting with the free looks"))
+            }
         }
     }
 
