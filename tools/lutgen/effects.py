@@ -19,10 +19,18 @@ DEFAULTS: dict[str, dict[str, float]] = {
     # `tint_hue` (Oklab degrees, as for shadow_tint) by `tint` (0..1), fading
     # out at `size` of the height.
     "gradient": {"size": 0.5, "exposure": 0.4, "tint_hue": 240, "tint": 0.3},
+    # Direct on-camera flash: the middle of the frame (a little above centre)
+    # brightens by `exposure` stops and takes a cool cast (tint_hue, tint
+    # 0..1), falling off to `falloff` stops darker at `radius` of the
+    # half-diagonal.
+    "flash": {"exposure": 0.6, "falloff": 1.0, "radius": 0.8, "tint_hue": 240, "tint": 0.1},
     # Bright, saturated light (signs, screens) blooms in its own colour.
     # threshold: brightness 0..1 where the glow starts. tint (0..1) pulls the
     # glow towards tint_hue (Oklab degrees), e.g. cyan halos around white lamps.
     "glow": {"threshold": 0.6, "radius": 0.02, "intensity": 0.7, "saturation": 1.4, "tint_hue": 0, "tint": 0},
+    # CCD smear: light above `threshold` streaks up and down by `length`, as
+    # on an old digital camera's sensor; tint pulls it towards tint_hue.
+    "smear": {"threshold": 0.95, "length": 0.2, "intensity": 1.0, "tint_hue": 300, "tint": 0.2},
     # Film halation: a red-orange halo around bright light (light bouncing
     # off the film base through the red-sensitive layer; never blue).
     "halation": {"threshold": 0.7, "radius": 0.012, "intensity": 0.6},
@@ -42,6 +50,8 @@ DEFAULTS: dict[str, dict[str, float]] = {
     "light_leak": {"intensity": 0.6, "size": 0.45, "tint_hue": 45},
     # Dark horizontal lines, like a CRT or a paused tape.
     "scanlines": {"spacing": 0.006, "intensity": 0.22},
+    # Crunchy in-camera sharpening (unsharp mask); radius is the halo width.
+    "sharpen": {"amount": 0.6, "radius": 0.0015},
     # Fine luminance noise; size is one noise cell.
     "noise": {"amount": 0.12, "size": 0.0012},
     # Film grain: clumpy (roughness 0..1), strongest in mid-tones and shadows,

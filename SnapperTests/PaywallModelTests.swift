@@ -224,4 +224,34 @@ final class PaywallModelTests: XCTestCase {
         await model.restore()
         if case .nothingToRestore = model.alert {} else { XCTFail("expected the nothing-to-restore alert") }
     }
+
+    @MainActor
+    func testOnboardingOfferLeadsWithTheTrialAndTheNewestCollection() async {
+        let model = makeModel(store: FakePurchaseService(), context: .intro)
+        await model.load()
+        XCTAssertTrue(model.isIntro)
+        XCTAssertFalse(makeModel(store: FakePurchaseService()).isIntro)
+        XCTAssertEqual(model.selectedPlan?.freeTrial?.shortLabel, "7-Day", "the trial plan is preselected")
+        XCTAssertEqual(model.slides.first?.look.collectionID, "digicam")
+    }
+
+    @MainActor
+    func testFinishingOnboardingOffersPremiumOnceToFreeUsersOnly() throws {
+        for isPremium in [false, true] {
+            let name = "PaywallModelTests-\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+            defer { defaults.removePersistentDomain(forName: name) }
+            let store = FakePurchaseService()
+            store.isPremium = isPremium
+            let app = AppModel(store: store, settings: AppSettings(defaults: defaults))
+            XCTAssertTrue(app.needsOnboarding)
+            app.finishOnboarding()
+            XCTAssertFalse(app.needsOnboarding)
+            if isPremium {
+                XCTAssertNil(app.paywall, "subscribers go straight to the camera")
+            } else {
+                XCTAssertEqual(app.paywall?.context.id, "intro")
+            }
+        }
+    }
 }

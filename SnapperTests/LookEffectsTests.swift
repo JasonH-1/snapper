@@ -19,7 +19,10 @@ final class LookEffectsTests: XCTestCase {
          "scanlines": {"spacing": 0.02, "intensity": 0.3},
          "noise": {"amount": 0.2, "size": 0.01},
          "grain": {"amount": 0.3, "size": 0.01, "roughness": 0.5, "color": 0.2},
-         "vignette": {"intensity": 0.6, "radius": 0.8}}
+         "vignette": {"intensity": 0.6, "radius": 0.8},
+         "flash": {"exposure": 0.7, "falloff": 1.2, "radius": 0.7, "tint_hue": 240, "tint": 0.1},
+         "smear": {"threshold": 0.5, "length": 0.3, "intensity": 2, "tint_hue": 300, "tint": 0.2},
+         "sharpen": {"amount": 0.8, "radius": 0.02}}
         """
         return try JSONDecoder().decode(LookEffects.self, from: Data(json.utf8))
     }
@@ -51,6 +54,11 @@ final class LookEffectsTests: XCTestCase {
         XCTAssertEqual(effects.glow?.tintHue, 200)
         XCTAssertEqual(effects.gradient?.exposure, 0.6)
         XCTAssertEqual(effects.gradient?.tintHue, 230)
+        XCTAssertEqual(effects.flash?.falloff, 1.2)
+        XCTAssertEqual(effects.flash?.tintHue, 240)
+        XCTAssertEqual(effects.smear?.length, 0.3)
+        XCTAssertEqual(effects.smear?.tintHue, 300)
+        XCTAssertEqual(effects.sharpen?.amount, 0.8)
         XCTAssertFalse(effects.isEmpty)
         XCTAssertTrue(LookEffects.none.isEmpty)
     }
@@ -77,7 +85,8 @@ final class LookEffectsTests: XCTestCase {
     func testEffectLooksCarryTheirEffects() throws {
         let library = LookLibrary.bundled()
         let expected = ["overclock": ["overdrive", "redline", "signal", "chrome", "hologram"],
-                        "darkroom": ["halo", "crossroad", "instant", "leak", "grit", "heirloom"]]
+                        "darkroom": ["halo", "crossroad", "instant", "leak", "grit", "heirloom"],
+                        "digicam": ["pocket", "afterparty", "y2k", "memorycard", "fluoro", "lowbatt"]]
         for (collection, ids) in expected {
             for id in ids {
                 let look = try XCTUnwrap(library.looks.first { $0.id == id }, "\(id) missing from filters.json")
@@ -113,7 +122,8 @@ final class LookEffectsTests: XCTestCase {
             ("chroma_bleed", LookEffects(chromaBleed: all.chromaBleed)), ("glitch", LookEffects(glitch: all.glitch)),
             ("light_leak", LookEffects(lightLeak: all.lightLeak)), ("scanlines", LookEffects(scanlines: all.scanlines)),
             ("noise", LookEffects(noise: all.noise)), ("grain", LookEffects(grain: all.grain)),
-            ("vignette", LookEffects(vignette: all.vignette)),
+            ("vignette", LookEffects(vignette: all.vignette)), ("flash", LookEffects(flash: all.flash)),
+            ("smear", LookEffects(smear: all.smear)), ("sharpen", LookEffects(sharpen: all.sharpen)),
         ]
         let original = pixels(sample())
         for (name, effects) in single {
@@ -159,6 +169,39 @@ final class LookEffectsTests: XCTestCase {
         let near = (50 * 100 + 60) * 4 // just right of the light
         XCTAssertGreaterThan(bytes[near], 20, "a red halo appears")
         XCTAssertGreaterThan(bytes[near], bytes[near + 2], "red, never blue")
+    }
+
+    func testFlashLightsTheMiddleAndDarkensTheEdges() {
+        let grey = CIImage(color: CIColor(red: 0.3, green: 0.3, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let flash = LookEffects(flash: .init(exposure: 1, falloff: 1, radius: 0.7, tintHue: 240, tint: 0))
+        let before = pixels(grey), after = pixels(LookPipeline.applyEffects(flash, to: grey))
+        // Rows are top-down in the bitmap; the flash lands a little above centre.
+        let middle = (42 * 100 + 50) * 4, corner = 0
+        // One stop either way: sRGB 76 becomes about 107 and 54.
+        XCTAssertGreaterThan(after[middle], before[middle] + 20, "the subject is lit")
+        XCTAssertLessThan(after[corner], before[corner] - 15, "the background falls off")
+    }
+
+    func testSmearStreaksUpAndDownNotSideways() {
+        let black = CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let light = CIImage(color: CIColor(red: 1, green: 1, blue: 1)).cropped(to: CGRect(x: 45, y: 45, width: 10, height: 10))
+        let smear = LookEffects(smear: .init(threshold: 0.5, length: 0.3, intensity: 2, tintHue: 300, tint: 0))
+        let bytes = pixels(LookPipeline.applyEffects(smear, to: light.composited(over: black)))
+        let above = (25 * 100 + 50) * 4, beside = (50 * 100 + 75) * 4
+        XCTAssertGreaterThan(bytes[above], 20, "a streak reaches above the light")
+        XCTAssertGreaterThan(bytes[above], bytes[beside] + 15, "streaks are vertical")
+    }
+
+    func testSharpenOvershootsEdges() {
+        let dark = CIImage(color: CIColor(red: 0.3, green: 0.3, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 50, height: 40))
+        let light = CIImage(color: CIColor(red: 0.7, green: 0.7, blue: 0.7)).cropped(to: CGRect(x: 50, y: 0, width: 50, height: 40))
+        let edge = light.composited(over: dark)
+        let sharpen = LookEffects(sharpen: .init(amount: 1, radius: 0.05))
+        let before = pixels(edge), after = pixels(LookPipeline.applyEffects(sharpen, to: edge))
+        let row = 20 * 100
+        XCTAssertGreaterThan(after[(row + 51) * 4], before[(row + 51) * 4] + 5, "a bright halo on the light side")
+        XCTAssertLessThan(after[(row + 48) * 4], before[(row + 48) * 4] - 5, "a dark halo on the dark side")
+        XCTAssertEqual(Int(after[(row + 5) * 4]), Int(before[(row + 5) * 4]), accuracy: 1, "flat areas are untouched")
     }
 
     func testSeededGeneratorMatchesSplitMix64() {

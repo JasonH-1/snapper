@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Why the paywall is being shown; drives its hero image and copy.
 enum PaywallContext: Identifiable {
-    /// Shown once after onboarding.
+    /// Shown once, at the end of onboarding.
     case intro
     /// Tried to save or share with a premium look (with the photo before and after).
     case lockedLook(Look, before: UIImage?, after: UIImage?)
@@ -194,10 +194,12 @@ final class AppModel {
 
     var needsOnboarding: Bool { !settings.hasCompletedOnboarding }
 
-    /// Start shooting immediately; upgrade offers follow a successful save
-    /// or an explicit request for a premium feature.
+    /// Ends onboarding with a single offer of Premium and its free trial.
+    /// Closing it starts the camera; after this, offers follow only a save
+    /// or an explicit request for a Premium feature.
     func finishOnboarding() {
         settings.hasCompletedOnboarding = true
+        if !hasPremium { presentPaywall(.intro) }
     }
 
     // MARK: - Navigation

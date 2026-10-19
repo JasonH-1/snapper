@@ -25,6 +25,25 @@ struct LookEffects: Codable, Hashable, Sendable {
         }
     }
 
+    /// Direct on-camera flash: a hot, slightly cool centre that falls off
+    /// fast into a dark background.
+    struct Flash: Codable, Hashable, Sendable {
+        /// Brightening where the flash lands, in stops.
+        var exposure: Double
+        /// Darkening past its reach, in stops.
+        var falloff: Double
+        /// Fraction of the half-diagonal where the flash has fully fallen off.
+        var radius: Double
+        /// Oklab hue (degrees) of the flash's cast, by `tint` (0…1).
+        var tintHue: Double
+        var tint: Double
+
+        enum CodingKeys: String, CodingKey {
+            case exposure, falloff, radius, tint
+            case tintHue = "tint_hue"
+        }
+    }
+
     /// Bright, saturated light blooms in its own colour.
     struct Glow: Codable, Hashable, Sendable {
         /// Brightness (0…1) where the glow starts.
@@ -39,6 +58,24 @@ struct LookEffects: Codable, Hashable, Sendable {
 
         enum CodingKeys: String, CodingKey {
             case threshold, radius, intensity, saturation, tint
+            case tintHue = "tint_hue"
+        }
+    }
+
+    /// CCD smear: the brightest lights bleed into vertical streaks, as on
+    /// an old digital camera's sensor.
+    struct Smear: Codable, Hashable, Sendable {
+        /// Brightness (0…1) where the smear starts.
+        var threshold: Double
+        /// How far the streaks reach up and down.
+        var length: Double
+        var intensity: Double
+        /// Oklab hue (degrees) the streaks are pulled towards, by `tint` (0…1).
+        var tintHue: Double
+        var tint: Double
+
+        enum CodingKeys: String, CodingKey {
+            case threshold, length, intensity, tint
             case tintHue = "tint_hue"
         }
     }
@@ -107,6 +144,13 @@ struct LookEffects: Codable, Hashable, Sendable {
         var intensity: Double
     }
 
+    /// Crunchy in-camera sharpening: bright and dark halos along edges.
+    struct Sharpen: Codable, Hashable, Sendable {
+        var amount: Double
+        /// Width of the edge halos.
+        var radius: Double
+    }
+
     /// Fine luminance noise.
     struct Noise: Codable, Hashable, Sendable {
         var amount: Double
@@ -132,13 +176,16 @@ struct LookEffects: Codable, Hashable, Sendable {
     var noise: Noise?
     var grain: Grain?
     var vignette: Vignette?
+    var flash: Flash?
+    var smear: Smear?
+    var sharpen: Sharpen?
 
     static let none = LookEffects()
 
     var isEmpty: Bool { self == .none }
 
     enum CodingKeys: String, CodingKey {
-        case gradient, glow, halation, glitch, scanlines, noise, grain, vignette
+        case gradient, glow, halation, glitch, scanlines, noise, grain, vignette, flash, smear, sharpen
         case chromaticAberration = "chromatic_aberration"
         case chromaBleed = "chroma_bleed"
         case lightLeak = "light_leak"

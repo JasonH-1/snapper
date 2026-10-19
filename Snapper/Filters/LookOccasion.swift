@@ -14,10 +14,10 @@ enum LookOccasion: String, CaseIterable, Identifiable {
     }
     var lookIDs: [String] {
         switch self {
-        case .friends: ["flashbulb", "boardwalk", "cream"]
+        case .friends: ["flashbulb", "pocket", "cream"]
         case .travel: ["boardwalk", "postcard", "halo"]
         case .portraits: ["cream", "halo", "boardwalk"]
-        case .night: ["afterglow", "lasttrain", "flashbulb"]
+        case .night: ["afterglow", "afterparty", "flashbulb"]
         }
     }
     var tip: String {

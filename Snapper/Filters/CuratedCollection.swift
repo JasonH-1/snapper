@@ -32,6 +32,11 @@ struct CuratedCollection: Identifiable, Sendable {
             style("quiet-window", "Window Light", "Face a window and avoid mixed room lighting.", look: "cream", strength: 0.4, highlights: -0.15, shadows: 0.2, bloom: 0.08),
             style("quiet-weekend", "Weekend", "Try open shade for softer skin and clothing colors.", look: "boardwalk", strength: 0.5, highlights: -0.1, shadows: 0.1, vignette: 0.08),
             style("quiet-air", "Soft Air", "Give a simple subject breathing room against a clean background.", look: "halo", strength: 0.35, highlights: -0.2, shadows: 0.08, bloom: 0.1)
+        ]),
+        .init(id: "pocket-camera-01", title: "Pocket Camera", subtitle: "Direct flash and crisp 2000s digital colour.", edition: "Collection 04", styles: [
+            style("pocket-party", "Party Flash", "Get close: the flash falls off fast, so the background drops to black.", look: "afterparty", strength: 0.8, highlights: -0.1, vignette: 0.1),
+            style("pocket-holiday", "Holiday Snaps", "Point it at blue sky and bright colour in the middle of the day.", look: "y2k", strength: 0.75, highlights: -0.15, vignette: 0.1),
+            style("pocket-pastel", "Pastel Memory", "Soft daylight, or flash from arm's length, keeps it airy.", look: "memorycard", strength: 0.7, shadows: 0.1, bloom: 0.08)
         ])
     ]
     static func contains(_ style: CuratedStyle) -> Bool { releases.contains { $0.styles.contains(style) } }
