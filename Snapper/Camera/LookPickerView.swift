@@ -38,24 +38,32 @@ struct LookPickerView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
-                    Button {
-                        showGuide = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text("Need a guide?").foregroundStyle(.secondary)
-                            Text("Tap here").foregroundStyle(Theme.accent).underline()
+                    HStack(spacing: 12) {
+                        if onSelectStyle != nil {
+                            Button { showCollections = true } label: {
+                                Label("Curated collections", systemImage: "square.stack")
+                                    .font(.footnote.weight(.semibold))
+                                    .chip(isSelected: false)
+                                    .minimumTapTarget()
+                            }
+                            .buttonStyle(PressableButtonStyle())
                         }
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open the Looks guide")
-                    .accessibilityHint("Learn about filters, favorites and look strength")
-                    if onSelectStyle != nil {
-                        Button { showCollections = true } label: {
-                            Label("Explore curated collections", systemImage: "square.stack").minimumTapTarget()
-                        }.font(.subheadline.weight(.semibold))
+                        Spacer(minLength: 0)
+                        Button {
+                            showGuide = true
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text("Need a guide?").foregroundStyle(.secondary)
+                                Text("Tap here").foregroundStyle(Theme.accent).underline()
+                            }
+                            .font(.caption)
+                            .lineLimit(1)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open the Snapper guide")
+                        .accessibilityHint("Learn about looks, editing and saving")
                     }
                     if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && scope == .all {
                         occasionDiscovery
@@ -73,7 +81,12 @@ struct LookPickerView: View {
                         section(id: "search-results", title: "\(filteredLooks.count) looks", tagline: nil, looks: filteredLooks)
                     } else {
                         if accepts(.original) {
-                            section(id: LookCatalog.originalEntryID, title: nil, tagline: nil, looks: [.original])
+                            OriginalRow(image: thumbnails.images[Look.original.id],
+                                        isSelected: selectedID == Look.original.id) {
+                                onSelect(.original)
+                                dismiss()
+                            }
+                            .id(LookCatalog.originalEntryID)
                         }
                         ForEach(catalog.sections) { section in
                             let matches = section.looks.filter(accepts)
@@ -88,7 +101,7 @@ struct LookPickerView: View {
                 .padding(.vertical, 12)
             }
             .scrollPosition(id: $position, anchor: .top)
-            .safeAreaInset(edge: .top, spacing: 0) {
+            .pinnedHeader {
                 VStack(spacing: 8) {
                     Picker("Show looks", selection: $scope) {
                         ForEach(LookDiscovery.Scope.allCases) { Text($0.title).tag($0) }
@@ -99,7 +112,6 @@ struct LookPickerView: View {
                     }
                 }
                 .padding(.vertical, 8)
-                .background(.bar)
             }
             .onChange(of: position) { _, id in
                 guard let id else { return }
@@ -129,7 +141,8 @@ struct LookPickerView: View {
                 }
             }
             .fullScreenCover(isPresented: $showGuide) {
-                GuideView(library: library, initialTopicID: "looks")
+                // The guide's home page, where every topic is listed, not one topic.
+                GuideView(library: library)
             }
             .onAppear {
                 if recentIDs == nil { recentIDs = settings.recentLookIDs }
@@ -140,18 +153,17 @@ struct LookPickerView: View {
 
     private var occasionDiscovery: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("What are you shooting?").font(.headline)
+            Text("What are you shooting?").font(.title3.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    Button("All Looks") { occasion = nil }
-                        .buttonStyle(.bordered).tint(occasion == nil ? Theme.accent : .secondary)
+                HStack(spacing: 8) {
+                    occasionChip(String(localized: "All Looks"), isSelected: occasion == nil) { occasion = nil }
                     ForEach(LookOccasion.allCases) { item in
-                        Button(item.title) { occasion = item }
-                            .buttonStyle(.bordered).tint(occasion == item ? Theme.accent : .secondary)
-                            .accessibilityAddTraits(occasion == item ? .isSelected : [])
+                        occasionChip(item.title, isSelected: occasion == item) { occasion = item }
                     }
                 }
             }
+            .edgeToEdgeScroll()
             if let occasion {
                 Text(occasion.tip).font(.subheadline).foregroundStyle(.secondary)
                 section(id: "occasion-results", title: "Try these looks", tagline: "Creative starting points; adjust for your light.",
@@ -160,6 +172,18 @@ struct LookPickerView: View {
             }
         }
         .id("occasion-discovery")
+    }
+
+    private func occasionChip(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.footnote.weight(.semibold))
+                .lineLimit(1)
+                .chip(isSelected: isSelected)
+                .minimumTapTarget()
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func resetSearchPosition() {
@@ -176,10 +200,12 @@ struct LookPickerView: View {
 
     private var featuredGuidance: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Find your signature.").font(Theme.lookName(.largeTitle))
-                Text("A little direction for your next photo.").font(.subheadline).foregroundStyle(.secondary)
+            // Styled like every other section heading on the page.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Find your signature.").font(.title3.weight(.semibold))
+                Text("A little direction for your next photo.").font(.footnote).foregroundStyle(.secondary)
             }
+            .accessibilityAddTraits(.isHeader)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(LookGuide.featured) { guide in
@@ -202,10 +228,12 @@ struct LookPickerView: View {
                                             Image(systemName: look.isPremium && !hasPremium ? "lock.fill" : "arrow.up.right")
                                                 .foregroundStyle(Theme.accent)
                                         }
-                                        Text(guide.bestFor).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                        Text(guide.bestFor).font(.caption).foregroundStyle(.secondary)
+                                            .lineLimit(2, reservesSpace: true)
+                                            .multilineTextAlignment(.leading)
                                     }.padding(12)
                                 }
-                                .frame(width: 210).background(Theme.surface)
+                                .frame(width: 200).background(Theme.surface)
                                 .clipShape(RoundedRectangle(cornerRadius: 18))
                             }.buttonStyle(PressableButtonStyle())
                             .accessibilityLabel("\(look.name), \(guide.bestFor)\(look.isPremium && !hasPremium ? ", Premium look" : "")")
@@ -213,6 +241,7 @@ struct LookPickerView: View {
                     }
                 }.padding(.bottom, 4)
             }
+            .edgeToEdgeScroll()
         }.id("signature-guidance")
     }
 
@@ -274,11 +303,11 @@ private struct LookTile: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay {
                         RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(isSelected ? Theme.accent : .clear, lineWidth: 3)
+                            .strokeBorder(isSelected ? Color.white : .clear, lineWidth: 3)
                     }
                     .overlay(alignment: .bottomLeading) {
                         if isSelected {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.black, Theme.accent).padding(8)
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.black, .white).padding(8)
                         }
                     }
                 HStack(spacing: 4) {
@@ -296,15 +325,79 @@ private struct LookTile: View {
             if let toggleFavorite {
                 Button(action: toggleFavorite) {
                     Image(systemName: isFavorite ? "star.fill" : "star")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(isFavorite ? Theme.accent : .white)
+                        .frame(width: 28, height: 28)
+                        .background(.black.opacity(0.55), in: Circle())
                         .frame(width: 44, height: 44)
-                        .background(.black.opacity(0.65), in: Circle())
+                        .contentShape(Rectangle())
                 }
-                .padding(4)
                 .accessibilityLabel(isFavorite ? Text("Remove \(look.name) from favorites") : Text("Add \(look.name) to favorites"))
             }
         }
         .sensoryFeedback(.selection, trigger: isFavorite)
+    }
+}
+
+/// "No look" as one slim row, so it doesn't sit alone in a mostly empty row
+/// of the grid.
+private struct OriginalRow: View {
+    let image: UIImage?
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                Rectangle().fill(.quaternary)
+                    .frame(width: 52, height: 52)
+                    .overlay {
+                        if let image { Image(uiImage: image).resizable().scaledToFill() }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Look.original.name).font(Theme.lookName(.headline))
+                    Text("No look, just your photo").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.black, .white)
+                }
+            }
+            .padding(10)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(isSelected ? Color.white : .clear, lineWidth: 2)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(Text(Look.original.name))
+        .accessibilityValue(Text("No look"))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private extension View {
+    /// Lets a horizontal row inside the sheet's 16 pt margins scroll out to
+    /// the screen edges, while its first item still lines up with the margin.
+    func edgeToEdgeScroll() -> some View {
+        contentMargins(.horizontal, 16, for: .scrollContent)
+            .padding(.horizontal, -16)
+    }
+
+    /// Pins the scope picker and chips under the search field. On iOS 26 they
+    /// share the navigation bar's soft scroll edge, so the sheet is one colour
+    /// instead of a grey band over a darker page.
+    @ViewBuilder
+    func pinnedHeader<Header: View>(@ViewBuilder _ header: () -> Header) -> some View {
+        if #available(iOS 26, *) {
+            safeAreaBar(edge: .top, spacing: 0, content: header)
+        } else {
+            safeAreaInset(edge: .top, spacing: 0) { header().background(.bar) }
+        }
     }
 }

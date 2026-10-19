@@ -197,7 +197,7 @@ struct LibraryView: View {
         PhotosPicker(selection: $model.pickerItems, maxSelectionCount: 50, selectionBehavior: .ordered,
                      matching: .images, preferredItemEncoding: .current) {
             // The same icon as the badge on imported photos.
-            Label("Import", systemImage: "plus")
+            Label("Import", systemImage: "square.and.arrow.down")
                 .fontWeight(.semibold)
                 .foregroundStyle(.black)
         }
@@ -260,57 +260,60 @@ struct LibraryView: View {
     }
 
     private var studioHeader: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Make it yours.").font(Theme.lookName(.title))
-                Spacer()
-                Text(model.summary).font(.caption).foregroundStyle(.secondary)
+                Text(model.summary).font(.subheadline).foregroundStyle(.secondary)
             }
             if let latest = model.records.first {
                 Button { model.open(latest) } label: {
                     HStack(spacing: 14) {
-                        Color.white.opacity(0.08).frame(width: 76, height: 88)
+                        Color.white.opacity(0.08).frame(width: 64, height: 64)
                             .overlay {
                                 if let image = model.thumbnail(for: latest) {
                                     Image(uiImage: image).resizable().scaledToFill()
                                 }
                             }.clipped().clipShape(RoundedRectangle(cornerRadius: 10))
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("YOUR LATEST PHOTO").font(.caption2.weight(.bold)).foregroundStyle(Theme.accent)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Latest photo").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                             Text(model.captures.look(for: latest).name).font(Theme.lookName(.title3))
-                            Text("Edit, add a frame, and make it ready to share.")
+                            Text("Edit, add a frame, and get it ready to share.")
                                 .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                                .lineLimit(2)
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: "arrow.up.right").foregroundStyle(Theme.accent)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                     }
-                    .padding(14).background(Theme.surface, in: RoundedRectangle(cornerRadius: 20))
+                    .padding(12).background(Theme.surface, in: RoundedRectangle(cornerRadius: 18))
                 }
                 .buttonStyle(PressableButtonStyle())
                 .onAppear { model.cellAppeared(latest) }
                 .accessibilityLabel("Edit latest photo in \(model.captures.look(for: latest).name)")
-                Button("Copy Style from Latest", systemImage: "doc.on.doc") { model.copyStyle(from: latest) }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(minHeight: 44)
             }
             HStack(spacing: 10) {
-                PhotosPicker(selection: $model.pickerItems, maxSelectionCount: 50, selectionBehavior: .ordered,
-                             matching: .images, preferredItemEncoding: .current) {
-                    Label("Import Photos", systemImage: "plus")
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14)).foregroundStyle(.black)
-                }
-                .disabled(model.importProgress != nil)
                 Button {
                     withAnimation(animation) { model.isSelecting = true }
                 } label: {
                     Label("Style a Set", systemImage: "square.stack")
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
                 }
                 .disabled(model.records.isEmpty)
+                if let latest = model.records.first {
+                    Button {
+                        model.copyStyle(from: latest)
+                    } label: {
+                        Label("Copy Latest Style", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .accessibilityHint("Copies the look and edits of your latest photo to paste onto others")
+                }
             }
             .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .foregroundStyle(.white)
             .buttonStyle(PressableButtonStyle())
         }.padding(.horizontal, 16)
     }

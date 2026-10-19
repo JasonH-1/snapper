@@ -82,32 +82,49 @@ struct EditorView: View {
         .onDisappear { model.finish() }
     }
 
+    /// Every tool in one row: equal widths when they all fit (the usual
+    /// case), scrolling only at large text sizes. Selection is white, like
+    /// the other tabs and chips; yellow stays for Save.
     private var toolNavigation: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(EditorModel.Tab.allCases) { tab in
-                    Button {
-                        withAnimation(animation) { model.tab = tab }
-                    } label: {
-                        VStack(spacing: 6) {
-                            Image(systemName: tab.symbol).font(.body.weight(.semibold))
-                            Text(tab.title).font(.caption.weight(.semibold))
-                        }
-                        .frame(minWidth: 66, minHeight: 58)
-                        .contentShape(Rectangle())
-                        .foregroundStyle(model.tab == tab ? Color.black : Color.primary)
-                        .background(model.tab == tab ? Theme.accent : .clear, in: RoundedRectangle(cornerRadius: 14))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
-                }
+        ViewThatFits(in: .horizontal) {
+            toolTabs(fillsWidth: true)
+            ScrollView(.horizontal, showsIndicators: false) {
+                toolTabs(fillsWidth: false)
             }
         }
-        .padding(5)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 19))
+        .padding(4)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18))
         .padding(.horizontal, 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Editing tools")
+    }
+
+    private func toolTabs(fillsWidth: Bool) -> some View {
+        HStack(spacing: 2) {
+            ForEach(EditorModel.Tab.allCases) { tab in
+                let isSelected = model.tab == tab
+                Button {
+                    withAnimation(animation) { model.tab = tab }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: tab.symbol)
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(height: 22)
+                        Text(tab.title)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    .padding(.horizontal, fillsWidth ? 2 : 10)
+                    .frame(maxWidth: fillsWidth ? .infinity : nil, minHeight: 52)
+                    .contentShape(Rectangle())
+                    .foregroundStyle(isSelected ? Color.black : Color.primary)
+                    .background(isSelected ? Color.white : .clear, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
     }
 
     private var animation: Animation? { .snapper(Motion.standard, reduceMotion: reduceMotion) }
@@ -215,22 +232,29 @@ struct EditorView: View {
                                        if !model.isBrushActive { model.isShowingOriginal = pressing }
                                    },
                                    onZoom: { model.canvasZoom = $0 })
-                        .overlay(alignment: .top) {
-                            if model.isShowingOriginal {
-                                Text("Original")
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .glassSurface(in: Capsule(), tint: .black.opacity(0.4))
-                                    .padding(.top, 10)
-                                    .transition(.opacity)
-                                    .allowsHitTesting(false)
+                        // The badges and buttons sit on the photo itself, which is
+                        // fitted inside the canvas, not in the space around it.
+                        .overlay {
+                            PhotoBoundsOverlay(imageSize: model.displayImage?.size) {
+                                if model.isShowingOriginal {
+                                    Text("Original")
+                                        .font(.caption.weight(.semibold))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .glassSurface(in: Capsule(), tint: .black.opacity(0.4))
+                                        .padding(.top, 10)
+                                        .frame(maxHeight: .infinity, alignment: .top)
+                                        .transition(.opacity)
+                                        .allowsHitTesting(false)
+                                }
+                                versionsButton
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                zoomBadge
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                compareButton
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             }
                         }
-                        .overlay(alignment: .topLeading) { versionsButton }
-                        .overlay(alignment: .topTrailing) { zoomBadge }
-                        // Compare sits on the photo it compares.
-                        .overlay(alignment: .bottomTrailing) { compareButton }
                         .padding(.horizontal, 16)
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel(Text("Photo in \(model.currentLook.name)"))
@@ -362,23 +386,25 @@ struct EditorView: View {
     }
 
     private var looksPanel: some View {
-        VStack(spacing: 8) {
-            HStack {
-                lookCaption
-            }
-            HStack(spacing: 16) {
+        VStack(spacing: 6) {
+            lookCaption
+            HStack(spacing: 8) {
                 Button { showsCollections = true } label: {
-                    Label("Collections", systemImage: "square.stack").minimumTapTarget()
+                    Label("Collections", systemImage: "square.stack")
+                        .font(.footnote.weight(.semibold))
+                        .chip(isSelected: false)
+                        .minimumTapTarget()
                 }
                 Button { showsPresets = true } label: {
-                    Label("Presets", systemImage: "slider.horizontal.3").minimumTapTarget()
+                    Label("Presets", systemImage: "slider.horizontal.3")
+                        .font(.footnote.weight(.semibold))
+                        .chip(isSelected: false)
+                        .minimumTapTarget()
                 }
+                Spacer(minLength: 0)
             }
-            .font(.subheadline.weight(.semibold))
-            if let guide = LookGuide.forLook(model.currentLook.id) {
-                Text(guide.bestFor).font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
-            }
+            .buttonStyle(PressableButtonStyle())
+            .padding(.horizontal, 16)
             LookBrowser(catalog: model.catalog,
                         selectedID: model.currentLook.id,
                         thumbnails: model.lookThumbnails,
@@ -418,17 +444,26 @@ struct EditorView: View {
                     .foregroundStyle(Theme.accent)
                     .accessibilityLabel(Text("Premium look"))
             }
-            Text(model.currentLook.name)
-                .font(Theme.lookName(.title3))
-                .tracking(-0.2)
-                .layoutPriority(1)
-                .minimumScaleFactor(0.7)
-                .contentTransition(.opacity)
-            // The collection is the first thing to go when space runs out.
-            if let collection = model.collectionName, !dynamicTypeSize.isAccessibilitySize {
-                Text(collection)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(model.currentLook.name)
+                        .font(Theme.lookName(.title3))
+                        .tracking(-0.2)
+                        .layoutPriority(1)
+                        .minimumScaleFactor(0.7)
+                        .contentTransition(.opacity)
+                    // The collection is the first thing to go when space runs out.
+                    if let collection = model.collectionName, !dynamicTypeSize.isAccessibilitySize {
+                        Text(collection)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let guide = LookGuide.forLook(model.currentLook.id) {
+                    Text(guide.bestFor)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer(minLength: 0)
             if !model.currentLook.isOriginal {
@@ -514,10 +549,14 @@ struct EditorView: View {
                     Label("Premium frames and layouts · preview free. The date stamp is free.", systemImage: "lock.fill")
                         .font(.caption).foregroundStyle(Theme.accent)
                 }
-                Picker("Frame", selection: $model.frame) {
-                    ForEach(PhotoFinish.Frame.allCases) { Text($0.title).tag($0) }
+                LabeledContent("Frame") {
+                    Picker("Frame", selection: $model.frame) {
+                        ForEach(PhotoFinish.Frame.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                 }
-                .pickerStyle(.menu)
+                .frame(minHeight: 44)
                 if model.frame != .none {
                     HStack {
                         Text("Border").font(.subheadline)
@@ -525,12 +564,18 @@ struct EditorView: View {
                             .accessibilityLabel("Border width")
                     }
                 }
-                Picker("Export layout", selection: $model.exportLayout) {
-                    ForEach(PhotoFinish.Layout.allCases) { Text($0.title).tag($0) }
+                VStack(alignment: .leading, spacing: 2) {
+                    LabeledContent("Layout") {
+                        Picker("Export layout", selection: $model.exportLayout) {
+                            ForEach(PhotoFinish.Layout.allCases) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                    }
+                    .frame(minHeight: 44)
+                    Text("Layouts fit your whole cropped photo inside the canvas.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                .pickerStyle(.menu)
-                Text("Layouts fit your whole cropped photo inside the canvas.")
-                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Date stamp", isOn: $model.hasDateStamp)
                 if model.hasDateStamp {
                     DatePicker("Date on photo", selection: $model.stampDate, displayedComponents: .date)
@@ -539,7 +584,9 @@ struct EditorView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Button("Remove All Finishing") { model.resetFinish() }
+                Button("Remove All Finishing", role: .destructive) { model.resetFinish() }
+                    .font(.subheadline)
+                    .frame(minHeight: 44)
                     .disabled(!model.recipe.finish.isActive)
             }
             .padding(.horizontal, 16).padding(.vertical, 6)
@@ -836,5 +883,34 @@ extension CropShape {
         case .square: "1:1"
         case .sixteenNine: "16:9"
         }
+    }
+}
+
+/// Lays its content over the part of the canvas the photo really fills (the
+/// photo is fitted and centred), so corner buttons sit on the photo rather
+/// than floating in the empty space beside a wide or tall one.
+private struct PhotoBoundsOverlay<Content: View>: View {
+    let imageSize: CGSize?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        GeometryReader { geometry in
+            let rect = Self.fittedRect(for: imageSize, in: geometry.size)
+            ZStack { content }
+                .frame(width: rect.width, height: rect.height)
+                .position(x: rect.midX, y: rect.midY)
+        }
+    }
+
+    static func fittedRect(for imageSize: CGSize?, in bounds: CGSize) -> CGRect {
+        guard let imageSize, imageSize.width > 0, imageSize.height > 0, bounds.width > 0, bounds.height > 0 else {
+            return CGRect(origin: .zero, size: bounds)
+        }
+        let aspect = imageSize.width / imageSize.height
+        let size = bounds.width / bounds.height > aspect
+            ? CGSize(width: bounds.height * aspect, height: bounds.height)
+            : CGSize(width: bounds.width, height: bounds.width / aspect)
+        return CGRect(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2,
+                      width: size.width, height: size.height)
     }
 }
