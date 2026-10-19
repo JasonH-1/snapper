@@ -45,6 +45,13 @@ actor CaptureService {
     /// A manual lens position is set; taps return focus to auto.
     private var isManualFocus = false
 
+    /// Camera Control's delegate, look picker and exposure slider (iOS 18).
+    /// Untyped because stored properties can't require iOS 18.
+    private var cameraControlsDelegate: AnyObject?
+    private var lookPicker: AnyObject?
+    private var exposureSlider: AnyObject?
+    private var exposureSliderRange: ClosedRange<Float>?
+
     init(renderer: PreviewRenderer) {
         self.renderer = renderer
         (events, eventContinuation) = AsyncStream.makeStream(of: CaptureEvent.self, bufferingPolicy: .bufferingNewest(32))
@@ -61,11 +68,13 @@ actor CaptureService {
 
     // MARK: - Lifecycle
 
-    /// Configures the session on first use and starts it.
-    func start() throws {
+    /// Configures the session on first use and starts it. The first start
+    /// opens `position` (when the device has it) with `exposureBias`.
+    func start(position preferred: CameraPosition = .back, exposureBias bias: Float = 0) throws {
         wantsRunning = true
         if !isConfigured {
-            try configureSession()
+            exposureBias = bias
+            try configureSession(preferring: preferred)
         }
         if !session.isRunning {
             session.startRunning()
@@ -83,8 +92,8 @@ actor CaptureService {
 
     // MARK: - Configuration
 
-    private func configureSession() throws {
-        let startPosition: CameraPosition = Self.device(for: .back) != nil ? .back : .front
+    private func configureSession(preferring preferred: CameraPosition) throws {
+        let startPosition: CameraPosition = Self.device(for: preferred) != nil ? preferred : preferred.toggled
         guard let device = Self.device(for: startPosition) else { throw CameraError.noCamera }
         let input = try AVCaptureDeviceInput(device: device)
 
@@ -125,6 +134,7 @@ actor CaptureService {
         photoCapture.configure(for: device)
         observeSession()
         observe(device: device)
+        setUpCameraControls()
         isConfigured = true
         eventContinuation.yield(.configured(capabilities(for: device)))
     }
@@ -189,13 +199,16 @@ actor CaptureService {
 
     // MARK: - Camera switching
 
-    func switchCamera() throws {
+    /// Flips between the back and front cameras; returns the one now in use.
+    @discardableResult
+    func switchCamera() throws -> CameraPosition {
         guard isConfigured else { throw CameraError.notRunning }
         let newPosition = position.toggled
         guard let device = Self.device(for: newPosition) else { throw CameraError.noCamera }
         try replaceInput(with: device, position: newPosition)
         whiteBalanceReturnDevice = nil
         eventContinuation.yield(.configured(capabilities(for: device)))
+        return newPosition
     }
 
     /// Restore the existing input if the session rejects the replacement.
@@ -476,6 +489,73 @@ actor CaptureService {
         return factor * displayZoomMultiplier
     }
 
+    // MARK: - Camera Control
+
+    /// Lets Camera Control (iPhone 16 and later, iOS 18) show this session's
+    /// controls. They arrive with `updateCameraControl(_:)`.
+    private func setUpCameraControls() {
+        guard #available(iOS 18, *), session.supportsControls else { return }
+        let delegate = CameraControlsDelegate(events: eventContinuation)
+        session.setControlsDelegate(delegate, queue: sessionQueue)
+        cameraControlsDelegate = delegate
+    }
+
+    /// Shows the look picker or exposure slider on Camera Control, or moves
+    /// it to a new value. Does nothing without Camera Control.
+    func updateCameraControl(_ update: CameraControlUpdate) {
+        guard #available(iOS 18, *), cameraControlsDelegate != nil else { return }
+        // Controls change on their action queue, which is this actor's queue.
+        switch update {
+        case .looks(let titles, let selected):
+            guard titles.indices.contains(selected) else { return }
+            if let picker = lookPicker as? AVCaptureIndexPicker, picker.localizedIndexTitles == titles {
+                if picker.selectedIndex != selected { picker.selectedIndex = selected }
+                return
+            }
+            let picker = AVCaptureIndexPicker(String(localized: "Looks"), symbolName: "camera.filters",
+                                              localizedIndexTitles: titles)
+            picker.setActionQueue(sessionQueue) { @Sendable [events = eventContinuation] index in
+                events.yield(.cameraControlLook(index))
+            }
+            picker.selectedIndex = selected
+            replaceControl(lookPicker as? AVCaptureControl, with: picker)
+            lookPicker = picker
+        case .exposure(let range, let value, let isEnabled):
+            guard range.lowerBound < range.upperBound else { return }
+            let clamped = min(max(value, range.lowerBound), range.upperBound)
+            if let slider = exposureSlider as? AVCaptureSlider, exposureSliderRange == range {
+                if slider.value != clamped { slider.value = clamped }
+                if slider.isEnabled != isEnabled { slider.isEnabled = isEnabled }
+                return
+            }
+            // ⅓-stop steps, like the exposure slider on screen.
+            let slider = AVCaptureSlider(String(localized: "Exposure"), symbolName: "plusminus.circle",
+                                         in: range, step: 1 / 3)
+            slider.prominentValues = [0]
+            slider.localizedValueFormat = String(localized: "%@ EV", comment: "Camera Control exposure value, in stops")
+            slider.setActionQueue(sessionQueue) { @Sendable [events = eventContinuation] stops in
+                events.yield(.cameraControlExposure(stops))
+            }
+            slider.value = clamped
+            slider.isEnabled = isEnabled
+            replaceControl(exposureSlider as? AVCaptureControl, with: slider)
+            exposureSlider = slider
+            exposureSliderRange = range
+        }
+    }
+
+    @available(iOS 18, *)
+    private func replaceControl(_ old: AVCaptureControl?, with new: AVCaptureControl) {
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        if let old { session.removeControl(old) }
+        if session.canAddControl(new) {
+            session.addControl(new)
+        } else {
+            Logger.camera.error("Camera Control has no room for \(String(describing: new), privacy: .public)")
+        }
+    }
+
     // MARK: - Photo capture
 
     /// Takes a full-resolution photo. The returned data is the camera's
@@ -632,5 +712,30 @@ actor CaptureService {
         guard !isFocusLocked, !isManualFocus else { return }
         resetFocus()
         eventContinuation.yield(.subjectAreaChanged)
+    }
+}
+
+/// Tells the camera model when Camera Control's overlay takes over the
+/// screen, so on-screen controls can step aside. Called on the session queue.
+@available(iOS 18, *)
+private final class CameraControlsDelegate: NSObject, AVCaptureSessionControlsDelegate, Sendable {
+    private let events: AsyncStream<CaptureEvent>.Continuation
+
+    init(events: AsyncStream<CaptureEvent>.Continuation) {
+        self.events = events
+    }
+
+    func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {}
+
+    func sessionControlsWillEnterFullscreenAppearance(_ session: AVCaptureSession) {
+        events.yield(.cameraControlFullscreen(true))
+    }
+
+    func sessionControlsWillExitFullscreenAppearance(_ session: AVCaptureSession) {
+        events.yield(.cameraControlFullscreen(false))
+    }
+
+    func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {
+        events.yield(.cameraControlFullscreen(false))
     }
 }

@@ -35,6 +35,9 @@ targets:
     platform: iOS
     sources:
       - path: Snapper
+    dependencies:
+      - target: SnapperCapture
+      - target: SnapperControls
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID)"
@@ -48,6 +51,84 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ENABLE_PREVIEWS: YES
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+        # LockedCameraCapture only exists on iOS 18; the app still runs on 17.
+        OTHER_LDFLAGS: "$(inherited) -weak_framework LockedCameraCapture"
+
+  # The Lock Screen camera: Snapper's camera and looks while the iPhone is
+  # locked, opened from Camera Control, the Lock Screen or Control Center.
+  # It shares the camera code with the app; its photos reach the Library
+  # through the session folder (Snapper/CameraLaunch/LockedCapture.swift).
+  SnapperCapture:
+    type: extensionkit-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: SnapperCapture
+      - path: Snapper/CameraLaunch/SnapperCaptureIntent.swift
+      - path: Snapper/CameraLaunch/LockedCapture.swift
+      - path: Snapper/Camera/CameraModel.swift
+      - path: Snapper/Camera/CameraPreviewView.swift
+      - path: Snapper/Camera/CameraTypes.swift
+      - path: Snapper/Camera/CaptureService.swift
+      - path: Snapper/Camera/DemoScene.swift
+      - path: Snapper/Camera/PhotoCapture.swift
+      - path: Snapper/Camera/PreviewRenderer.swift
+      - path: Snapper/Camera/WhiteBalanceControl.swift
+      - path: Snapper/Camera/Components/CameraOverlays.swift
+      - path: Snapper/Camera/Components/CameraStatusOverlay.swift
+      - path: Snapper/Camera/Components/FocusReticle.swift
+      - path: Snapper/Camera/Components/LookBanner.swift
+      - path: Snapper/Camera/Components/ShutterButton.swift
+      - path: Snapper/Camera/Components/VolumeShutter.swift
+      - path: Snapper/Camera/Components/ZoomControl.swift
+      - path: Snapper/Filters/CubeLUT.swift
+      - path: Snapper/Filters/Look.swift
+      - path: Snapper/Filters/LookEffects.swift
+      - path: Snapper/Filters/LookLibrary.swift
+      - path: Snapper/Filters/LookPipeline.swift
+      - path: Snapper/Filters/LookPipeline+Effects.swift
+      - path: Snapper/Filters/LUTStore.swift
+      - path: Snapper/Library/AdvancedAdjustments.swift
+      - path: Snapper/Library/ColorMixRendering.swift
+      - path: Snapper/Library/PhotoEditing.swift
+      - path: Snapper/Library/PhotoFinish.swift
+      - path: Snapper/Library/PhotoFinishing.swift
+      - path: Snapper/Library/PhotoRecipe.swift
+      - path: Snapper/Library/SelectiveRendering.swift
+      - path: Snapper/Library/ToneCurves.swift
+      - path: Snapper/Library/ToneRendering.swift
+      - path: Snapper/Presets/PresetStore.swift
+      - path: Snapper/Shared/Locked.swift
+      - path: Snapper/Shared/Theme.swift
+      # The looks' manifest and LUTs, read from the extension's own bundle.
+      - path: Snapper/Resources/Filters
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID).capture"
+        INFOPLIST_FILE: SnapperCapture/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+
+  # The Control Center control that opens the camera (SnapperCaptureIntent).
+  SnapperControls:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: SnapperControls
+      - path: Snapper/CameraLaunch/SnapperCaptureIntent.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID).controls"
+        INFOPLIST_FILE: SnapperControls/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
 
   SnapperTests:
     type: bundle.unit-test

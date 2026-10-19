@@ -72,9 +72,17 @@ final class AppModel {
     /// Premium looks we've already explained this session (one toast per look).
     @ObservationIgnored private var lockedLooksExplained: Set<String> = []
 
+    // The Lock Screen camera (see AppModel+LockScreen.swift).
+    /// The camera settings last handed to the Lock Screen camera.
+    @ObservationIgnored var sharedLockScreenCamera: SnapperCameraContext?
+    @ObservationIgnored var lockScreenShareTask: Task<Void, Never>?
+    @ObservationIgnored var isImportingLockScreenPhotos = false
+    /// The Library has read its index, so photos already in it are known.
+    @ObservationIgnored var isLibraryLoaded = false
+
     var hasPremium: Bool { store.isPremium }
 
-    init(store: any PurchaseService, settings: AppSettings = AppSettings()) {
+    init(store: any PurchaseService, settings: AppSettings = AppSettings(), captureStore: CaptureStore = .default) {
         let library = LookLibrary.bundled()
         let renderer = PhotoRenderer()
         self.library = library
@@ -82,9 +90,10 @@ final class AppModel {
         self.renderer = renderer
         self.store = store
         self.camera = CameraModel(library: library)
-        self.captures = CaptureLibrary(library: library, renderer: renderer)
+        self.captures = CaptureLibrary(library: library, renderer: renderer, store: captureStore)
 
         captures.hasPremium = { [weak self] in self?.hasPremium ?? false }
+        camera.restore(settings.cameraPreferences)
         camera.setLookOrder(settings.orderedLooks(from: library))
         if let id = settings.lastLookID, let look = library.look(id: id) {
             camera.select(look)
@@ -95,6 +104,9 @@ final class AppModel {
         camera.onLookChange = { [weak self] look in
             self?.settings.lastLookID = look.id
             self?.settings.lastPresetID = self?.camera.activePreset?.id
+        }
+        camera.onPreferencesChange = { [weak self] preferences in
+            self?.settings.cameraPreferences = preferences
         }
     }
 
@@ -129,42 +141,59 @@ final class AppModel {
 
     private func handleCapture(_ photo: CapturedPhoto, look: Look) {
         settings.lastLookID = look.id
+        Task { await keep(photo, look: look) }
+    }
+
+    /// Adds a photo to the Library and, with auto-save on, to Photos.
+    /// Returns whether it reached the Library.
+    @discardableResult
+    func keep(_ photo: CapturedPhoto, look: Look) async -> Bool {
         settings.noteRecentlyUsed(look)
-        Task {
-            do {
-                let record = try await captures.add(photo, look: look)
-                guard settings.autoSaveToPhotos else { return }
-                guard PhotoLibrarySaver.isAuthorized || PhotoLibrarySaver.canAsk else {
-                    warnAboutPhotosAccess()
-                    return
-                }
-                // A shot with a previewed Premium look or tools is still saved,
-                // without those parts; the Library keeps the full edit.
-                let isLocked = !hasPremium && captures.needsPremium(record.recipe, of: record)
-                try await captures.saveToPhotos(record, recipe: isLocked ? captures.freeVersion(of: record.recipe) : nil,
-                                                includeOriginal: settings.alsoSaveOriginal,
-                                                options: ExportOptions(format: settings.photoFormat))
-                if isLocked {
-                    guard lockedLooksExplained.insert(look.id).inserted else { return }
-                    let message = captures.premiumParts(of: record.recipe).look != nil
-                        ? String(localized: "Saved to Photos without \(look.name), a Premium look. Snapper Library keeps the full look.")
-                        : String(localized: "Saved to Photos without its Premium tools. Snapper Library keeps the full edit.")
-                    show(Toast(message: message,
-                               symbol: "lock.fill", action: .showPaywall, actionTitle: String(localized: "Unlock")))
-                    return
-                }
-                if !hasPremium && !settings.hasSeenIntroPaywall {
-                    settings.hasSeenIntroPaywall = true
-                    show(Toast(message: String(localized: "Photo saved. Make your next style your own."),
-                               symbol: "checkmark.circle.fill", action: .showPaywall,
-                               actionTitle: String(localized: "Explore Premium")))
-                }
-            } catch PhotoLibrarySaver.SaveError.notAuthorized {
+        let record: CaptureRecord
+        do {
+            record = try await captures.add(photo, look: look)
+        } catch {
+            Logger.library.error("Capture handling failed: \(error.localizedDescription, privacy: .public)")
+            show(Toast(message: error.localizedDescription, symbol: "exclamationmark.triangle.fill"))
+            return false
+        }
+        await autoSave(record, look: look)
+        return true
+    }
+
+    private func autoSave(_ record: CaptureRecord, look: Look) async {
+        do {
+            guard settings.autoSaveToPhotos else { return }
+            guard PhotoLibrarySaver.isAuthorized || PhotoLibrarySaver.canAsk else {
                 warnAboutPhotosAccess()
-            } catch {
-                Logger.library.error("Capture handling failed: \(error.localizedDescription, privacy: .public)")
-                show(Toast(message: error.localizedDescription, symbol: "exclamationmark.triangle.fill"))
+                return
             }
+            // A shot with a previewed Premium look or tools is still saved,
+            // without those parts; the Library keeps the full edit.
+            let isLocked = !hasPremium && captures.needsPremium(record.recipe, of: record)
+            try await captures.saveToPhotos(record, recipe: isLocked ? captures.freeVersion(of: record.recipe) : nil,
+                                            includeOriginal: settings.alsoSaveOriginal,
+                                            options: ExportOptions(format: settings.photoFormat))
+            if isLocked {
+                guard lockedLooksExplained.insert(look.id).inserted else { return }
+                let message = captures.premiumParts(of: record.recipe).look != nil
+                    ? String(localized: "Saved to Photos without \(look.name), a Premium look. Snapper Library keeps the full look.")
+                    : String(localized: "Saved to Photos without its Premium tools. Snapper Library keeps the full edit.")
+                show(Toast(message: message,
+                           symbol: "lock.fill", action: .showPaywall, actionTitle: String(localized: "Unlock")))
+                return
+            }
+            if !hasPremium && !settings.hasSeenIntroPaywall {
+                settings.hasSeenIntroPaywall = true
+                show(Toast(message: String(localized: "Photo saved. Make your next style your own."),
+                           symbol: "checkmark.circle.fill", action: .showPaywall,
+                           actionTitle: String(localized: "Explore Premium")))
+            }
+        } catch PhotoLibrarySaver.SaveError.notAuthorized {
+            warnAboutPhotosAccess()
+        } catch {
+            Logger.library.error("Saving to Photos failed: \(error.localizedDescription, privacy: .public)")
+            show(Toast(message: error.localizedDescription, symbol: "exclamationmark.triangle.fill"))
         }
     }
 

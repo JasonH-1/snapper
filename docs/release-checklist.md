@@ -41,6 +41,10 @@ These looks are featured with tips, not newly validated against human subjects. 
 - [ ] Check white/cream/black/instant frames, each layout and border extremes. Compare saved JPEG and HEIC against the preview. Verify date placement and imported-photo date correction. Check no extra crop or unexpected stretching.
 - [ ] Crop after adding a frame, undo/redo finishing, relaunch, and confirm recipes still match.
 
+## Camera Control, Lock Screen and Control Center
+
+- [ ] Run the real-iPhone checks in [camera-launch.md](camera-launch.md) (iPhone 16 or later for Camera Control). The Simulator can't run the Lock Screen camera or show Camera Control.
+
 ## Purchases and subscription changes
 
 Use the checked-in StoreKit configuration locally, then validate real products in App Store Connect sandbox/TestFlight.
