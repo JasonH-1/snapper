@@ -8,6 +8,7 @@ An iPhone camera and photo editor with live film looks and reusable personal sty
 - **What you see is what you save:** the preview, the full-resolution photo and every export go through the same pipeline (`LookPipeline`).
 - **47 original looks in six collections:** Disposable, Neon Nights, Soft Portrait, Overclock, Darkroom and Digicam. Nine are free, at least one in every collection.
 - **Looks are data:** each look is a 33-point `.cube` file listed in `filters.json`, plus optional effects (sky gradient, direct flash, glow, CCD smear, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, sharpening, noise, film grain, vignette) drawn after it. A Python tool generates and quality-checks them.
+- **Opens from Camera Control, the Lock Screen and Control Center (iOS 18):** a Lock Screen camera extension with the same live looks, a Control Center control, and a look picker and exposure slider on Camera Control. Snapper also keeps the last look, flash, exposure and front/back camera between launches. See [docs/camera-launch.md](docs/camera-launch.md).
 - **StoreKit 2:** monthly and yearly plans (7-day trial on yearly) and a one-time Lifetime unlock. There are no accounts and no backend; the Apple ID is the account.
 
 Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6 on `macos-latest`.
@@ -144,7 +145,8 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 - [ ] Check the sample photos in `Snapper/Resources/Showcase/`. They appear in onboarding, on the paywall, in the look thumbnails and in the Simulator. They're Unsplash photos at 1800 px (credits in `docs/photo-credits.md`); Unsplash includes no model releases, so get a release for the portrait or swap in your own photo shot with consent.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
-- [ ] App Review notes: "Onboarding opens the camera immediately. Eight looks, highlights, shadows, the date stamp and one personal preset are free, with watermark-free exports. Premium looks and tools can be previewed free; saving them as they are requires Premium, and any photo can be saved for free without its Premium parts. Presets are under Looks › Presets; batch presets are under Library › Select › Style; frames and layouts are in Finish. The paywall has an × close button. Use a sandbox account to test the subscriptions and the Lifetime purchase."
+- [ ] Set `APP_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config/Local.xcconfig` (see Setup). The Lock Screen camera and Control Center control get their own IDs, `<app id>.capture` and `<app id>.controls`; register all three in your developer account.
+- [ ] App Review notes: "Onboarding ends with one optional Premium offer; Not Now or × goes straight to the camera. Nine looks, highlights, shadows, the date stamp and one personal preset are free, with watermark-free exports. Premium looks and tools can be previewed free; saving them as they are requires Premium, and any photo can be saved for free without its Premium parts. Presets are under Looks › Presets; batch presets are under Library › Select › Style; frames and layouts are in Finish. On iOS 18, Snapper can be chosen as the Lock Screen and Camera Control camera, and has a Control Center control. The paywall has an × close button. Use a sandbox account to test the subscriptions and the Lifetime purchase."
 
 ## How it's built
 
@@ -160,7 +162,10 @@ Snapper/
   Store/        PurchaseService protocol, StoreKitPurchaseService, PaywallModel + PaywallView
   Onboarding/   OnboardingView
   Settings/     SettingsView, FavoritesView
+  CameraLaunch/ SnapperCaptureIntent (shared with both extensions), Lock Screen photo inbox and import
   Resources/    Assets, Info.plist, PrivacyInfo.xcprivacy, Filters/ (filters.json, LUTs/), Showcase/
+SnapperCapture/  Lock Screen camera (LockedCameraCapture extension, reuses the camera code)
+SnapperControls/ Control Center control (WidgetKit)
 SnapperTests/   LUT parser, manifest, capture store, export, Core Image vs generator, StoreKit
 tools/lutgen/   Look generator, quality gates, contact sheets
 docs/           Privacy Policy, Terms of Use, Support (GitHub Pages)

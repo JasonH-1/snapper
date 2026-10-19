@@ -5,7 +5,8 @@ This branch implements the proposed $19.99/year product package; it does not est
 ## Required owner inputs
 
 - [ ] Set the developer/publisher name and real monitored support email in `AppConfig.swift` and `docs/*.html`. Confirm the terms' governing-law placeholder. Do not guess these identities or legal terms.
-- [ ] Set the App Store ID when it exists; configure the monthly/yearly products and localized benefits to match the app.
+- [ ] Set `APP_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config/Local.xcconfig`, and register the app and both extension IDs (`.capture`, `.controls`) in the developer account.
+- [ ] Set the App Store ID when it exists; configure the monthly, yearly and Lifetime products and localized benefits to match the app.
 - [ ] Sample photos are Unsplash photos at 1800 px; their licence and credits are in `docs/photo-credits.md`. Get a model release for the portrait, or replace it with an owned photo shot with consent (at least 1600 px on the long edge), and keep the consent record.
 - [ ] Confirm the privacy/support/terms pages are deployed and accessible.
 
@@ -35,11 +36,15 @@ These looks are featured with tips, not newly validated against human subjects. 
 - [ ] Without Premium, shoot with a Premium look and with a Premium preset: automatic save adds the photo without them, and the editor's Save Without button and the Library's batch dialog save it too.
 - [ ] Buy Lifetime in sandbox, delete and reinstall, then Restore Purchases. Expire a subscription and confirm photos edited while it was active still save as edited.
 - [ ] As a monthly or yearly subscriber, open Settings › Switch to Lifetime and buy it. The paywall offers only Lifetime, then says the subscription keeps renewing and offers Manage Subscription; nothing is cancelled automatically. Afterwards Settings shows Lifetime and no longer offers the switch. Turn off auto-renew: Settings drops the cancel footer and the Manage Subscription row while Premium stays. A subscriber who already turned off auto-renew sees "Your subscription won't renew" on the switch paywall and gets no reminder after buying.
-- [ ] On a fresh install, onboarding opens the camera; no automatic purchase screen blocks the first photo. Denied Photos access must not trigger a successful-save offer.
+- [ ] On a fresh install, onboarding ends with the trial offer once: Not Now and × both go straight to the camera, and it never appears again. A Premium user skips it. Denied Photos access must not trigger a successful-save offer.
 - [ ] Save a preset, relaunch, rename, duplicate, delete and apply it. Crops, rotations and frames must stay unchanged. An invalid name must not erase anything.
 - [ ] Apply a preset to a mixed portrait/landscape batch. Undo it. Edit one photo after the batch and verify batch undo preserves that later edit.
 - [ ] Check white/cream/black/instant frames, each layout and border extremes. Compare saved JPEG and HEIC against the preview. Verify date placement and imported-photo date correction. Check no extra crop or unexpected stretching.
 - [ ] Crop after adding a frame, undo/redo finishing, relaunch, and confirm recipes still match.
+
+## Camera Control, Lock Screen and Control Center
+
+- [ ] Run the real-iPhone checks in [camera-launch.md](camera-launch.md) (iPhone 16 or later for Camera Control). The Simulator can't run the Lock Screen camera or show Camera Control.
 
 ## Purchases and subscription changes
 

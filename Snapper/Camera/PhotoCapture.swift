@@ -14,6 +14,9 @@ struct CapturedPhoto: Sendable {
     var id = UUID()
     /// Frozen at shutter press, even if the user changes styles during capture.
     var style: PhotoRecipe?
+    /// When it was taken, for photos that reach the Library later (the Lock
+    /// Screen camera's). Nil means just now.
+    var takenAt: Date?
 }
 
 /// Wraps AVCapturePhotoOutput. Owned and only used by `CaptureService`, so it

@@ -15,6 +15,19 @@ for path in [root / 'Snapper/App/AppConfig.swift', *sorted((root / 'docs').glob(
 config = (root / 'Snapper/App/AppConfig.swift').read_text()
 if re.search(r'appStoreID:\s*String\?\s*=\s*nil', config):
     issues.append('AppConfig.swift: App Store ID not configured')
+# Signing: Config/Local.xcconfig (git-ignored) overrides Base.xcconfig.
+settings = {}
+for name in ['Base.xcconfig', 'Local.xcconfig']:
+    path = root / 'Config' / name
+    if path.exists():
+        for line in path.read_text().splitlines():
+            key, sep, value = line.partition('=')
+            if sep and not key.strip().startswith(('//', '#')):
+                settings[key.strip()] = value.split('//')[0].strip()
+if settings.get('APP_BUNDLE_ID', '').startswith('com.example.'):
+    issues.append('Config/Local.xcconfig: APP_BUNDLE_ID still com.example.snapper')
+if not settings.get('DEVELOPMENT_TEAM'):
+    issues.append('Config/Local.xcconfig: DEVELOPMENT_TEAM not set')
 for path in sorted((root / 'Snapper/Resources/Showcase').glob('showcase-*.jpg')):
     with Image.open(path) as image:
         if max(image.size) < 1600:

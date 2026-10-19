@@ -56,6 +56,7 @@ struct CameraView: View {
                 VStack(spacing: 0) {
                     topBar
                         .frame(height: Self.topBarHeight)
+                        .hiddenForCameraControl(model.isCameraControlFullscreen)
                     preview(size: previewSize, bottomInset: overlap)
                         .frame(width: previewSize.width, height: previewSize.height)
                     Spacer(minLength: 0)
@@ -64,6 +65,7 @@ struct CameraView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     bottomControls
+                        .hiddenForCameraControl(model.isCameraControlFullscreen)
                 }
             }
         }
@@ -235,6 +237,7 @@ struct CameraView: View {
                     .padding(.bottom, 14 + bottomInset)
                 }
             }
+            .hiddenForCameraControl(model.isCameraControlFullscreen)
 
             Color.black
                 .opacity(shutterBlink ? 0.85 : 0)

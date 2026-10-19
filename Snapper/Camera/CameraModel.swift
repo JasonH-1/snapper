@@ -48,7 +48,11 @@ final class CameraModel {
     /// Manual lens position (0 near … 1 far); nil = auto focus.
     private(set) var lensPosition: Float?
     /// Manual ISO and shutter speed; nil = auto exposure.
-    private(set) var manualExposure: ManualExposure?
+    private(set) var manualExposure: ManualExposure? {
+        didSet { if (manualExposure == nil) != (oldValue == nil) { syncCameraControlExposure() } }
+    }
+    /// Camera Control's overlay is up: on-screen controls step aside.
+    private(set) var isCameraControlFullscreen = false
 
     struct ManualExposure: Equatable, Sendable {
         var iso: Float
@@ -70,6 +74,21 @@ final class CameraModel {
     var currentLook: Look { looks.indices.contains(lookIndex) ? looks[lookIndex] : .original }
     var collectionName: String? { library.collection(for: currentLook)?.name }
 
+    /// Flash, exposure and camera, to remember between launches.
+    var preferences: CameraPreferences {
+        CameraPreferences(flash: flashMode, exposureBias: exposureBias, position: preferredPosition)
+    }
+
+    /// Camera Control's look picker: every look in swipe order, and the current one.
+    var cameraControlLooks: CameraControlUpdate {
+        .looks(titles: looks.map(\.name), selected: lookIndex)
+    }
+
+    /// Camera Control's exposure slider, which only works with auto exposure.
+    var cameraControlExposure: CameraControlUpdate {
+        .exposure(range: exposureRange, value: exposureBias, isEnabled: manualExposure == nil)
+    }
+
     @ObservationIgnored let renderer: PreviewRenderer
     @ObservationIgnored let library: LookLibrary
     @ObservationIgnored private let captureService: CaptureService
@@ -88,21 +107,31 @@ final class CameraModel {
     private var isPreviewVisible = true
     private var isAppActive = true
     @ObservationIgnored private var hasStarted = false
+    /// The camera to open: the one last used (see `restore(_:)`).
+    @ObservationIgnored private var preferredPosition: CameraPosition = .back
+    /// Parse every look's LUT up front (the app), or only the looks either
+    /// side of the current one (the Lock Screen camera, to start fast and small).
+    @ObservationIgnored private let preloadsEveryLook: Bool
+    @ObservationIgnored private var cameraControlUpdates: [CameraControlUpdate] = []
+    @ObservationIgnored private var cameraControlTask: Task<Void, Never>?
 
     /// Called with each new photo and the look it was taken with.
     @ObservationIgnored var onCapture: ((CapturedPhoto, Look) -> Void)?
     /// Called when the selected look changes (swipe or picker).
     @ObservationIgnored var onLookChange: ((Look) -> Void)?
+    /// Called when the person changes flash, exposure or camera.
+    @ObservationIgnored var onPreferencesChange: ((CameraPreferences) -> Void)?
 
     /// The id the next photo will get. The preview renders random effects
     /// with its seed, and each shot advances it, like winding on a roll.
     @ObservationIgnored private var nextFrameID = UUID()
 
-    init(library: LookLibrary, lutStore: LUTStore = .shared) {
+    init(library: LookLibrary, lutStore: LUTStore = .shared, preloadsEveryLook: Bool = true) {
         let renderer = PreviewRenderer()
         self.renderer = renderer
         self.library = library
         self.lutStore = lutStore
+        self.preloadsEveryLook = preloadsEveryLook
         self.looks = library.looks
         self.captureService = CaptureService(renderer: renderer)
         renderer.show(lookState(for: currentLook))
@@ -112,6 +141,29 @@ final class CameraModel {
     }
 
     // MARK: - Session
+
+    /// Starts as the camera was left: flash, exposure and front or back
+    /// camera. Call before `start()`.
+    func restore(_ preferences: CameraPreferences) {
+        flashMode = preferences.flash
+        preferredPosition = preferences.position
+        exposureBias = min(max(preferences.exposureBias, exposureRange.lowerBound), exposureRange.upperBound)
+        if status == .noCamera { updateDemo() }
+    }
+
+    /// Takes on flash, exposure and camera chosen elsewhere (the Lock Screen
+    /// camera), switching cameras if this one is already running.
+    func adopt(_ preferences: CameraPreferences) {
+        flashMode = preferences.flash
+        applyExposureBias(preferences.exposureBias)
+        syncCameraControlExposure()
+        if hasStarted, capabilities.position != preferences.position, capabilities.canSwitchCamera {
+            switchCamera()
+        } else {
+            preferredPosition = preferences.position
+        }
+        onPreferencesChange?(self.preferences)
+    }
 
     /// Starts the camera if permission allows. Safe to call repeatedly.
     func start() async {
@@ -144,7 +196,7 @@ final class CameraModel {
         guard isPreviewVisible, isAppActive else { return }
         if status != .running { status = .starting }
         do {
-            try await captureService.start()
+            try await captureService.start(position: preferredPosition, exposureBias: exposureBias)
             hasStarted = true
         } catch CameraError.noCamera {
             status = .noCamera
@@ -166,6 +218,7 @@ final class CameraModel {
         demo.supportsWhiteBalance = true
         demo.photoMegapixels = [12, 24, 48]
         capabilities = demo
+        updateDemo()
     }
 
     /// Pause the camera while another full-screen view covers it.
@@ -221,6 +274,8 @@ final class CameraModel {
             lensPosition = nil
             manualExposure = nil
             exposureBias = min(max(exposureBias, exposureRange.lowerBound), exposureRange.upperBound)
+            sendCameraControl(cameraControlLooks)
+            sendCameraControl(cameraControlExposure)
         case .whiteBalanceChanged(let preset):
             whiteBalance = preset
         case .running(let running):
@@ -241,6 +296,12 @@ final class CameraModel {
             break
         case .subjectAreaChanged:
             if !isFocusLocked { focusPoint = nil }
+        case .cameraControlLook(let index):
+            cameraControlSelectedLook(at: index)
+        case .cameraControlExposure(let stops):
+            cameraControlChangedExposure(to: stops)
+        case .cameraControlFullscreen(let fullscreen):
+            isCameraControlFullscreen = fullscreen
         }
     }
 
@@ -252,12 +313,17 @@ final class CameraModel {
 
     /// Jumps straight to a look (from the look picker).
     func select(_ look: Look) {
+        select(look, fromCameraControl: false)
+    }
+
+    private func select(_ look: Look, fromCameraControl: Bool) {
         guard let index = looks.firstIndex(of: look) else { return }
         activePreset = nil
         swipeTarget = nil
         lookIndex = index
         renderer.show(lookState(for: look))
         lookChangeCount += 1
+        lookSelectionChanged(fromCameraControl: fromCameraControl)
         onLookChange?(look)
     }
 
@@ -271,6 +337,7 @@ final class CameraModel {
         state.adjustments = preset.adjustments
         renderer.show(state)
         lookChangeCount += 1
+        lookSelectionChanged(fromCameraControl: false)
         onLookChange?(look)
     }
 
@@ -280,13 +347,30 @@ final class CameraModel {
         looks = ordered.isEmpty ? [.original] : ordered
         if let index = looks.firstIndex(of: current) {
             lookIndex = index
+            lookSelectionChanged(fromCameraControl: false)
         } else {
             activePreset = nil
             swipeTarget = nil
             lookIndex = 0
             renderer.show(lookState(for: currentLook))
+            lookSelectionChanged(fromCameraControl: false)
             onLookChange?(currentLook)
         }
+    }
+
+    /// Camera Control's look picker moved: its indexes follow the swipe order.
+    func cameraControlSelectedLook(at index: Int) {
+        guard looks.indices.contains(index), index != lookIndex else { return }
+        cancelSwipe()
+        select(looks[index], fromCameraControl: true)
+    }
+
+    /// Keeps the nearby looks ready and Camera Control's picker in step. A
+    /// change that came from the picker isn't sent back, so a fast scroll
+    /// on Camera Control is never pulled back to an older look.
+    private func lookSelectionChanged(fromCameraControl: Bool) {
+        if !preloadsEveryLook { preloadLooks() }
+        if !fromCameraControl { sendCameraControl(cameraControlLooks) }
     }
 
     private func wrapped(_ index: Int) -> Int {
@@ -313,6 +397,7 @@ final class CameraModel {
             activePreset = nil
             lookIndex = target
             lookChangeCount += 1
+            lookSelectionChanged(fromCameraControl: false)
             onLookChange?(currentLook)
         }
     }
@@ -325,7 +410,9 @@ final class CameraModel {
     }
 
     private func preloadLooks() {
-        let looks = self.looks
+        let looks = preloadsEveryLook || self.looks.isEmpty
+            ? self.looks
+            : [-1, 0, 1].map { self.looks[wrapped(lookIndex + $0)] }
         let store = lutStore
         Task.detached(priority: .utility) {
             store.preload(looks)
@@ -337,6 +424,7 @@ final class CameraModel {
     func cycleFlash() {
         guard capabilities.hasFlash else { return }
         flashMode = flashMode.next
+        onPreferencesChange?(preferences)
     }
 
     func switchCamera() {
@@ -344,7 +432,8 @@ final class CameraModel {
         focusPoint = nil
         Task {
             do {
-                try await captureService.switchCamera()
+                preferredPosition = try await captureService.switchCamera()
+                onPreferencesChange?(preferences)
             } catch {
                 Logger.camera.error("Switching camera failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -391,22 +480,63 @@ final class CameraModel {
 
     /// Exposure compensation in stops, clamped to `exposureRange`.
     func setExposureBias(_ stops: Float) {
-        guard !isChangingWhiteBalance else { return }
-        let clamped = min(max(stops, exposureRange.lowerBound), exposureRange.upperBound)
-        guard clamped != exposureBias else { return }
-        exposureBias = clamped
-        if status == .noCamera {
-            updateDemo()
+        guard applyExposureBias(stops) else { return }
+        syncCameraControlExposure()
+    }
+
+    /// Camera Control's exposure slider moved. The slider already shows the
+    /// value, so it's only sent back when the camera couldn't take it.
+    func cameraControlChangedExposure(to stops: Float) {
+        guard manualExposure == nil, !isChangingWhiteBalance else {
+            syncCameraControlExposure()
             return
         }
+        applyExposureBias(stops)
+    }
+
+    /// Returns whether the bias changed.
+    @discardableResult
+    private func applyExposureBias(_ stops: Float) -> Bool {
+        guard !isChangingWhiteBalance else { return false }
+        let clamped = min(max(stops, exposureRange.lowerBound), exposureRange.upperBound)
+        guard clamped != exposureBias else { return false }
+        exposureBias = clamped
+        onPreferencesChange?(preferences)
+        if status == .noCamera {
+            updateDemo()
+            return true
+        }
         pendingExposure = clamped
-        guard exposureTask == nil else { return }
+        guard exposureTask == nil else { return true }
         exposureTask = Task {
             while let next = pendingExposure {
                 pendingExposure = nil
                 await captureService.setExposureBias(next)
             }
             exposureTask = nil
+        }
+        return true
+    }
+
+    // MARK: - Camera Control
+
+    private func syncCameraControlExposure() {
+        sendCameraControl(cameraControlExposure)
+    }
+
+    /// Sends Camera Control updates to the capture service in order; a newer
+    /// update of the same kind replaces one still waiting.
+    private func sendCameraControl(_ update: CameraControlUpdate) {
+        guard status != .noCamera else { return }
+        cameraControlUpdates.removeAll { update.replaces($0) }
+        cameraControlUpdates.append(update)
+        guard cameraControlTask == nil else { return }
+        cameraControlTask = Task {
+            while !cameraControlUpdates.isEmpty {
+                let next = cameraControlUpdates.removeFirst()
+                await captureService.updateCameraControl(next)
+            }
+            cameraControlTask = nil
         }
     }
 

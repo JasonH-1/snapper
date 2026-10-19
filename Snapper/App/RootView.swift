@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     @Bindable var app: AppModel
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @Namespace private var libraryZoom
     @State private var incomingPreset: PresetFile?
     @State private var importError: String?
@@ -48,6 +49,25 @@ struct RootView: View {
             app.store.start()
             app.synchronizeCameraPreset()
             await app.captures.load()
+            app.isLibraryLoaded = true
+            await app.importLockScreenPhotos()
+            app.shareCameraWithLockScreen()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active: Task { await app.importLockScreenPhotos() }
+            // Hand the latest settings over before the Lock Screen camera can open.
+            case .background: app.shareCameraWithLockScreen()
+            default: break
+            }
+        }
+        .onContinueUserActivity(AppModel.lockScreenCameraActivity) { activity in
+            let destination = (activity.userInfo?[LockScreenHandoff.userInfoKey] as? String)
+                .flatMap(LockScreenHandoff.init(rawValue:))
+            Task {
+                await app.importLockScreenPhotos()
+                if destination == .library { app.openLibraryFromLockScreen() }
+            }
         }
     }
 
