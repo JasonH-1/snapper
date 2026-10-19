@@ -22,6 +22,9 @@ final class AppSettings {
         static let mirrorFront = "camera.mirrorFrontCamera"
         static let volumeShutter = "camera.volumeButtonShutter"
         static let megapixels = "camera.photoMegapixels"
+        static let flashMode = "camera.flashMode"
+        static let exposureBias = "camera.exposureBias"
+        static let cameraPosition = "camera.position"
         static let photoFormat = "photos.format"
         static let exportOptions = "photos.exportOptions"
     }
@@ -109,6 +112,31 @@ final class AppSettings {
         didSet { defaults.set(photoMegapixels, forKey: Key.megapixels) }
     }
 
+    /// Flash as last set (the front camera turns it off only while in use).
+    var flashMode: FlashMode {
+        didSet { defaults.set(flashMode.rawValue, forKey: Key.flashMode) }
+    }
+
+    /// Exposure compensation as last set, in stops.
+    var exposureBias: Float {
+        didSet { defaults.set(exposureBias, forKey: Key.exposureBias) }
+    }
+
+    /// The camera last shot with: front or back.
+    var cameraPosition: CameraPosition {
+        didSet { defaults.set(cameraPosition.rawValue, forKey: Key.cameraPosition) }
+    }
+
+    /// Flash, exposure and camera, to start the camera as it was left.
+    var cameraPreferences: CameraPreferences {
+        get { CameraPreferences(flash: flashMode, exposureBias: exposureBias, position: cameraPosition) }
+        set {
+            if flashMode != newValue.flash { flashMode = newValue.flash }
+            if exposureBias != newValue.exposureBias { exposureBias = newValue.exposureBias }
+            if cameraPosition != newValue.position { cameraPosition = newValue.position }
+        }
+    }
+
     /// How photos are written when saved or shared: format, size, quality
     /// and location.
     var exportOptions: ExportOptions {
@@ -147,6 +175,9 @@ final class AppSettings {
         mirrorFrontCamera = defaults.object(forKey: Key.mirrorFront) as? Bool ?? true
         volumeButtonShutter = defaults.object(forKey: Key.volumeShutter) as? Bool ?? true
         photoMegapixels = defaults.object(forKey: Key.megapixels) as? Int ?? 24
+        flashMode = defaults.string(forKey: Key.flashMode).flatMap(FlashMode.init(rawValue:)) ?? .off
+        exposureBias = defaults.float(forKey: Key.exposureBias)
+        cameraPosition = defaults.string(forKey: Key.cameraPosition).flatMap(CameraPosition.init(rawValue:)) ?? .back
         if let data = defaults.data(forKey: Key.exportOptions),
            let options = try? JSONDecoder().decode(ExportOptions.self, from: data) {
             exportOptions = options

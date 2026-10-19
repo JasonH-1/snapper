@@ -8,6 +8,7 @@ An iPhone camera and photo editor with live film looks and reusable personal sty
 - **What you see is what you save:** the preview, the full-resolution photo and every export go through the same pipeline (`LookPipeline`).
 - **41 original looks in five collections:** Disposable, Neon Nights, Soft Portrait, Overclock and Darkroom. Eight are free, at least one in every collection.
 - **Looks are data:** each look is a 33-point `.cube` file listed in `filters.json`, plus optional effects (sky gradient, glow, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, noise, film grain, vignette) drawn after it. A Python tool generates and quality-checks them.
+- **Opens from Camera Control, the Lock Screen and Control Center (iOS 18):** a Lock Screen camera extension with the same live looks, a Control Center control, and a look picker and exposure slider on Camera Control. Snapper also keeps the last look, flash, exposure and front/back camera between launches. See [docs/camera-launch.md](docs/camera-launch.md).
 - **StoreKit 2:** monthly and yearly plans (7-day trial on yearly) and a one-time Lifetime unlock. There are no accounts and no backend; the Apple ID is the account.
 
 Requirements: Xcode 26 or later, iOS 17+, iPhone only. CI builds with Xcode 26.6 on `macos-latest`.
@@ -160,7 +161,10 @@ Snapper/
   Store/        PurchaseService protocol, StoreKitPurchaseService, PaywallModel + PaywallView
   Onboarding/   OnboardingView
   Settings/     SettingsView, FavoritesView
+  CameraLaunch/ SnapperCaptureIntent (shared with both extensions), Lock Screen photo inbox and import
   Resources/    Assets, Info.plist, PrivacyInfo.xcprivacy, Filters/ (filters.json, LUTs/), Showcase/
+SnapperCapture/  Lock Screen camera (LockedCameraCapture extension, reuses the camera code)
+SnapperControls/ Control Center control (WidgetKit)
 SnapperTests/   LUT parser, manifest, capture store, export, Core Image vs generator, StoreKit
 tools/lutgen/   Look generator, quality gates, contact sheets
 docs/           Privacy Policy, Terms of Use, Support (GitHub Pages)

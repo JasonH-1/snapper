@@ -126,8 +126,8 @@ final class CaptureLibrary {
         recipe.lookID = look.id
         recipe.crop = PhotoCrop(shape: CropShape(cameraAspect: photo.aspect))
         recipe.finish = .none
-        records.insert(CaptureRecord(id: id, fileName: fileName, source: .camera, isFrontCamera: photo.isFrontCamera,
-                                     recipe: recipe), at: 0)
+        records.insert(CaptureRecord(id: id, takenAt: photo.takenAt, fileName: fileName, source: .camera,
+                                     isFrontCamera: photo.isFrontCamera, recipe: recipe), at: 0)
         notePremiumEdits(at: 0)
         let record = records[0]
         await refreshThumbnail(for: record)

@@ -139,11 +139,20 @@ struct CaptureOptions: Sendable, Equatable {
     var mirrorFrontCamera = true
 }
 
-enum CameraPosition: Sendable {
+enum CameraPosition: String, Sendable {
     case back, front
 
     var toggled: CameraPosition { self == .back ? .front : .back }
     var avPosition: AVCaptureDevice.Position { self == .back ? .back : .front }
+}
+
+/// The camera as the person left it, kept between launches: flash,
+/// exposure compensation and which camera (front or back).
+struct CameraPreferences: Equatable, Sendable {
+    var flash: FlashMode = .off
+    /// Exposure compensation in stops.
+    var exposureBias: Float = 0
+    var position: CameraPosition = .back
 }
 
 /// Why the live camera is not showing frames right now.
@@ -199,6 +208,30 @@ enum CaptureEvent: Sendable {
     case failed(String)
     case captureOrientation(CGFloat)
     case subjectAreaChanged
+    /// Camera Control (iOS 18): the look picker moved to this index.
+    case cameraControlLook(Int)
+    /// Camera Control: the exposure slider moved to this many stops.
+    case cameraControlExposure(Float)
+    /// Camera Control's overlay took over the screen (true) or left it.
+    case cameraControlFullscreen(Bool)
+}
+
+/// What Camera Control (iOS 18, iPhone 16 and later) shows: a picker of the
+/// looks in swipe order and an exposure slider.
+enum CameraControlUpdate: Equatable, Sendable {
+    /// The look picker: one title per look, in swipe order, and the selection.
+    case looks(titles: [String], selected: Int)
+    /// The exposure slider: its range and value, in stops. It is disabled
+    /// while ISO and shutter speed are set by hand.
+    case exposure(range: ClosedRange<Float>, value: Float, isEnabled: Bool)
+
+    /// Updates of the same kind replace each other while they wait.
+    func replaces(_ other: CameraControlUpdate) -> Bool {
+        switch (self, other) {
+        case (.looks, .looks), (.exposure, .exposure): true
+        default: false
+        }
+    }
 }
 
 enum CameraError: LocalizedError, Sendable {
