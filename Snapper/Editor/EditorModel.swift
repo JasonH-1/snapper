@@ -459,10 +459,12 @@ final class EditorModel: Identifiable, Hashable {
     }
     var brushMode: MaskStroke.Mode = .paint
     /// Brush diameter on screen, in points.
-    var brushSize = 50.0
+    var brushSize = EditorModel.defaultBrushSize
     static let brushSizeRange = 8.0...160.0
+    static let defaultBrushSize = 50.0
     /// 0 is a hard edge, 1 fully feathered.
-    var brushSoftness = 0.5
+    var brushSoftness = EditorModel.defaultBrushSoftness
+    static let defaultBrushSoftness = 0.5
 
     /// The selection tinted, the same shape as the preview.
     private(set) var maskOverlay: UIImage?

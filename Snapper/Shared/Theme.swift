@@ -48,7 +48,22 @@ extension View {
     }
 }
 
-/// A round glass button used for camera controls.
+// MARK: - Controls
+
+/// Controls take after the camera's dial: dark faces, hairline edges where
+/// a button needs an outline, and Signal Yellow only for the primary action.
+/// Nothing glows except the purchase button.
+enum Instrument {
+    static let hairline = Color.white.opacity(0.18)
+    static let face = Color.white.opacity(0.05)
+    static let pressedFace = Color.white.opacity(0.12)
+    /// Camera and editing controls: a borderless face a little lighter
+    /// than `face`, so it reads over the black camera chrome.
+    static let controlFace = Color.white.opacity(0.1)
+    static let pressedControlFace = Color.white.opacity(0.2)
+}
+
+/// A square camera or editing control on a borderless dark face.
 struct CameraIconButtonStyle: ButtonStyle {
     var size: CGFloat = Theme.controlSize
 
@@ -57,59 +72,73 @@ struct CameraIconButtonStyle: ButtonStyle {
             .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .glassSurface(in: Circle(), interactive: true)
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
-            .contentShape(Circle())
+            .controlFace(isPressed: configuration.isPressed)
+            .contentShape(Rectangle())
+            .animation(Motion.quick, value: configuration.isPressed)
     }
 }
 
-/// Primary call-to-action button (filled, full width).
+/// Call-to-action button, full width: yellow, or a hairline outline when
+/// not prominent. `glows` is for the purchase button only.
 struct PrimaryButtonStyle: ButtonStyle {
     var isProminent = true
+    var glows = false
 
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let isPressed = configuration.isPressed && isEnabled
+        let isFilled = isProminent && isEnabled
         configuration.label
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .foregroundStyle(foreground)
-            .background(background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .opacity(configuration.isPressed ? 0.85 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-
-    /// Disabled buttons go grey so they never look tappable.
-    private var foreground: Color {
-        guard isEnabled else { return Color(.systemGray) }
-        return isProminent ? .black : .primary
-    }
-
-    private var background: Color {
-        isEnabled && isProminent ? Theme.accent : Color(.systemGray5)
+            .foregroundStyle(isEnabled ? (isProminent ? Color.black : Color.white) : Color(.systemGray))
+            .background {
+                if isFilled {
+                    shape.fill(isPressed ? Color(red: 0.9, green: 0.72, blue: 0) : Theme.accent)
+                } else {
+                    shape.fill(isPressed ? Instrument.pressedFace : Instrument.face)
+                }
+            }
+            .overlay {
+                if !isFilled {
+                    shape.strokeBorder(isEnabled ? Instrument.hairline : Color.white.opacity(0.08), lineWidth: 1)
+                }
+            }
+            .shadow(color: Theme.accent.opacity(glows && isFilled && !isPressed ? 0.3 : 0), radius: 14)
+            .animation(Motion.quick, value: isPressed)
     }
 }
 
 extension View {
-    /// The pill for filter, category and shape chips. Selected is solid
-    /// white; yellow is kept for primary actions so it always means "do it".
-    /// The pill grows with the text size (padding, not a fixed height).
+    /// A camera or editing control's face: dark and borderless, lighter
+    /// while pressed.
+    func controlFace(isPressed: Bool = false, cornerRadius: CGFloat = 12) -> some View {
+        background(isPressed ? Instrument.pressedControlFace : Instrument.controlFace,
+                   in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
+    /// A secondary button's face: dark, with a hairline edge.
+    func hairlineControl(cornerRadius: CGFloat = 12) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return background(Instrument.face, in: shape)
+            .overlay(shape.strokeBorder(Instrument.hairline, lineWidth: 1))
+    }
+
+    /// The chip for filters, categories and shapes: a hairline frame,
+    /// brighter and outlined in white when selected. Yellow is kept for the
+    /// primary action. The chip grows with the text size (padding, not a
+    /// fixed height).
     func chip(isSelected: Bool, horizontalPadding: CGFloat = 12) -> some View {
-        self
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        return self
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 7)
-            .foregroundStyle(isSelected ? Color.black : Color.white)
-            .background {
-                if isSelected {
-                    Capsule().fill(.white)
-                } else {
-                    Capsule().fill(.white.opacity(0.13))
-                        .overlay(Capsule().strokeBorder(.white.opacity(0.16), lineWidth: 1))
-                }
-            }
+            .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.75))
+            .background(isSelected ? Color.white.opacity(0.14) : Instrument.face, in: shape)
+            .overlay(shape.strokeBorder(isSelected ? Color.white.opacity(0.75) : Instrument.hairline, lineWidth: 1))
     }
 
     /// Pads a small control's tappable area out to Apple's 44 pt minimum

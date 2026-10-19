@@ -164,7 +164,7 @@ struct CategoryChips: View {
             if let count = section.count {
                 Text("\(count)")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(isActive ? Color.black.opacity(0.55) : Color.secondary)
+                    .foregroundStyle(isActive ? Color.white.opacity(0.6) : Color.secondary)
             }
         }
         .lineLimit(1)

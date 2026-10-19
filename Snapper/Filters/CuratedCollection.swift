@@ -40,6 +40,17 @@ struct CuratedCollection: Identifiable, Sendable {
         ])
     ]
     static func contains(_ style: CuratedStyle) -> Bool { releases.contains { $0.styles.contains(style) } }
+
+    /// The bundled photo its styles are previewed on, chosen to suit the
+    /// collection's light.
+    var samplePhoto: String {
+        switch id {
+        case "golden-hour-01": "showcase-portrait"
+        case "after-dark-01": "showcase-night"
+        case "quiet-days-01": "showcase-cafe"
+        default: "demo-scene"
+        }
+    }
     private static func style(_ id: String, _ name: String, _ tip: String, look: String, strength: Double,
                               warmth: Double = 0, highlights: Double = 0, shadows: Double = 0,
                               bloom: Double = 0, halation: Double = 0, vignette: Double = 0) -> CuratedStyle {
