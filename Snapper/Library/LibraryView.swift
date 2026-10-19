@@ -296,7 +296,7 @@ struct LibraryView: View {
                 } label: {
                     Label("Style a Set", systemImage: "square.stack")
                         .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                        .hairlineControl()
                 }
                 .disabled(model.records.isEmpty)
                 if let latest = model.records.first {
@@ -305,7 +305,7 @@ struct LibraryView: View {
                     } label: {
                         Label("Copy Latest Style", systemImage: "doc.on.doc")
                             .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                            .hairlineControl()
                     }
                     .accessibilityHint("Copies the look and edits of your latest photo to paste onto others")
                 }

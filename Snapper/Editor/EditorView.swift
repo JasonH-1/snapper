@@ -414,23 +414,11 @@ struct EditorView: View {
                         select: { look in withAnimation(animation) { model.select(look) } },
                         toggleFavorite: { model.toggleFavorite($0) })
 
-            HStack(spacing: 12) {
-                Text("Strength")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Slider(value: $model.strength, in: 0...1) { editing in
-                    model.interaction(began: editing)
-                }
+            ProSlider(title: String(localized: "Strength"), value: $model.strength, range: 0...1, defaultValue: 1,
+                      format: { "\(Int(($0 * 100).rounded()))" },
+                      onEditingChanged: { model.interaction(began: $0) })
                 .disabled(model.currentLook.isOriginal)
-                Text("\(Int((model.strength * 100).rounded()))")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .fixedSize()
-                    .frame(minWidth: 34, alignment: .trailing)
-            }
-            .padding(.horizontal, 16)
-            .opacity(model.currentLook.isOriginal ? 0.4 : 1)
+                .padding(.horizontal, 16)
         }
     }
 
@@ -558,11 +546,9 @@ struct EditorView: View {
                 }
                 .frame(minHeight: 44)
                 if model.frame != .none {
-                    HStack {
-                        Text("Border").font(.subheadline)
-                        Slider(value: $model.border, in: 0.01...0.16, onEditingChanged: { model.interaction(began: $0) })
-                            .accessibilityLabel("Border width")
-                    }
+                    ProSlider(title: String(localized: "Border"), value: $model.border, range: 0.01...0.16,
+                              defaultValue: PhotoFinish().border, format: ProSlider.percent,
+                              onEditingChanged: { model.interaction(began: $0) })
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     LabeledContent("Layout") {

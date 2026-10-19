@@ -42,8 +42,8 @@ struct CameraView: View {
     }
 
     private static let topBarHeight: CGFloat = 52
-    /// Approximate height of the look caption + shutter row.
-    private static let controlsHeight: CGFloat = 186
+    /// Approximate height of the look dial + shutter row.
+    private static let controlsHeight: CGFloat = 198
 
     var body: some View {
         GeometryReader { geometry in
@@ -136,13 +136,16 @@ struct CameraView: View {
                         Image(systemName: "lock.fill")
                         Text("Premium")
                     }
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.black)
+                    .font(.system(.footnote, design: .monospaced, weight: .semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(Theme.accent, in: Capsule())
+                    .background(Theme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1))
                     .minimumTapTarget()
                 }
+                .buttonStyle(PressableButtonStyle())
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                 .accessibilityHint(Text("Shows Snapper Premium. Without it, photos save without the Premium look or tools."))
             }
@@ -304,33 +307,31 @@ struct CameraView: View {
         VStack(spacing: 12) {
             HStack(spacing: 10) {
                 Button(action: onOpenLookPicker) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "camera.filters").foregroundStyle(Theme.accent)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("LOOKS").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
-                            Text(model.currentLook.name).font(Theme.lookName(.headline)).lineLimit(1)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
-                    }
-                    .padding(12).frame(maxWidth: .infinity, minHeight: 58)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
-                    .contentShape(Rectangle())
+                    let place = LookDial.position(of: model.currentLook, in: model.library)
+                    LookDial(look: model.currentLook, collectionName: model.collectionName,
+                             position: place?.index, count: place?.count ?? 0)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Browse looks. Current look: \(model.currentLook.name)")
+                // A readout to match the dial: which personal style is on.
                 Button(action: onOpenPresets) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label("MY STYLES", systemImage: "square.stack").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("My styles")
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .textCase(.uppercase)
+                            .foregroundStyle(.secondary)
                         Text(model.activePreset?.name ?? String(localized: "Presets"))
                             .font(.subheadline.weight(.semibold)).lineLimit(1)
                             .foregroundStyle(model.activePreset == nil ? Color.white : Theme.accent)
                     }
-                    .padding(12).frame(minHeight: 58)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 12)
+                    .frame(maxHeight: .infinity)
+                    .dialPanel()
                     .contentShape(Rectangle())
                 }
                 .accessibilityHint("Choose or save a personal style")
             }
+            .fixedSize(horizontal: false, vertical: true)
             .buttonStyle(PressableButtonStyle())
             .padding(.horizontal, 16)
             HStack {
@@ -346,13 +347,14 @@ struct CameraView: View {
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 18, weight: .semibold))
                             .frame(width: 52, height: 52)
-                            .glassSurface(in: Circle(), interactive: true)
+                            .controlFace()
                         Text("Flip").font(.caption.weight(.semibold))
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(!model.capabilities.canSwitchCamera)
                 .opacity(model.capabilities.canSwitchCamera ? 1 : 0.35)
                 .accessibilityLabel(Text("Switch camera"))

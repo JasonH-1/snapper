@@ -265,7 +265,7 @@ struct PaywallView: View {
                     Text(ctaTitle)
                 }
             }
-            .buttonStyle(PrimaryButtonStyle())
+            .buttonStyle(PrimaryButtonStyle(glows: true))
             .disabled(model.selectedPlan == nil || model.isPurchasing || model.isRestoring)
 
             if let plan = model.selectedPlan {

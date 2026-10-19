@@ -137,7 +137,7 @@ final class PaywallModel: Identifiable {
 
         var photos: [URL] = []
         if let photoURL { photos.append(photoURL) }
-        for name in ["showcase-portrait", "showcase-coffee", "showcase-launch"] {
+        for name in ["showcase-portrait", "showcase-cafe", "showcase-night"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "jpg") { photos.append(url) }
         }
         guard !photos.isEmpty else { return [] }

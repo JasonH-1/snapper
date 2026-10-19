@@ -294,53 +294,47 @@ private struct CurveEditor: View {
 }
 
 /// Split toning, in the Color tab: one tint for the highlights, another for
-/// the shadows, and the balance between them.
+/// the shadows, and the balance between them. Reset lives in the tab's menu.
 struct SplitToningPanel: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            toneRow(title: Text("Highlights"), hue: \.highlightHue, saturation: \.highlightSaturation)
-            toneRow(title: Text("Shadows"), hue: \.shadowHue, saturation: \.shadowSaturation)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("Balance").font(.caption)
-                    Spacer()
-                    Text(EditorView.formatAdjustment(model.splitToning.balance))
-                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                }
-                Slider(value: binding(\.balance), in: -1...1, onEditingChanged: { model.interaction(began: $0) })
-                    .tint(Theme.accent)
-                    .accessibilityLabel(Text("Balance"))
-                    .accessibilityValue(Text(balanceDescription))
-            }
-            Button("Reset Split Toning") { model.resetSplitToning() }
-                .frame(minHeight: 44)
-                .disabled(model.splitToning == .none)
+        VStack(alignment: .leading, spacing: 4) {
+            toneGroup(title: Text("Highlights"), hue: \.highlightHue, saturation: \.highlightSaturation)
+            toneGroup(title: Text("Shadows"), hue: \.shadowHue, saturation: \.shadowSaturation)
+            ProSlider(title: String(localized: "Balance"), value: binding(\.balance),
+                      gradient: [tint(hue: model.splitToning.shadowHue), Color(white: 0.6), tint(hue: model.splitToning.highlightHue)],
+                      onEditingChanged: { model.interaction(began: $0) })
+                .accessibilityValue(Text(balanceDescription))
         }
     }
 
-    private func toneRow(title: Text, hue: WritableKeyPath<SplitToning, Double>,
-                         saturation: WritableKeyPath<SplitToning, Double>) -> some View {
+    private func toneGroup(title: Text, hue: WritableKeyPath<SplitToning, Double>,
+                           saturation: WritableKeyPath<SplitToning, Double>) -> some View {
         let toning = model.splitToning
-        return VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Circle()
-                    .fill(Color(hue: toning[keyPath: hue] / 360, saturation: max(toning[keyPath: saturation], 0.15), brightness: 1))
-                    .frame(width: 12, height: 12)
-                title.font(.subheadline.weight(.semibold))
-                Spacer()
-                Text("\(Int(toning[keyPath: hue].rounded()))° · \(Int((toning[keyPath: saturation] * 100).rounded()))")
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .fill(tint(hue: toning[keyPath: hue], saturation: max(toning[keyPath: saturation], 0.15)))
+                    .frame(width: 10, height: 10)
+                title.font(.footnote.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
             }
-            HueSlider(value: binding(hue), onEditingChanged: { model.interaction(began: $0) })
-                .accessibilityLabel(title)
-                .accessibilityValue(Text("Hue \(Int(toning[keyPath: hue].rounded())) degrees"))
-            Slider(value: binding(saturation), in: 0...1, onEditingChanged: { model.interaction(began: $0) })
-                .tint(Color(hue: toning[keyPath: hue] / 360, saturation: 0.8, brightness: 1))
-                .accessibilityLabel(title)
-                .accessibilityValue(Text("Saturation \(Int((toning[keyPath: saturation] * 100).rounded())) percent"))
+            .padding(.top, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            ProSlider(title: String(localized: "Hue"), value: binding(hue), range: 0...360, origin: SplitToning.none[keyPath: hue],
+                      gradient: stride(from: 0.0, through: 360, by: 60).map { tint(hue: $0) },
+                      format: { "\(Int($0.rounded()))°" },
+                      onEditingChanged: { model.interaction(began: $0) })
+            ProSlider(title: String(localized: "Amount"), value: binding(saturation), range: 0...1,
+                      gradient: [Color(white: 0.55), tint(hue: toning[keyPath: hue])],
+                      format: ProSlider.percent,
+                      onEditingChanged: { model.interaction(began: $0) })
         }
+    }
+
+    private func tint(hue: Double, saturation: Double = 0.8) -> Color {
+        Color(hue: hue.truncatingRemainder(dividingBy: 360) / 360, saturation: saturation, brightness: 1)
     }
 
     private var balanceDescription: String {
@@ -356,24 +350,6 @@ struct SplitToningPanel: View {
             toning[keyPath: key] = value
             model.splitToning = toning
         })
-    }
-}
-
-/// A hue slider over a rainbow track.
-private struct HueSlider: View {
-    @Binding var value: Double
-    var onEditingChanged: (Bool) -> Void
-
-    var body: some View {
-        Slider(value: $value, in: 0...360, onEditingChanged: onEditingChanged)
-            .tint(.clear)
-            .background {
-                LinearGradient(colors: stride(from: 0.0, through: 1.0, by: 1.0 / 6).map { Color(hue: $0, saturation: 0.85, brightness: 1) },
-                               startPoint: .leading, endPoint: .trailing)
-                    .frame(height: 6)
-                    .clipShape(Capsule())
-                    .allowsHitTesting(false)
-            }
     }
 }
 

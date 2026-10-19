@@ -6,7 +6,7 @@ This branch implements the proposed $19.99/year product package; it does not est
 
 - [ ] Set the developer/publisher name and real monitored support email in `AppConfig.swift` and `docs/*.html`. Confirm the terms' governing-law placeholder. Do not guess these identities or legal terms.
 - [ ] Set the App Store ID when it exists; configure the monthly/yearly products and localized benefits to match the app.
-- [ ] Replace showcase stand-ins with owned/permissioned original photos (at least 1600px on the long edge). Keep consent/licensing records. Do not upscale the current samples and call them new originals.
+- [ ] Sample photos are Unsplash photos at 1800 px; their licence and credits are in `docs/photo-credits.md`. Get a model release for the portrait, or replace it with an owned photo shot with consent (at least 1600 px on the long edge), and keep the consent record.
 - [ ] Confirm the privacy/support/terms pages are deployed and accessible.
 
 Run `python3 scripts/check-release.py` to report unresolved configuration and showcase checks. It deliberately fails until the required inputs are supplied; it is not part of ordinary development CI.

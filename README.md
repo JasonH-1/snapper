@@ -141,7 +141,7 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 
 - [ ] Fill in the placeholders in `Snapper/App/AppConfig.swift`: developer name, support email, and the App Store ID once the app exists. The ID turns on the "Rate Snapper" deep link.
 - [ ] Replace the highlighted placeholders in `docs/*.html` (name, email, governing law).
-- [ ] Replace `Snapper/Resources/Showcase/*.jpg` with your own high-resolution photos (1600 px or more) shot with consent. They appear in onboarding, on the paywall, and in the Simulator. The current ones are small public-domain stand-ins.
+- [ ] Check the sample photos in `Snapper/Resources/Showcase/`. They appear in onboarding, on the paywall, in the look thumbnails and in the Simulator. They're Unsplash photos at 1800 px (credits in `docs/photo-credits.md`); Unsplash includes no model releases, so get a release for the portrait or swap in your own photo shot with consent.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
 - [ ] App Review notes: "Onboarding opens the camera immediately. Eight looks, highlights, shadows, the date stamp and one personal preset are free, with watermark-free exports. Premium looks and tools can be previewed free; saving them as they are requires Premium, and any photo can be saved for free without its Premium parts. Presets are under Looks › Presets; batch presets are under Library › Select › Style; frames and layouts are in Finish. The paywall has an × close button. Use a sandbox account to test the subscriptions and the Lifetime purchase."
