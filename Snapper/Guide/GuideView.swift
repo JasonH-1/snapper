@@ -27,7 +27,7 @@ struct GuideView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("A little guidance. Better photos.", systemImage: "sparkles")
                                 .font(Theme.lookName(.title2))
-                            Text("Start with your first photo, or explore a tool. Visual examples use a sample photo and never change your own images.")
+                            Text("Start with your first photo, or explore a tool. Each topic shows it in Snapper on sample photos, never your own.")
                                 .foregroundStyle(.secondary)
                         }.padding(.vertical, 8)
                     }
@@ -91,7 +91,9 @@ private struct GuideTopicView: View {
                 Text(topic.section.uppercased()).font(.caption.weight(.bold)).foregroundStyle(Theme.accent)
                 Text(topic.title).font(Theme.lookName(.largeTitle)).accessibilityAddTraits(.isHeader)
                 Text(topic.summary).font(.title3).foregroundStyle(.secondary)
-                if [.looks, .brightness, .warmth, .crop, .color, .film].contains(topic.visual) {
+                if let demo = GuideDemoView.url(for: topic) {
+                    GuideDemoView(url: demo, title: topic.title)
+                } else if [.looks, .brightness, .warmth, .crop, .color, .film].contains(topic.visual) {
                     GuidePhotoExample(visual: topic.visual, library: library)
                 } else {
                     GuideDiagram(visual: topic.visual)
