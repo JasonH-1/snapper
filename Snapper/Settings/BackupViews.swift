@@ -145,78 +145,29 @@ struct BackupRestoreView: View {
     }
 }
 
-/// The Back Up and Restore rows in Settings.
-struct BackupSection: View {
-    let app: AppModel
-
-    @State private var isBackingUp = false
-    @State private var backupTask: Task<Void, Never>?
-    @State private var backupFile: BackupFile?
-    @State private var errorMessage: String?
-    @State private var isPickingBackup = false
-    @State private var pickedBackup: AppModel.IncomingBackup?
+/// What Back Up and Restore are doing. Settings keeps it and attaches
+/// `backupPresentations` to its whole list: on a List section, SwiftUI copies
+/// sheets to every row, and the Back Up row is swapped for a progress row
+/// mid-backup, which dropped the share sheet and closed Settings with it.
+@MainActor
+@Observable
+final class BackupFlow {
+    var isBackingUp = false
+    var backupFile: BackupFile?
+    var errorMessage: String?
+    var isPickingBackup = false
+    var pickedBackup: AppModel.IncomingBackup?
+    @ObservationIgnored private var backupTask: Task<Void, Never>?
     /// The temporary backup file to delete once the share sheet closes.
-    @State private var sharedBackupURL: URL?
+    @ObservationIgnored private var sharedBackupURL: URL?
 
-    private struct BackupFile: Identifiable {
+    struct BackupFile: Identifiable {
         let url: URL
         let summary: LibraryBackup.Summary
         var id: URL { url }
     }
 
-    var body: some View {
-        Section {
-            if isBackingUp {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Backing up…")
-                        Spacer()
-                        Button("Stop") { backupTask?.cancel() }
-                    }
-                    ProgressView(value: app.captures.backupProgress ?? 0)
-                        .tint(Theme.accent)
-                }
-            } else {
-                Button {
-                    backUp()
-                } label: {
-                    Label("Back Up Library", systemImage: "externaldrive.badge.plus")
-                }
-                .disabled(app.captures.records.isEmpty)
-            }
-            Button {
-                isPickingBackup = true
-            } label: {
-                Label("Restore from Backup", systemImage: "arrow.clockwise.icloud")
-            }
-            .disabled(isBackingUp)
-        } header: {
-            Text("Backup")
-        } footer: {
-            Text("A backup is one file with every original, its edits and versions, plus your presets and favorites. Save it to Files or AirDrop it to your new iPhone, then open it in Snapper.")
-        }
-        .sheet(item: $backupFile, onDismiss: removeBackupFile) { file in
-            ShareSheet(items: [file.url])
-                .presentationDetents([.medium, .large])
-                .ignoresSafeArea()
-        }
-        .sheet(item: $pickedBackup) { backup in
-            BackupRestoreView(app: app, url: backup.url)
-        }
-        .fileImporter(isPresented: $isPickingBackup, allowedContentTypes: [.snapperBackup]) { result in
-            switch result {
-            case .success(let url): pickedBackup = AppModel.IncomingBackup(url: url)
-            case .failure(let error): errorMessage = error.localizedDescription
-            }
-        }
-        .alert("Backup didn't finish", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? "")
-        }
-    }
-
-    private func backUp() {
+    func backUp(_ app: AppModel) {
         isBackingUp = true
         backupTask = Task {
             defer { isBackingUp = false }
@@ -232,10 +183,12 @@ struct BackupSection: View {
         }
     }
 
+    func stop() { backupTask?.cancel() }
+
     /// Removes the temporary backup a while after the share sheet closes:
     /// an AirDrop can still be sending when it does. (A new backup also
     /// clears old ones.)
-    private func removeBackupFile() {
+    func removeBackupFile() {
         guard let url = sharedBackupURL else { return }
         sharedBackupURL = nil
         let folder = url.deletingLastPathComponent()
@@ -243,5 +196,82 @@ struct BackupSection: View {
             try? await Task.sleep(for: .seconds(900))
             try? FileManager.default.removeItem(at: folder)
         }
+    }
+}
+
+/// The Back Up and Restore rows in Settings. What they open is shown by
+/// `backupPresentations`, on the list around them.
+struct BackupSection: View {
+    let app: AppModel
+    let backup: BackupFlow
+
+    var body: some View {
+        Section {
+            if backup.isBackingUp {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Backing up…")
+                        Spacer()
+                        Button("Stop") { backup.stop() }
+                    }
+                    ProgressView(value: app.captures.backupProgress ?? 0)
+                        .tint(Theme.accent)
+                }
+            } else {
+                Button {
+                    backup.backUp(app)
+                } label: {
+                    Label("Back Up Library", systemImage: "externaldrive.badge.plus")
+                }
+                .disabled(app.captures.records.isEmpty)
+            }
+            Button {
+                backup.isPickingBackup = true
+            } label: {
+                Label("Restore from Backup", systemImage: "arrow.clockwise.icloud")
+            }
+            .disabled(backup.isBackingUp)
+        } header: {
+            Text("Backup")
+        } footer: {
+            Text("A backup is one file with every original, its edits and versions, plus your presets and favorites. Save it to Files or AirDrop it to your new iPhone, then open it in Snapper.")
+        }
+    }
+}
+
+extension View {
+    /// The backup's share sheet, the file picker and restore, and errors, for
+    /// `BackupSection`. Attach it to the list, not the section.
+    func backupPresentations(_ backup: BackupFlow, app: AppModel) -> some View {
+        modifier(BackupPresentations(backup: backup, app: app))
+    }
+}
+
+private struct BackupPresentations: ViewModifier {
+    @Bindable var backup: BackupFlow
+    let app: AppModel
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $backup.backupFile, onDismiss: { backup.removeBackupFile() }) { file in
+                ShareSheet(items: [file.url])
+                    .presentationDetents([.medium, .large])
+                    .ignoresSafeArea()
+            }
+            .sheet(item: $backup.pickedBackup) { picked in
+                BackupRestoreView(app: app, url: picked.url)
+            }
+            .fileImporter(isPresented: $backup.isPickingBackup, allowedContentTypes: [.snapperBackup]) { result in
+                switch result {
+                case .success(let url): backup.pickedBackup = AppModel.IncomingBackup(url: url)
+                case .failure(let error): backup.errorMessage = error.localizedDescription
+                }
+            }
+            .alert("Backup didn't finish", isPresented: Binding(get: { backup.errorMessage != nil },
+                                                                 set: { if !$0 { backup.errorMessage = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(backup.errorMessage ?? "")
+            }
     }
 }

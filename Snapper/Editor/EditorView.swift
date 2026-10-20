@@ -713,7 +713,7 @@ struct EditorView: View {
             }
             .padding(.horizontal, 16)
 
-            if model.isLocked {
+            if model.offersFreeSave {
                 // Never a dead end: the photo can always be saved without its
                 // Premium parts.
                 Button {
@@ -747,6 +747,7 @@ struct EditorView: View {
         }
         .animation(animation, value: model.isSaved)
         .animation(animation, value: model.isLocked)
+        .animation(animation, value: model.offersFreeSave)
     }
 
     @ViewBuilder

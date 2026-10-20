@@ -167,6 +167,12 @@ final class EditorModel: Identifiable, Hashable {
     var record: CaptureRecord? { library.record(id: id) }
     var currentLook: Look { looks.look(id: recipe.lookID) ?? .original }
     var isLocked: Bool { needsPremium(recipe) }
+    /// Whether the save bar offers the free save under its buttons. It
+    /// follows `isLocked` but waits for the finger to lift, so the rows it
+    /// adds never move the panel under a drag.
+    var offersFreeSave: Bool { lockedWhenDragBegan ?? isLocked }
+    /// `isLocked` when the current drag began.
+    private var lockedWhenDragBegan: Bool?
     var hasPremiumNow: Bool { hasPremium() }
     var isImported: Bool { record?.isImported ?? false }
     var isEdited: Bool { record.map { recipe != $0.initialRecipe } ?? false }
@@ -883,7 +889,12 @@ final class EditorModel: Identifiable, Hashable {
     /// A slider, dial or crop drag started or ended.
     func interaction(began: Bool) {
         isInteracting = began
-        if !began { commit() }
+        if began {
+            if lockedWhenDragBegan == nil { lockedWhenDragBegan = isLocked }
+        } else {
+            lockedWhenDragBegan = nil
+            commit()
+        }
     }
 
     /// A single tap's change (a look, a shape, a turn, a reset): always its
@@ -986,6 +997,7 @@ final class EditorModel: Identifiable, Hashable {
     /// Called when the editor closes.
     func finish() {
         isInteracting = false
+        lockedWhenDragBegan = nil
         commit()
         estimateTask?.cancel()
         discardPreparedExport()
@@ -1042,7 +1054,11 @@ final class EditorModel: Identifiable, Hashable {
         let unfinished = tab == .selective
         if unfinished { shown.finish = .none }
         if let image = await renderer.preview(id: id, sourceURL: url, look: look, recipe: shown, maxPixelSize: previewPixelSize) {
-            guard self.recipe == recipe, tab == renderingTab else { return }
+            // Mid-drag the recipe has usually moved on by the time a render
+            // finishes. Show it anyway when the next render is already
+            // queued, so the photo keeps up with the slider; that render
+            // draws the latest value.
+            guard self.recipe == recipe || renderAgain, tab == renderingTab else { return }
             preview = image
             previewIsUnfinished = unfinished || recipe.finish == .none
         }

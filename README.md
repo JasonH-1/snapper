@@ -148,6 +148,20 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 - [ ] Set `APP_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config/Local.xcconfig` (see Setup). The Lock Screen camera and Control Center control get their own IDs, `<app id>.capture` and `<app id>.controls`; register all three in your developer account.
 - [ ] App Review notes: "Onboarding ends with one optional Premium offer; Not Now or × goes straight to the camera. Nine looks, highlights, shadows, the date stamp and one personal preset are free, with watermark-free exports. Premium looks and tools can be previewed free; saving them as they are requires Premium, and any photo can be saved for free without its Premium parts. Presets are under Looks › Presets; batch presets are under Library › Select › Style; frames and layouts are in Finish. On iOS 18, Snapper can be chosen as the Lock Screen and Camera Control camera, and has a Control Center control. The paywall has an × close button. Use a sandbox account to test the subscriptions and the Lifetime purchase."
 
+## Guide videos
+
+Each Snapper Guide topic shows a short looping clip of the feature being used, recorded in the Simulator: `Snapper/Resources/GuideDemos/guide-<topic id>.mp4`. A topic without a clip (Lenses & zoom: the Simulator has one lens) keeps its illustration.
+
+Each clip is scripted as a UI test in `SnapperDemos/GuideDemoTests.swift`, which also directs the camera: `focus` zooms in on the controls in use, `wide` pulls back to the whole phone, `hold` keeps a pause. To record or re-record one, with the iPhone 18 Pro Simulator booted:
+
+```
+SIMULATOR_ID=<device id> scripts/record-guide-demo.sh testColorMixer color-mixer
+```
+
+It builds the `SnapperGuideDemos` scheme, records the screen while the test runs, and encodes the part between the test's DEMO START and DEMO END marks (`scripts/encode-guide-demo.swift`): 720×900 at 60 fps, the phone on a dark backdrop, pauses shortened, a fade at the loop. Touches show as circles (Debug builds launched with `-SnapperShowTouches YES`).
+
+The scripts expect the Simulator's Library to hold the sample photos (photo 0 an astronaut portrait, photo 5 Times Square, unedited) and no personal presets. Each script undoes its edits afterwards; if one stops part-way, run `testRestoreState` and then `testPrepareCamera` (in `SnapperDemos`) before recording again.
+
 ## How it's built
 
 ```
@@ -166,6 +180,7 @@ Snapper/
   Resources/    Assets, Info.plist, PrivacyInfo.xcprivacy, Filters/ (filters.json, LUTs/), Showcase/
 SnapperCapture/  Lock Screen camera (LockedCameraCapture extension, reuses the camera code)
 SnapperControls/ Control Center control (WidgetKit)
+SnapperDemos/   UI-test scripts for the Guide's videos (scripts/record-guide-demo.sh)
 SnapperTests/   LUT parser, manifest, capture store, export, Core Image vs generator, StoreKit
 tools/lutgen/   Look generator, quality gates, contact sheets
 docs/           Privacy Policy, Terms of Use, Support (GitHub Pages)
