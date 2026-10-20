@@ -369,9 +369,17 @@ final class ZoomableCanvasView: UIScrollView, UIScrollViewDelegate {
 @MainActor
 private final class SimultaneousGestures: NSObject, UIGestureRecognizerDelegate {
     // The stroke gives way to a pinch itself; the press ends when one starts.
+    // Gestures around the canvas don't run alongside a stroke.
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        true
+        !(gestureRecognizer is StrokeGestureRecognizer) || other.view === gestureRecognizer.view
+    }
+
+    // While painting, gestures around the canvas, like the zoom transition's
+    // drag to close the editor, wait for the stroke, so a stroke never closes it.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+        gestureRecognizer is StrokeGestureRecognizer && gestureRecognizer.isEnabled && other.view !== gestureRecognizer.view
     }
 }
 

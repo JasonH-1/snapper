@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var restoreMessage: RestoreMessage?
     @State private var storageUsed: Int64?
     @State private var showClearConfirmation = false
+    @State private var backup = BackupFlow()
 
     private struct RestoreMessage: Identifiable {
         let id = UUID()
@@ -40,7 +41,7 @@ struct SettingsView: View {
                 photosSection
                 exportSection
                 librarySection
-                BackupSection(app: app)
+                BackupSection(app: app, backup: backup)
                 cameraSection
                 looksSection
                 supportSection
@@ -69,6 +70,7 @@ struct SettingsView: View {
                 }
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+            .backupPresentations(backup, app: app)
             .alert(restoreMessage?.title ?? "", isPresented: restoreAlertBinding, presenting: restoreMessage) { _ in
                 Button("OK", role: .cancel) {}
             } message: { message in

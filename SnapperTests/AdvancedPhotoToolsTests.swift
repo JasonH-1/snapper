@@ -210,9 +210,13 @@ final class AdvancedWorkflowTests: XCTestCase {
         var requests = 0
         let editor = EditorModel(library: library, looks: looks, settings: AppSettings(defaults: defaults), id: record.id,
                                  hasPremium: { purchase.isPremium }, requestPremium: { _, _, _ in requests += 1 })
+        // Mid-drag the free save waits, so its rows don't move the panel.
+        editor.interaction(began: true)
         editor.setColorMix(ColorMix(hue: 0.2), for: .red)
-        editor.interaction(began: false)
         XCTAssertTrue(editor.isLocked)
+        XCTAssertFalse(editor.offersFreeSave)
+        editor.interaction(began: false)
+        XCTAssertTrue(editor.offersFreeSave)
         editor.save(); editor.share()
         XCTAssertEqual(requests, 2)
         editor.undo()
