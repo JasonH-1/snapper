@@ -147,19 +147,33 @@ struct CaptureStore: Sendable {
         directory.appendingPathComponent(record.fileName)
     }
 
-    func load() -> [CaptureRecord] {
-        guard let data = try? Data(contentsOf: indexURL) else { return [] }
+    enum IndexError: LocalizedError {
+        case unreadable
+        var errorDescription: String? {
+            String(localized: "Snapper couldn't read your Library. Your files have been kept. Retry in Settings before adding photos.")
+        }
+    }
+
+    func load() throws -> [CaptureRecord] {
+        let data: Data
         do {
-            let records = try JSONDecoder().decode([CaptureRecord].self, from: data)
-            // Drop entries whose file has gone missing.
-            return records.filter { FileManager.default.fileExists(atPath: url(for: $0).path) }
-        } catch {
-            Logger.library.error("Capture index unreadable: \(error.localizedDescription, privacy: .public)")
+            data = try Data(contentsOf: indexURL)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             return []
+        } catch {
+            throw IndexError.unreadable
+        }
+        do {
+            // Keep records even when an original is temporarily unavailable.
+            return try JSONDecoder().decode([CaptureRecord].self, from: data)
+        } catch {
+            throw IndexError.unreadable
         }
     }
 
     func save(_ records: [CaptureRecord]) throws {
+        // A failed read is never permission to replace an existing index.
+        _ = try load()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(records)
         try data.write(to: indexURL, options: .atomic)

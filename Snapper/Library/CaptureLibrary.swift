@@ -25,7 +25,10 @@ final class CaptureLibrary {
     @ObservationIgnored private let library: LookLibrary
     @ObservationIgnored private let photoSaver: @Sendable (URL, URL?) async throws -> Void
     @ObservationIgnored private var pendingCaptures = 0
-    @ObservationIgnored private var persistTask: Task<Void, Never>?
+    @ObservationIgnored private var persistTask: Task<Void, Error>?
+    @ObservationIgnored private var loadTask: Task<[CaptureRecord], Error>?
+    private(set) var isLoaded = false
+    private(set) var storageError: String?
     @ObservationIgnored private var thumbnailRequests: Set<UUID> = []
     /// Thumbnail ids, least recently drawn first, for trimming.
     @ObservationIgnored private var thumbnailOrder: [UUID] = []
@@ -44,15 +47,43 @@ final class CaptureLibrary {
         self.photoSaver = photoSaver
     }
 
-    func load() async {
-        let store = self.store
-        let loaded = await Task.detached(priority: .userInitiated) { store.load() }.value
-        // Keep anything captured while the index was loading.
-        let known = Set(records.map(\.id))
-        records = (records + loaded.filter { !known.contains($0.id) }).sorted { $0.createdAt > $1.createdAt }
-        for record in records.prefix(12) where thumbnails[record.id] == nil {
-            await refreshThumbnail(for: record)
+    @discardableResult
+    func load() async -> Bool {
+        do {
+            try await ensureLoaded()
+            for record in records.prefix(12) where thumbnails[record.id] == nil {
+                await refreshThumbnail(for: record)
+            }
+            return true
+        } catch { return false }
+    }
+
+    private func ensureLoaded() async throws {
+        guard !isLoaded else { return }
+        if loadTask == nil {
+            let store = self.store
+            loadTask = Task.detached(priority: .userInitiated) { try store.load() }
         }
+        do {
+            let loaded = try await loadTask!.value
+            if !isLoaded {
+                records = loaded.sorted { $0.createdAt > $1.createdAt }
+                isLoaded = true
+                storageError = nil
+            }
+            loadTask = nil
+        } catch {
+            loadTask = nil
+            storageError = error.localizedDescription
+            throw error
+        }
+    }
+
+    /// A successful return means the current records are on disk. Retrying
+    /// writes the full in-memory snapshot, including any earlier failed save.
+    func flush() async throws {
+        try await ensureLoaded()
+        try await persist().value
     }
 
     func url(for record: CaptureRecord) -> URL {
@@ -108,6 +139,11 @@ final class CaptureLibrary {
     /// Stores a new capture and returns its record.
     @discardableResult
     func add(_ photo: CapturedPhoto, look: Look) async throws -> CaptureRecord {
+        try await ensureLoaded()
+        if let existing = record(id: photo.id) {
+            try await flush()
+            return existing
+        }
         pendingCaptures += 1
         isProcessingCapture = true
         defer {
@@ -130,8 +166,8 @@ final class CaptureLibrary {
                                      isFrontCamera: photo.isFrontCamera, recipe: recipe), at: 0)
         notePremiumEdits(at: 0)
         let record = records[0]
+        try await persist().value
         await refreshThumbnail(for: record)
-        persist()
         return record
     }
 
@@ -147,6 +183,7 @@ final class CaptureLibrary {
     /// yet. `createdAt` orders imports picked together.
     @discardableResult
     func importPhoto(_ data: Data, createdAt: Date = Date()) async throws -> CaptureRecord {
+        try await ensureLoaded()
         let id = UUID()
         let fileName = "\(id.uuidString).\(CaptureStore.fileExtension(for: data))"
         let store = self.store
@@ -161,8 +198,8 @@ final class CaptureLibrary {
                                    source: .imported, recipe: .untouched)
         let index = records.firstIndex { $0.createdAt < createdAt } ?? records.endIndex
         records.insert(record, at: index)
+        try await persist().value
         await refreshThumbnail(for: record)
-        persist()
         return record
     }
 
@@ -361,7 +398,20 @@ final class CaptureLibrary {
             export = try await prepareExport(record, recipe: recipe, options: options, watermark: watermark)
         }
         defer { try? FileManager.default.removeItem(at: export.url.deletingLastPathComponent()) }
-        let original = includeOriginal ? store.url(for: record) : nil
+        var original = includeOriginal ? store.url(for: record) : nil
+        if let source = original, !options.includesLocation {
+            // Export an unedited, full-size copy without location. Never mutate
+            // the source kept in Snapper or pass it to Photos in this mode.
+            let sanitized = export.url.deletingLastPathComponent()
+                .appendingPathComponent("Original.\(options.format.fileExtension)")
+            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: source) }.value
+            var originalOptions = ExportOptions(format: options.format)
+            originalOptions.quality = 1
+            originalOptions.includesLocation = false
+            try await renderer.exportFile(source: data, look: .original, recipe: .untouched,
+                                          watermark: false, options: originalOptions, to: sanitized)
+            original = sanitized
+        }
         try await photoSaver(export.url, original)
         markSaved(id: record.id, recipe: export.recipe)
     }
@@ -433,6 +483,7 @@ final class CaptureLibrary {
     /// Adds the photos in a backup to the Library. Photos already here are
     /// left alone, so restoring twice changes nothing.
     func restoreBackup(from url: URL) async throws -> LibraryBackup.RestoreResult {
+        try await ensureLoaded()
         let store = self.store
         let existing = Set(records.map(\.id))
         backupProgress = 0
@@ -451,7 +502,7 @@ final class CaptureLibrary {
         let added = result.records.filter { !known.contains($0.id) }
         if !added.isEmpty {
             records = (records + added).sorted { $0.createdAt > $1.createdAt }
-            persist()
+            try await persist().value
             for record in records.prefix(12) where thumbnails[record.id] == nil {
                 await refreshThumbnail(for: record)
             }
@@ -519,18 +570,27 @@ final class CaptureLibrary {
     }
 
     /// Writes the index off the main actor; writes are chained so they land in order.
-    private func persist() {
+    @discardableResult
+    private func persist() -> Task<Void, Error> {
         let snapshot = records
         let store = self.store
         let previous = persistTask
-        persistTask = Task.detached(priority: .utility) {
-            await previous?.value
+        let work = Task.detached(priority: .utility) {
+            _ = try? await previous?.value
+            try store.save(snapshot)
+        }
+        let task = Task { @MainActor in
             do {
-                try store.save(snapshot)
+                try await work.value
+                storageError = nil
             } catch {
+                storageError = String(localized: "Your Library changes couldn't be saved. Free up space if needed, then retry in Settings before closing Snapper.")
                 Logger.library.error("Could not save capture index: \(error.localizedDescription, privacy: .public)")
+                throw error
             }
         }
+        persistTask = task
+        return task
     }
 
 }

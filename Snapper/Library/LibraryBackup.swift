@@ -197,6 +197,8 @@ enum LibraryBackup {
                 continue
             }
             var record = photo.record
+            // A backup cannot prove that this device has a copy in Photos.
+            record.savedRecipe = nil
             record.fileName = safeFileName(record.fileName, id: record.id)
             if FileManager.default.fileExists(atPath: store.directory.appendingPathComponent(record.fileName).path) {
                 // A stray file with that name; never overwrite it.
@@ -240,9 +242,12 @@ enum LibraryBackup {
               manifest.format == "app.snapper.backup" else { throw BackupError.damaged }
         guard manifest.version <= Int(formatVersion) else { throw BackupError.newerVersion }
         let payloadStart = UInt64(headerLength) + manifestLength
+        guard fileSize <= UInt64(Int64.max) else { throw BackupError.damaged }
         var expected = payloadStart
         for photo in manifest.photos {
-            guard photo.byteCount > 0 else { throw BackupError.damaged }
+            guard photo.byteCount > 0, UInt64(photo.byteCount) <= fileSize - expected else {
+                throw BackupError.damaged
+            }
             expected += UInt64(photo.byteCount)
         }
         // A short file was cut off in transfer; refuse it rather than restore part.
@@ -284,7 +289,8 @@ enum LibraryBackup {
 
     private static func ensureSpace(for bytes: Int64, at directory: URL) throws {
         // Room for the files plus a little to spare for everything else.
-        let needed = bytes + (50 << 20)
+        let (needed, overflow) = bytes.addingReportingOverflow(50 << 20)
+        guard bytes >= 0, !overflow else { throw BackupError.damaged }
         guard let values = try? directory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
               let available = values.volumeAvailableCapacityForImportantUsage else { return }
         guard available >= needed else { throw BackupError.notEnoughSpace(needed: needed) }

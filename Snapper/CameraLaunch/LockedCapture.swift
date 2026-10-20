@@ -76,6 +76,8 @@ enum LockedCaptureInbox {
     struct Contents: Sendable {
         /// Oldest first.
         var photos: [Photo] = []
+        /// False if any file could not be accounted for; keep the session.
+        var isComplete = true
         /// The camera as the session left it, if the person changed it there.
         var camera: SnapperCameraContext?
     }
@@ -96,19 +98,39 @@ enum LockedCaptureInbox {
         try JSONEncoder().encode(context).write(to: folder.appendingPathComponent(cameraFileName), options: .atomic)
     }
 
-    /// What a session folder holds. Unreadable notes are skipped (and logged).
+    /// What a session folder holds, including whether every photo was accounted for.
     static func read(_ folder: URL) -> Contents {
         var contents = Contents()
-        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        let files: [URL]
+        do {
+            files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        } catch {
+            contents.isComplete = false
+            return contents
+        }
+        var referencedFiles: Set<String> = []
         for file in files where file.pathExtension == noteExtension {
             do {
                 let note = try JSONDecoder().decode(Note.self, from: Data(contentsOf: file))
+                guard note.fileName == "\(note.id.uuidString).photo" else {
+                    contents.isComplete = false
+                    continue
+                }
+                referencedFiles.insert(note.fileName)
                 let url = folder.appendingPathComponent(note.fileName)
-                guard FileManager.default.fileExists(atPath: url.path) else { continue }
+                guard FileManager.default.fileExists(atPath: url.path) else {
+                    contents.isComplete = false
+                    continue
+                }
                 contents.photos.append(Photo(note: note, url: url))
             } catch {
+                contents.isComplete = false
                 Logger.camera.error("Unreadable Lock Screen photo note \(file.lastPathComponent, privacy: .public)")
             }
+        }
+        if files.contains(where: { $0.pathExtension == "photo" && !referencedFiles.contains($0.lastPathComponent) }) {
+            // A session may have ended between the photo and its note writes.
+            contents.isComplete = false
         }
         contents.photos.sort { $0.note.takenAt < $1.note.takenAt }
         let cameraURL = folder.appendingPathComponent(cameraFileName)

@@ -82,30 +82,41 @@ extension AppModel {
         defer { isImportingLockScreenPhotos = false }
 
         var added = 0
+        var hasIncompleteSession = false
         var newestCamera: SnapperCameraContext?
         for folder in folders {
             let contents = LockedCaptureInbox.read(folder)
-            var isComplete = true
+            var isComplete = contents.isComplete
             for photo in contents.photos where captures.record(id: photo.note.id) == nil {
                 let look = library.look(id: photo.note.lookID) ?? .original
                 do {
                     if await keep(try photo.load(), look: look) { added += 1 } else { isComplete = false }
                 } catch {
+                    isComplete = false
                     Logger.library.error("Unreadable Lock Screen photo: \(error.localizedDescription, privacy: .public)")
                 }
             }
             if let camera = contents.camera, camera.updatedAt > (newestCamera?.updatedAt ?? .distantPast) {
                 newestCamera = camera
             }
-            guard isComplete else { continue }
+            guard isComplete else {
+                hasIncompleteSession = true
+                continue
+            }
             do {
+                // Includes records skipped above after an earlier index-write failure.
+                try await captures.flush()
                 try await finished(folder)
             } catch {
+                hasIncompleteSession = true
                 Logger.library.error("Couldn't clear a Lock Screen session: \(error.localizedDescription, privacy: .public)")
             }
         }
         if let newestCamera { adoptLockScreenCamera(newestCamera) }
-        if added > 0 {
+        if hasIncompleteSession {
+            show(Toast(message: String(localized: "Some Lock Screen photos couldn't be imported. Their files have been kept; Snapper will retry when you reopen it."),
+                       symbol: "exclamationmark.triangle"))
+        } else if added > 0 {
             show(Toast(message: added == 1
                        ? String(localized: "Your photo from the Lock Screen is in your Library.")
                        : String(localized: "Your \(added) photos from the Lock Screen are in your Library."),

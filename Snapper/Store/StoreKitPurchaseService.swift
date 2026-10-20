@@ -210,7 +210,8 @@ final class StoreKitPurchaseService: PurchaseService {
                 lifetime = true
                 continue
             }
-            if let expiration = transaction.expirationDate, expiration < Date() { continue }
+            // currentEntitlements includes expired transactions during an active
+            // billing grace period. StoreKit determines access, not this date.
             subscribed = true
             if await Self.willRenew(transaction) { renews = true }
         }
