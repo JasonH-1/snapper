@@ -149,7 +149,32 @@ targets:
         # warnings from imported C/ObjC headers in the test target only.
         OTHER_SWIFT_FLAGS: "$(inherited) -Xcc -Wno-deprecated-declarations"
 
+  # Scripts for the guide's demo clips (scripts/record-guide-demo.sh).
+  # Only in the SnapperGuideDemos scheme, never in CI.
+  SnapperDemos:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SnapperDemos
+    dependencies:
+      - target: Snapper
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        PRODUCT_BUNDLE_IDENTIFIER: "$(APP_BUNDLE_ID).demos"
+
 schemes:
+  SnapperGuideDemos:
+    build:
+      targets:
+        Snapper: all
+        SnapperDemos: [test]
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - SnapperDemos
   Snapper:
     build:
       targets:
