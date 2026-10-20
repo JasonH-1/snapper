@@ -78,6 +78,7 @@ targets:
       - path: Snapper/Camera/Components/CameraStatusOverlay.swift
       - path: Snapper/Camera/Components/FocusReticle.swift
       - path: Snapper/Camera/Components/LookBanner.swift
+      - path: Snapper/Camera/Components/LookDial.swift
       - path: Snapper/Camera/Components/ShutterButton.swift
       - path: Snapper/Camera/Components/VolumeShutter.swift
       - path: Snapper/Camera/Components/ZoomControl.swift

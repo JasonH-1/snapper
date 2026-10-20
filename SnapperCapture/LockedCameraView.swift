@@ -3,10 +3,13 @@ import SwiftUI
 /// The Lock Screen camera's screen: the live preview through the current
 /// look, swipe to change looks, and the shutter. Everything else (editing,
 /// presets, settings) waits for Snapper, a tap on the photo button away.
+/// It's laid out and styled like `CameraView`, so unlocking into Snapper
+/// keeps everything in place.
 struct LockedCameraView: View {
     @Bindable var model: LockedCameraModel
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showBanner = false
     @State private var bannerTask: Task<Void, Never>?
     @State private var zoomAtGestureStart: CGFloat?
@@ -16,7 +19,8 @@ struct LockedCameraView: View {
     private var hidesChrome: Bool { camera.isCameraControlFullscreen }
 
     private static let topBarHeight: CGFloat = 52
-    private static let controlsHeight: CGFloat = 186
+    /// Approximate height of the look dial + shutter row.
+    private static let controlsHeight: CGFloat = 198
 
     var body: some View {
         GeometryReader { geometry in
@@ -65,41 +69,33 @@ struct LockedCameraView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(spacing: 10) {
-            if camera.capabilities.hasFlash {
-                Button {
-                    camera.cycleFlash()
-                } label: {
-                    Image(systemName: camera.flashMode.symbolName)
-                        .foregroundStyle(camera.flashMode == .off ? Color.white : Theme.accent)
-                        .contentTransition(.symbolEffect(.replace))
+        ZStack {
+            HStack(spacing: 10) {
+                if camera.capabilities.hasFlash {
+                    Button {
+                        camera.cycleFlash()
+                    } label: {
+                        Image(systemName: camera.flashMode.symbolName)
+                            .foregroundStyle(camera.flashMode == .off ? Color.white : Theme.accent)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(CameraIconButtonStyle(size: 44))
+                    .accessibilityLabel(Text(camera.flashMode.accessibilityLabel))
                 }
-                .buttonStyle(CameraIconButtonStyle(size: 44))
-                .accessibilityLabel(Text(camera.flashMode.accessibilityLabel))
+                Spacer()
             }
-            Spacer()
-            // Set in Snapper; shown so a delayed or brighter shot isn't a surprise.
-            let timer = model.settings.captureOptions.timer
-            if timer != .off {
-                Label(timer.label, systemImage: "timer")
-                    .font(.footnote.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .glassSurface(in: Capsule())
-                    .accessibilityLabel(Text("Self-timer \(timer.label)"))
-            }
-            if camera.exposureBias != 0 {
-                Label(Self.exposureText(camera.exposureBias), systemImage: "plusminus.circle")
-                    .font(.footnote.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .glassSurface(in: Capsule())
-                    .accessibilityLabel(Text("Exposure \(Self.exposureText(camera.exposureBias))"))
+
+            // A label only: Premium is bought in Snapper.
+            if model.isLocked {
+                PremiumTag()
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("Premium look"))
+                    .accessibilityHint(Text("Photos save without the Premium look or tools until you get Premium in Snapper."))
             }
         }
         .padding(.horizontal, 16)
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: model.isLocked)
     }
 
     // MARK: - Preview
@@ -129,6 +125,27 @@ struct LockedCameraView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .allowsHitTesting(false)
             }
+
+            // Set in Snapper; shown so a delayed or brighter shot isn't a
+            // surprise. Here rather than in the top bar, where they'd run
+            // into the Premium tag on smaller iPhones.
+            VStack {
+                HStack(spacing: 8) {
+                    let timer = model.settings.captureOptions.timer
+                    if timer != .off {
+                        readout(timer.label, systemImage: "timer")
+                            .accessibilityLabel(Text("Self-timer \(timer.label)"))
+                    }
+                    if camera.exposureBias != 0 {
+                        readout(Self.exposureText(camera.exposureBias), systemImage: "plusminus.circle")
+                            .accessibilityLabel(Text("Exposure \(Self.exposureText(camera.exposureBias))"))
+                    }
+                }
+                Spacer()
+            }
+            .padding(.top, 12)
+            .allowsHitTesting(false)
+            .hiddenForCameraControl(hidesChrome)
 
             if let countdown = camera.countdown, countdown > 0 {
                 Text("\(countdown)")
@@ -166,12 +183,24 @@ struct LockedCameraView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Camera preview"))
-        .accessibilityAction(named: Text("Next look")) {
-            camera.select(camera.looks[(camera.lookIndex + 1) % camera.looks.count])
-        }
-        .accessibilityAction(named: Text("Previous look")) {
-            camera.select(camera.looks[(camera.lookIndex - 1 + camera.looks.count) % camera.looks.count])
-        }
+        .accessibilityAction(named: Text("Next look")) { stepLook(by: 1) }
+        .accessibilityAction(named: Text("Previous look")) { stepLook(by: -1) }
+    }
+
+    /// A setting made in Snapper, as a mono readout on the dial's panel.
+    private func readout(_ value: String, systemImage: String) -> some View {
+        Label(value, systemImage: systemImage)
+            .font(.system(.footnote, design: .monospaced, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .dialPanel(cornerRadius: 8)
+    }
+
+    /// The next or previous look in swipe order, for VoiceOver.
+    private func stepLook(by offset: Int) {
+        let count = camera.looks.count
+        camera.select(camera.looks[((camera.lookIndex + offset) % count + count) % count])
     }
 
     /// Camera access can only be given in Snapper itself, after unlocking.
@@ -245,7 +274,7 @@ struct LockedCameraView: View {
     // MARK: - Bottom controls
 
     private var bottomControls: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             if let error = model.saveError {
                 Text(error)
                     .font(.footnote)
@@ -253,7 +282,7 @@ struct LockedCameraView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             } else {
-                LookCaption(look: camera.currentLook, collectionName: camera.collectionName, isLocked: model.isLocked)
+                lookRow
             }
             HStack {
                 photosButton
@@ -268,14 +297,14 @@ struct LockedCameraView: View {
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 18, weight: .semibold))
                             .frame(width: 52, height: 52)
-                            .glassSurface(in: Circle(), interactive: true)
+                            .controlFace()
                         Text("Flip").font(.caption.weight(.semibold))
                     }
-                    .frame(width: 64)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .disabled(!camera.capabilities.canSwitchCamera)
                 .opacity(camera.capabilities.canSwitchCamera ? 1 : 0.35)
                 .accessibilityLabel(Text("Switch camera"))
@@ -288,6 +317,48 @@ struct LockedCameraView: View {
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
         }
+    }
+
+    /// Snapper's look dial and style readout, to read only: there's no look
+    /// picker while locked, so looks change by swiping the preview. A style
+    /// from Snapper shows until a swipe moves off it.
+    private var lookRow: some View {
+        HStack(spacing: 10) {
+            let place = LookDial.position(of: camera.currentLook, in: camera.library)
+            LookDial(look: camera.currentLook, collectionName: camera.collectionName,
+                     position: place?.index, count: place?.count ?? 0, opensPicker: false)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Look: \(camera.currentLook.name)"))
+                .accessibilityValue(model.isLocked ? Text("Premium") : Text(""))
+                .accessibilityHint(Text("Swipe left or right on the preview to change the look."))
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .increment: stepLook(by: 1)
+                    case .decrement: stepLook(by: -1)
+                    @unknown default: break
+                    }
+                }
+            if let preset = camera.activePreset {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("My styles")
+                        .font(.system(.caption2, design: .monospaced, weight: .medium))
+                        .textCase(.uppercase)
+                        .foregroundStyle(.secondary)
+                    Text(preset.name)
+                        .font(.subheadline.weight(.semibold)).lineLimit(1)
+                        .foregroundStyle(Theme.accent)
+                }
+                .padding(.horizontal, 12)
+                .frame(maxHeight: .infinity)
+                .dialPanel()
+                .transition(.opacity)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Style: \(preset.name)"))
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 16)
+        .animation(.snapper(Motion.standard, reduceMotion: reduceMotion), value: camera.activePreset?.id)
     }
 
     /// This session's newest photo. Opens Snapper's Library after unlocking,
@@ -319,6 +390,16 @@ struct LockedCameraView: View {
                 .frame(width: 52, height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.3), lineWidth: 1))
+                // The Library button's badge in Snapper, where these photos open.
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "square.grid.2x2.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 24, height: 24)
+                        .background(Theme.accent, in: Circle())
+                        .overlay(Circle().strokeBorder(.black, lineWidth: 2))
+                        .offset(x: 6, y: 6)
+                }
                 .animation(.spring(response: 0.35, dampingFraction: 0.75), value: model.lastCapture)
 
                 Text("Snapper")
