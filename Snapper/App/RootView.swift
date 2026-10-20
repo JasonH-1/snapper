@@ -48,12 +48,15 @@ struct RootView: View {
         .task {
             app.store.start()
             app.synchronizeCameraPreset()
-            app.isLibraryLoaded = await app.captures.load()
+            await app.captures.load()
             await app.importLockScreenPhotos()
             app.shareCameraWithLockScreen()
         }
         .onChange(of: app.captures.storageError) { _, message in
             if let message { app.show(Toast(message: message, symbol: "exclamationmark.triangle")) }
+        }
+        .onChange(of: app.captures.notice) { _, message in
+            if let message { app.show(Toast(message: message, symbol: "wrench.and.screwdriver")) }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {

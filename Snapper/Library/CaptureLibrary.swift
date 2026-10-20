@@ -26,9 +26,11 @@ final class CaptureLibrary {
     @ObservationIgnored private let photoSaver: @Sendable (URL, URL?) async throws -> Void
     @ObservationIgnored private var pendingCaptures = 0
     @ObservationIgnored private var persistTask: Task<Void, Error>?
-    @ObservationIgnored private var loadTask: Task<[CaptureRecord], Error>?
+    @ObservationIgnored private var loadTask: Task<(records: [CaptureRecord], repair: CaptureStore.Repair?), Error>?
     private(set) var isLoaded = false
     private(set) var storageError: String?
+    /// Something to tell the person once, such as a damaged index having been rebuilt.
+    private(set) var notice: String?
     @ObservationIgnored private var thumbnailRequests: Set<UUID> = []
     /// Thumbnail ids, least recently drawn first, for trimming.
     @ObservationIgnored private var thumbnailOrder: [UUID] = []
@@ -62,14 +64,19 @@ final class CaptureLibrary {
         guard !isLoaded else { return }
         if loadTask == nil {
             let store = self.store
-            loadTask = Task.detached(priority: .userInitiated) { try store.load() }
+            loadTask = Task.detached(priority: .userInitiated) { try store.loadRepairingDamage() }
         }
         do {
             let loaded = try await loadTask!.value
             if !isLoaded {
-                records = loaded.sorted { $0.createdAt > $1.createdAt }
+                // Shots taken while the index couldn't be read join it now.
+                let known = Set(loaded.records.map(\.id))
+                let kept = records.filter { !known.contains($0.id) }
+                records = (kept + loaded.records).sorted { $0.createdAt > $1.createdAt }
                 isLoaded = true
                 storageError = nil
+                if let repair = loaded.repair { notice = Self.repairNotice(repair) }
+                if !kept.isEmpty { persist() }
             }
             loadTask = nil
         } catch {
@@ -84,6 +91,12 @@ final class CaptureLibrary {
     func flush() async throws {
         try await ensureLoaded()
         try await persist().value
+    }
+
+    private static func repairNotice(_ repair: CaptureStore.Repair) -> String {
+        repair.recoveredPhotos == 0
+            ? String(localized: "Snapper repaired its Library index. Every photo kept its edits.")
+            : String(localized: "Snapper repaired its damaged Library index. \(LibraryModel.photoCount(repair.recoveredPhotos)) came back without their edits.")
     }
 
     func url(for record: CaptureRecord) -> URL {
@@ -136,11 +149,13 @@ final class CaptureLibrary {
 
     // MARK: - Adding
 
-    /// Stores a new capture and returns its record.
+    /// Stores a new capture and returns its record. A shot is never dropped:
+    /// if the index can't be read, the photo is still stored and kept in
+    /// memory, and joins the index once it loads (see `ensureLoaded`).
     @discardableResult
     func add(_ photo: CapturedPhoto, look: Look) async throws -> CaptureRecord {
-        try await ensureLoaded()
-        if let existing = record(id: photo.id) {
+        try? await ensureLoaded()
+        if isLoaded, let existing = record(id: photo.id) {
             try await flush()
             return existing
         }
@@ -166,7 +181,10 @@ final class CaptureLibrary {
                                      isFrontCamera: photo.isFrontCamera, recipe: recipe), at: 0)
         notePremiumEdits(at: 0)
         let record = records[0]
-        try await persist().value
+        // The photo is in the Library even if the index can't be written yet:
+        // the next save writes it, and `storageError` says so meanwhile.
+        // (The Lock Screen import flushes before letting a session go.)
+        persist()
         await refreshThumbnail(for: record)
         return record
     }
@@ -198,7 +216,15 @@ final class CaptureLibrary {
                                    source: .imported, recipe: .untouched)
         let index = records.firstIndex { $0.createdAt < createdAt } ?? records.endIndex
         records.insert(record, at: index)
-        try await persist().value
+        do {
+            try await persist().value
+        } catch {
+            // The photo is still in the photo library: undo, so the import
+            // either happens completely or not at all.
+            records.removeAll { $0.id == id }
+            Task.detached(priority: .utility) { store.delete(record) }
+            throw error
+        }
         await refreshThumbnail(for: record)
         return record
     }
@@ -572,6 +598,9 @@ final class CaptureLibrary {
     /// Writes the index off the main actor; writes are chained so they land in order.
     @discardableResult
     private func persist() -> Task<Void, Error> {
+        // Until the index has loaded, only shots kept in memory are here;
+        // they're saved with everything else once it loads.
+        guard isLoaded else { return Task { throw CaptureStore.IndexError.unreadable } }
         let snapshot = records
         let store = self.store
         let previous = persistTask

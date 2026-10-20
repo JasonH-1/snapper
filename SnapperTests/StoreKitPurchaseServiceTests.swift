@@ -164,19 +164,21 @@ final class StoreKitPurchaseServiceTests: XCTestCase {
         let monthly = try XCTUnwrap(service.plans.first { $0.period == .month })
         _ = try await service.purchase(monthly)
 
+        // StoreKit testing moves the transaction's expiration date into the
+        // grace window, so it can't show the App Store's case of an
+        // already-passed date during grace; this checks Premium holds in grace.
         let deadline = Date().addingTimeInterval(50)
         var sawGracePeriod = false
         while Date() < deadline {
             for await result in Transaction.currentEntitlements {
                 guard case .verified(let transaction) = result, transaction.productID == monthly.id,
-                      let expiration = transaction.expirationDate, expiration < Date(),
                       let status = await transaction.subscriptionStatus, status.state == .inGracePeriod else { continue }
                 sawGracePeriod = true
             }
             if sawGracePeriod { break }
             try await Task.sleep(for: .milliseconds(100))
         }
-        XCTAssertTrue(sawGracePeriod, "the fixture must reach grace with an expired transaction")
+        XCTAssertTrue(sawGracePeriod, "the fixture must reach the billing grace period")
         await service.refreshEntitlements()
         XCTAssertTrue(service.isPremium)
         XCTAssertTrue(service.hasActiveSubscription)

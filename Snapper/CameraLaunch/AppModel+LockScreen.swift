@@ -77,7 +77,8 @@ extension AppModel {
     /// lets the system delete it. A session with a photo that couldn't be
     /// added is kept for next time; photos already in the Library are skipped.
     func importLockScreenSessions(_ folders: [URL], finished: (URL) async throws -> Void) async {
-        guard isLibraryLoaded, !isImportingLockScreenPhotos, !folders.isEmpty else { return }
+        // Until the index has loaded, photos already in the Library aren't known.
+        guard captures.isLoaded, !isImportingLockScreenPhotos, !folders.isEmpty else { return }
         isImportingLockScreenPhotos = true
         defer { isImportingLockScreenPhotos = false }
 
@@ -114,7 +115,9 @@ extension AppModel {
         }
         if let newestCamera { adoptLockScreenCamera(newestCamera) }
         if hasIncompleteSession {
-            show(Toast(message: String(localized: "Some Lock Screen photos couldn't be imported. Their files have been kept; Snapper will retry when you reopen it."),
+            show(Toast(message: added > 0
+                       ? String(localized: "\(LibraryModel.photoCount(added)) from the Lock Screen are in your Library. Some others couldn't be imported yet; their files have been kept and Snapper will try again.")
+                       : String(localized: "Some Lock Screen photos couldn't be imported. Their files have been kept; Snapper will retry when you reopen it."),
                        symbol: "exclamationmark.triangle"))
         } else if added > 0 {
             show(Toast(message: added == 1

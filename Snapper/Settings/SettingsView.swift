@@ -212,8 +212,7 @@ struct SettingsView: View {
                     .font(.footnote)
                 Button("Retry Library") {
                     Task {
-                        app.isLibraryLoaded = await app.captures.load()
-                        guard app.isLibraryLoaded else { return }
+                        guard await app.captures.load() else { return }
                         do {
                             try await app.captures.flush()
                             await app.importLockScreenPhotos()

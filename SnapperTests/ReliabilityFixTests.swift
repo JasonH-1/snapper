@@ -29,7 +29,7 @@ final class ReliabilityFixTests: XCTestCase {
         settings.autoSaveToPhotos = false
         let app = AppModel(store: FakePurchaseService(), settings: settings,
                            captureStore: CaptureStore(directory: root.appendingPathComponent("library")))
-        app.isLibraryLoaded = await app.captures.load()
+        await app.captures.load()
         return app
     }
 
@@ -39,11 +39,13 @@ final class ReliabilityFixTests: XCTestCase {
         return url
     }
 
+    /// An index that can't be read (rather than one that's damaged) may read
+    /// fine later, so nothing replaces it until a retry succeeds.
     func testUnreadableIndexIsPreservedAndBlocksImportsUntilRetry() async throws {
         let directory = try folder("library")
         let index = directory.appendingPathComponent("captures.json")
-        let damaged = Data("{incomplete".utf8)
-        try damaged.write(to: index)
+        // A folder where the index should be can't be read as one.
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
         let captures = library("library")
         let loaded = await captures.load()
         XCTAssertFalse(loaded)
@@ -52,16 +54,80 @@ final class ReliabilityFixTests: XCTestCase {
             _ = try await captures.importPhoto(TestImages.jpeg(width: 8, height: 8))
             XCTFail("Must not replace an unreadable index")
         } catch {}
-        XCTAssertEqual(try Data(contentsOf: index), damaged)
         XCTAssertThrowsError(try CaptureStore(directory: directory).save([]))
-        XCTAssertEqual(try Data(contentsOf: index), damaged)
-        // Simulate a repaired index; retry works without restarting the app.
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(atPath: index.path, isDirectory: &isDirectory) && isDirectory.boolValue)
+        // Once it reads again, retry works without restarting the app.
+        try FileManager.default.removeItem(at: index)
         try Data("[]".utf8).write(to: index)
         let retried = await captures.load()
         XCTAssertTrue(retried)
         XCTAssertNil(captures.storageError)
         let photo = try await captures.importPhoto(TestImages.jpeg(width: 8, height: 8))
         XCTAssertEqual(try CaptureStore(directory: directory).load().map(\.id), [photo.id])
+    }
+
+    /// A damaged index can't be fixed by retrying: it's moved aside and
+    /// rebuilt, keeping every record that still reads and bringing back the
+    /// photos the rest pointed to.
+    func testDamagedIndexIsRebuiltKeepingReadableRecordsAndPhotos() async throws {
+        let directory = try folder("library")
+        let store = CaptureStore(directory: directory)
+        // Originals are named by their record's id.
+        let editedID = UUID()
+        let edited = CaptureRecord(id: editedID, fileName: "\(editedID.uuidString).jpg", source: .imported,
+                                   recipe: PhotoRecipe(lookID: "boardwalk", strength: 0.7))
+        let lost = UUID()
+        try store.write(TestImages.jpeg(width: 8, height: 8), fileName: edited.fileName)
+        try store.write(TestImages.jpeg(width: 6, height: 6), fileName: "\(lost.uuidString).jpg")
+        try Data("not a photo".utf8).write(to: directory.appendingPathComponent("\(UUID().uuidString).jpg"))
+        // One good record and one that no longer decodes.
+        let good = try JSONSerialization.jsonObject(with: JSONEncoder().encode(edited))
+        let index = try JSONSerialization.data(withJSONObject: [good, ["id": "broken"]])
+        try index.write(to: directory.appendingPathComponent("captures.json"))
+
+        let captures = library("library")
+        let loaded = await captures.load()
+        XCTAssertTrue(loaded)
+        XCTAssertNil(captures.storageError)
+        XCTAssertNotNil(captures.notice)
+        XCTAssertEqual(Set(captures.records.map(\.id)), [edited.id, lost])
+        XCTAssertEqual(captures.record(id: edited.id)?.recipe, edited.recipe, "a record that still reads keeps its edit")
+        XCTAssertEqual(captures.record(id: lost)?.recipe, .untouched)
+        XCTAssertEqual(Set(try store.load().map(\.id)), [edited.id, lost])
+        let copies = try FileManager.default.contentsOfDirectory(atPath: directory.path).filter { $0.hasPrefix("captures.damaged-") }
+        XCTAssertEqual(copies.count, 1)
+        XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent(copies[0])), index, "the damaged index is kept")
+
+        // An index cut off mid-file still brings every photo back.
+        try Data("[{\"id\":".utf8).write(to: directory.appendingPathComponent("captures.json"))
+        let rebuilt = library("library")
+        await rebuilt.load()
+        XCTAssertEqual(Set(rebuilt.records.map(\.id)), [edited.id, lost])
+    }
+
+    /// A shot is never dropped because the index can't be read: it's kept,
+    /// and joins the index once the index loads.
+    func testShotIsKeptWhileIndexIsUnreadable() async throws {
+        let directory = try folder("library")
+        let index = directory.appendingPathComponent("captures.json")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        let captures = library("library")
+        await captures.load()
+        let photo = CapturedPhoto(data: try TestImages.jpeg(width: 8, height: 8), isFrontCamera: false)
+        let record = try await captures.add(photo, look: .original)
+        XCTAssertEqual(captures.records.map(\.id), [photo.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: captures.url(for: record).path))
+        XCTAssertNotNil(captures.storageError)
+
+        try FileManager.default.removeItem(at: index)
+        let earlier = CaptureRecord(fileName: "\(UUID().uuidString).jpg", recipe: .untouched)
+        try CaptureStore(directory: directory).save([earlier])
+        let retried = await captures.load()
+        XCTAssertTrue(retried)
+        XCTAssertEqual(Set(captures.records.map(\.id)), [photo.id, earlier.id])
+        try await captures.flush()
+        XCTAssertEqual(Set(try CaptureStore(directory: directory).load().map(\.id)), [photo.id, earlier.id])
     }
 
     func testImportBeforeExplicitLoadPreservesExistingRecordsAndIsDurable() async throws {
@@ -100,10 +166,73 @@ final class ReliabilityFixTests: XCTestCase {
         await app.importLockScreenSessions([invalidNote, orphan, missingPhoto, unreadablePhoto, missingFolder, valid]) {
             cleared.append($0)
         }
-        XCTAssertEqual(cleared, [valid])
+        // A note whose photo is gone has nothing left to wait for.
+        XCTAssertEqual(cleared, [missingPhoto, valid])
         XCTAssertEqual(app.captures.records.count, 1)
         XCTAssertEqual(try CaptureStore(directory: root.appendingPathComponent("library")).load().count, 1)
         XCTAssertTrue(FileManager.default.fileExists(atPath: invalidNote.path))
+    }
+
+    /// A photo whose note never arrived (the camera stopped between the two)
+    /// is brought in with the session's camera once it's clearly not still
+    /// being written, rather than holding its session open forever.
+    func testOldLockScreenPhotosWithoutNotesAreImported() async throws {
+        let app = try await app()
+        let session = try folder("session")
+        var camera = SnapperCameraContext()
+        camera.lookID = "boardwalk"
+        try LockedCaptureInbox.writeCamera(camera, to: session)
+        let orphan = UUID()
+        let file = session.appendingPathComponent("\(orphan.uuidString).photo")
+        try TestImages.jpeg(width: 8, height: 8).write(to: file)
+        let junk = session.appendingPathComponent("\(UUID().uuidString).photo")
+        try Data("not a photo".utf8).write(to: junk)
+        var cleared: [URL] = []
+
+        // Just written: its note may still be on the way.
+        await app.importLockScreenSessions([session]) { cleared.append($0) }
+        XCTAssertTrue(cleared.isEmpty)
+        XCTAssertTrue(app.captures.records.isEmpty)
+
+        let old = Date().addingTimeInterval(-120)
+        for url in [file, junk] {
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+        }
+        await app.importLockScreenSessions([session]) { cleared.append($0) }
+        XCTAssertEqual(cleared, [session])
+        XCTAssertEqual(app.captures.records.map(\.id), [orphan])
+        XCTAssertEqual(app.captures.records.first?.lookID, "boardwalk")
+    }
+
+    /// Lock Screen photos come in once the Library has loaded, even when that
+    /// happened later than launch (here, through a shot).
+    func testLockScreenImportWaitsForTheLibraryNotForLaunch() async throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+        settings.autoSaveToPhotos = false
+        let directory = try folder("library")
+        let index = directory.appendingPathComponent("captures.json")
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        let app = AppModel(store: FakePurchaseService(), settings: settings, captureStore: CaptureStore(directory: directory))
+        let launched = await app.captures.load()
+        XCTAssertFalse(launched)
+
+        let session = try folder("session")
+        let photo = CapturedPhoto(data: try TestImages.jpeg(width: 8, height: 8), isFrontCamera: false)
+        try LockedCaptureInbox.write(photo, lookID: "original", to: session)
+        var cleared: [URL] = []
+        await app.importLockScreenSessions([session]) { cleared.append($0) }
+        XCTAssertTrue(cleared.isEmpty, "photos already in the Library aren't known yet")
+
+        try FileManager.default.removeItem(at: index)
+        let shot = CapturedPhoto(data: try TestImages.jpeg(width: 8, height: 8), isFrontCamera: false)
+        _ = try await app.captures.add(shot, look: .original)
+        XCTAssertTrue(app.captures.isLoaded)
+        await app.importLockScreenSessions([session]) { cleared.append($0) }
+        XCTAssertEqual(cleared, [session])
+        XCTAssertEqual(Set(app.captures.records.map(\.id)), [photo.id, shot.id])
     }
 
     func testLockScreenWaitsForIndexPersistenceAndRetryDoesNotDuplicate() async throws {
