@@ -33,39 +33,21 @@ struct LookBanner: View {
     }
 }
 
-/// Small persistent label under the preview naming the current look.
-struct LookCaption: View {
-    let look: Look
-    let collectionName: String?
-    let isLocked: Bool
-
+/// The yellow hairline tag in the camera's top bar while a Premium look or
+/// style is on without Premium.
+struct PremiumTag: View {
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "chevron.compact.left")
-                .foregroundStyle(.white.opacity(0.35))
-            HStack(spacing: 6) {
-                if isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                }
-                Text(look.name)
-                    .font(Theme.lookTitle(size: 17))
-                    .foregroundStyle(.white)
-                if let collectionName {
-                    Text(collectionName)
-                        .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-            }
-            .contentTransition(.opacity)
-            Image(systemName: "chevron.compact.right")
-                .foregroundStyle(.white.opacity(0.35))
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        HStack(spacing: 6) {
+            Image(systemName: "lock.fill")
+            Text("Premium")
         }
-        .lineLimit(1)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Look: \(look.name)"))
-        .accessibilityValue(isLocked ? Text("Premium") : Text(""))
-        .accessibilityHint(Text("Swipe left or right on the preview to change the look."))
+        .font(.system(.footnote, design: .monospaced, weight: .semibold))
+        .textCase(.uppercase)
+        .foregroundStyle(Theme.accent)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Theme.accent.opacity(0.1), in: shape)
+        .overlay(shape.strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1))
     }
 }

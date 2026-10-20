@@ -9,6 +9,9 @@ struct LookDial: View {
     /// The look's place in its collection, or nil for Original.
     let position: Int?
     let count: Int
+    /// Shows the chevron that says a tap opens the look picker. The Lock
+    /// Screen camera has no picker: its looks change by swiping the preview.
+    var opensPicker = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -30,9 +33,11 @@ struct LookDial: View {
                     .lineLimit(1)
                     .contentTransition(.opacity)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.down")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+                if opensPicker {
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
             }
             DialScale(position: position, count: count)
                 .frame(height: 9)

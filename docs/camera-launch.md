@@ -34,6 +34,7 @@ None of this can run in the Simulator: there is no camera, no Camera Control, an
 - [ ] Swipe the Lock Screen to the right with Snapper set as the Lock Screen camera, if offered.
 - [ ] In Snapper, light-press Camera Control: **Looks** and **Exposure** appear. Scrolling Looks changes the live look in swipe order, favourites first, with the name banner. Edit favourites and check the order again. Exposure moves in ⅓ stops and matches the on-screen slider both ways; it is disabled while ISO & Shutter is manual. Both work in the Lock Screen camera. The on-screen buttons fade while the Camera Control overlay is up.
 - [ ] Flip to the front camera, set flash to Auto and exposure to +0.7, force quit and relaunch: all three are kept. Do the same for the Lock Screen camera.
+- [ ] The Lock Screen camera looks like Snapper's: unlock from it and the top bar, preview, look dial, shutter and Flip stay where they were. On the smallest iOS 18 iPhone, with a 10s timer, an exposure change and a Premium look without Premium, nothing overlaps; with a preset from Snapper the dial shares its row with the style readout, which goes after a swipe. VoiceOver: swiping up or down on the dial changes the look.
 - [ ] Camera permission never granted: the Lock Screen camera explains and opens Snapper.
 - [ ] Measure the Lock Screen camera's launch time and memory during 50 shots and fast look scrolling.
 - [ ] On an iOS 17 device, Snapper still launches and works (the extensions are simply absent).

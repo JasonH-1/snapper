@@ -134,18 +134,8 @@ struct CameraView: View {
 
             if isLocked {
                 Button(action: onShowPaywall) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.fill")
-                        Text("Premium")
-                    }
-                    .font(.system(.footnote, design: .monospaced, weight: .semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.accent)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(Theme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.accent.opacity(0.8), lineWidth: 1))
-                    .minimumTapTarget()
+                    PremiumTag()
+                        .minimumTapTarget()
                 }
                 .buttonStyle(PressableButtonStyle())
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
