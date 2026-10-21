@@ -60,6 +60,16 @@ private struct CuratedStyleCard: View {
 
     private var look: Look? { library.look(id: style.recipe.lookID) }
 
+    private var sampleURL: URL? {
+        #if DEBUG
+        // SNAPPER_DEMO_IMAGE puts every style on one test photo, as it does
+        // the looks (see LookSamples).
+        if ProcessInfo.processInfo.environment["SNAPPER_DEMO_IMAGE"] != nil { return DemoScene.url }
+        #endif
+        return Bundle.main.url(forResource: samplePhoto, withExtension: "jpg")
+            ?? Bundle.main.url(forResource: "demo-scene", withExtension: "jpg")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Color.white.opacity(0.06)
@@ -113,9 +123,7 @@ private struct CuratedStyleCard: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .task {
-            guard let url = Bundle.main.url(forResource: samplePhoto, withExtension: "jpg")
-                    ?? Bundle.main.url(forResource: "demo-scene", withExtension: "jpg"),
-                  let look else { unavailable = true; return }
+            guard let url = sampleURL, let look else { unavailable = true; return }
             image = await renderer.preview(id: sampleID, sourceURL: url, look: look, recipe: style.recipe, maxPixelSize: 700)
             unavailable = image == nil
         }

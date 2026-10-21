@@ -21,3 +21,19 @@ In the look picker each collection is shown on its own photo
 Unsplash doesn't provide model releases. Before release, get a release for the
 portrait or replace it with a photo of someone who has given consent. The
 other photos show people only from behind or at a distance.
+
+## Guide clips
+
+The Guide's clips (`Snapper/Resources/GuideDemos/`) show only photos that need
+no credit or model release: the Unsplash photos above and crops of them (not
+the portrait), and three photos from `test-photos/stand-ins/` that come with
+scikit-image:
+
+| File | Author | License |
+|---|---|---|
+| `food-coffee.jpg` | Rachel Michetti | CC0 |
+| `pet-cat.jpg` | Stefan van der Walt | CC0 |
+| `outdoor-launch.jpg` | SpaceX | Public domain |
+
+`scripts/seed-guide-library.sh` puts them in the Simulator's Library for
+recording. In the clips the camera shows `showcase-cafe.jpg`, not the portrait.

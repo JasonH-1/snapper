@@ -160,7 +160,7 @@ SIMULATOR_ID=<device id> scripts/record-guide-demo.sh testColorMixer color-mixer
 
 It builds the `SnapperGuideDemos` scheme, records the screen while the test runs, and encodes the part between the test's DEMO START and DEMO END marks (`scripts/encode-guide-demo.swift`): 720×900 at 60 fps, the phone on a dark backdrop, pauses shortened, a fade at the loop. Touches show as circles (Debug builds launched with `-SnapperShowTouches YES`).
 
-The scripts expect the Simulator's Library to hold the sample photos (photo 0 an astronaut portrait, photo 5 Times Square, unedited) and no personal presets. Each script undoes its edits afterwards; if one stops part-way, run `testRestoreState` and then `testPrepareCamera` (in `SnapperDemos`) before recording again.
+Every photo in the clips is free to use with no credit or model release: the Unsplash photos in `Snapper/Resources/Showcase/` and crops of them (not the portrait), plus three CC0 / public-domain photos from `test-photos/stand-ins/` (see `docs/photo-credits.md`). The camera shows the café photo in place of the Simulator's usual stand-in, the portrait. The scripts expect the Simulator's Library as `scripts/seed-guide-library.sh` fills it (12 photos in a fixed order; photo 5 is a street at night, unedited) and no personal presets. The import picker shows the Simulator's Photos library, so keep only those photos there too (`PHOTOS=1` adds them). Each script undoes its edits afterwards; if one stops part-way, run `testRestoreState` and then `testPrepareCamera` (in `SnapperDemos`) before recording again.
 
 ## How it's built
 

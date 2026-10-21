@@ -10,14 +10,15 @@ import XCTest
 /// keeps a pause at full length (other pauses are shortened). After the
 /// clip, each script puts back what it changed, so they can run in any order.
 ///
-/// The scripts expect the Simulator's Library to hold the sample photos
-/// (photo 0, an astronaut portrait; photo 5, Times Square at night, unedited),
+/// The scripts expect the Simulator's Library as `scripts/seed-guide-library.sh`
+/// leaves it (photo 0, a birthday cake; photo 5, a street at night, unedited),
 /// no personal presets, and the camera options as `testPrepareCamera` leaves
 /// them. The Simulator has no camera: the preview is a demo photo that still
-/// shows exposure, white balance and focus changes.
+/// shows exposure, white balance and focus changes. Every photo in the clips
+/// is free to use, with no credit or model release needed.
 final class GuideDemoTests: XCTestCase {
     /// Photos in the Simulator's Library when no demo is running.
-    static let libraryCount = 34
+    static let libraryCount = 12
 
     override func setUp() {
         continueAfterFailure = false
@@ -550,7 +551,7 @@ final class GuideDemoTests: XCTestCase {
         resetEdits(app)
     }
 
-    /// guide-selective: paint the subject, then darken the background.
+    /// guide-selective: paint the cake and its candles, then brighten them.
     @MainActor
     func testSelective() {
         let app = launch()
@@ -568,10 +569,11 @@ final class GuideDemoTests: XCTestCase {
         tap(paint)
         hold(0.4)
         focus(picture, padding: 0)
-        for (from, to) in [(CGVector(dx: 0.5, dy: 0.12), CGVector(dx: 0.5, dy: 0.95)),
-                           (CGVector(dx: 0.42, dy: 0.3), CGVector(dx: 0.58, dy: 0.3)),
-                           (CGVector(dx: 0.36, dy: 0.55), CGVector(dx: 0.64, dy: 0.55)),
-                           (CGVector(dx: 0.32, dy: 0.8), CGVector(dx: 0.68, dy: 0.8))] {
+        for (from, to) in [(CGVector(dx: 0.47, dy: 0.45), CGVector(dx: 0.63, dy: 0.45)),
+                           (CGVector(dx: 0.45, dy: 0.56), CGVector(dx: 0.66, dy: 0.56)),
+                           (CGVector(dx: 0.42, dy: 0.67), CGVector(dx: 0.68, dy: 0.67)),
+                           (CGVector(dx: 0.4, dy: 0.78), CGVector(dx: 0.68, dy: 0.78)),
+                           (CGVector(dx: 0.42, dy: 0.87), CGVector(dx: 0.66, dy: 0.87))] {
             stroke(on: picture, from: from, to: to)
         }
         hold(0.4)
@@ -579,8 +581,8 @@ final class GuideDemoTests: XCTestCase {
         let brightness = slider("Brightness", in: app)
         XCTAssertTrue(brightness.waitForExistence(timeout: 3))
         focus(picture, brightness)
-        tap(app.segmentedControls.buttons["Background"])
-        drag(brightness, from: 0, to: -0.6)
+        tap(app.segmentedControls.buttons["Subject"])
+        drag(brightness, from: 0, to: 0.5)
         hold(0.5)
         tap(button("Show Selection", in: app))
         hold(1.0)
@@ -915,10 +917,16 @@ final class GuideDemoTests: XCTestCase {
 
     // MARK: - Helpers
 
+    /// Launches Snapper; `demoImage`, a photo in Snapper/Resources/Showcase,
+    /// replaces the Simulator camera's stand-in photo (a portrait without a
+    /// model release). It also stands in for the looks' and collections'
+    /// sample photos.
     @MainActor
-    private func launch() -> XCUIApplication {
+    private func launch(demoImage: String = "showcase-cafe") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-SnapperShowTouches", "YES", "-app.hasCompletedOnboarding", "YES"]
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        app.launchEnvironment["SNAPPER_DEMO_IMAGE"] = root.appendingPathComponent("Snapper/Resources/Showcase/\(demoImage).jpg").path
         // Saving asks for Photos access the first time.
         addUIInterruptionMonitor(withDescription: "Photos access") { alert in
             for label in ["Allow", "Allow Full Access", "OK"] where alert.buttons[label].exists {
