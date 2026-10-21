@@ -77,8 +77,6 @@ final class AppModel {
     @ObservationIgnored var sharedLockScreenCamera: SnapperCameraContext?
     @ObservationIgnored var lockScreenShareTask: Task<Void, Never>?
     @ObservationIgnored var isImportingLockScreenPhotos = false
-    /// The Library has read its index, so photos already in it are known.
-    @ObservationIgnored var isLibraryLoaded = false
 
     var hasPremium: Bool { store.isPremium }
 

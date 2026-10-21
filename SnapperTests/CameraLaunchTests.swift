@@ -288,7 +288,6 @@ final class CameraLaunchTests: XCTestCase {
         let app = AppModel(store: FakePurchaseService(), settings: settings,
                            captureStore: CaptureStore(directory: try makeDirectory()))
         await app.captures.load()
-        app.isLibraryLoaded = true
 
         let session = try makeDirectory()
         let photo = CapturedPhoto(data: try TestImages.jpeg(width: 8, height: 8), isFrontCamera: false, aspect: .square)

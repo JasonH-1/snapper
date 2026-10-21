@@ -510,6 +510,41 @@ final class ExportOptionsTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testLocationOffAlsoSanitizesAdditionalOriginalAndKeepsSource() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = try photoWithLocation()
+        let received = Locked<[Data]>([])
+        let captures = CaptureLibrary(library: .bundled(), renderer: PhotoRenderer(),
+                                      store: CaptureStore(directory: directory), photoSaver: { edited, original in
+            let original = try XCTUnwrap(original)
+            let files = try [Data(contentsOf: edited), Data(contentsOf: original)]
+            received.withLock { $0 = files }
+        })
+        let record = try await captures.importPhoto(source)
+        var recipe = record.recipe
+        recipe.crop = PhotoCrop(shape: .square)
+        try await captures.saveToPhotos(record, recipe: recipe, includeOriginal: true,
+                                        options: ExportOptions(format: .jpeg, includesLocation: false))
+        let copies = received.withLock { $0 }
+        XCTAssertEqual(copies.count, 2)
+        for data in copies {
+            let metadata = try properties(data)
+            XCTAssertNil(metadata[kCGImagePropertyGPSDictionary])
+            XCTAssertNil((metadata[kCGImagePropertyIPTCDictionary] as? [CFString: Any])?[kCGImagePropertyIPTCCity])
+        }
+        XCTAssertEqual(try properties(copies[0])[kCGImagePropertyPixelWidth] as? Int, 300)
+        XCTAssertEqual(try properties(copies[1])[kCGImagePropertyPixelWidth] as? Int, 400, "original stays uncropped")
+        XCTAssertEqual(try Data(contentsOf: captures.url(for: record)), source)
+        try await captures.flush()
+        // Location on preserves the byte-for-byte additional original.
+        try await captures.saveToPhotos(record, includeOriginal: true,
+                                        options: ExportOptions(format: .jpeg, includesLocation: true))
+        XCTAssertEqual(received.withLock { $0.last }, source)
+        try await captures.flush()
+    }
+
     func testSizeAndQualityChangeTheFile() async throws {
         let renderer = PhotoRenderer()
         let source = try photoWithLocation()

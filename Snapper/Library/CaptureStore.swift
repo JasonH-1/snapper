@@ -147,19 +147,107 @@ struct CaptureStore: Sendable {
         directory.appendingPathComponent(record.fileName)
     }
 
-    func load() -> [CaptureRecord] {
-        guard let data = try? Data(contentsOf: indexURL) else { return [] }
+    enum IndexError: LocalizedError {
+        /// The index is there but couldn't be read (a file system problem),
+        /// so a retry may work.
+        case unreadable
+        /// The index was read but isn't valid. Retrying won't help;
+        /// `loadRepairingDamage()` rebuilds it.
+        case damaged
+
+        var errorDescription: String? {
+            switch self {
+            case .unreadable:
+                String(localized: "Snapper couldn't read your Library. Your files have been kept. Retry in Settings before adding photos.")
+            case .damaged:
+                String(localized: "Snapper's Library index is damaged.")
+            }
+        }
+    }
+
+    /// What `loadRepairingDamage()` did with a damaged index.
+    struct Repair: Equatable, Sendable {
+        /// Records that still read from the damaged index, edits and all.
+        var keptRecords: Int
+        /// Photos in the folder without a readable record, back without their edits.
+        var recoveredPhotos: Int
+        /// The damaged index, moved aside rather than deleted.
+        var damagedCopy: URL
+    }
+
+    func load() throws -> [CaptureRecord] {
+        guard let data = try readIndex() else { return [] }
         do {
-            let records = try JSONDecoder().decode([CaptureRecord].self, from: data)
-            // Drop entries whose file has gone missing.
-            return records.filter { FileManager.default.fileExists(atPath: url(for: $0).path) }
+            // Keep records even when an original is temporarily unavailable.
+            return try JSONDecoder().decode([CaptureRecord].self, from: data)
         } catch {
-            Logger.library.error("Capture index unreadable: \(error.localizedDescription, privacy: .public)")
-            return []
+            throw IndexError.damaged
+        }
+    }
+
+    /// The index, rebuilt if it's damaged: it's moved aside, every record that
+    /// still reads keeps its edits, and photos in the folder that no record
+    /// mentions come back unedited. A damaged index can't be fixed by
+    /// retrying, and without this the Library could never be used again.
+    /// Read errors still throw, since those can pass.
+    func loadRepairingDamage() throws -> (records: [CaptureRecord], repair: Repair?) {
+        do {
+            return (try load(), nil)
+        } catch IndexError.damaged {}
+        let salvaged = Self.salvageRecords(from: try readIndex() ?? Data())
+        let damagedCopy = directory.appendingPathComponent("captures.damaged-\(UUID().uuidString).json")
+        try FileManager.default.moveItem(at: indexURL, to: damagedCopy)
+        let recovered = recoverablePhotos(excludingIDs: Set(salvaged.map(\.id)), fileNames: Set(salvaged.map(\.fileName)))
+        let records = salvaged + recovered
+        try save(records)
+        Logger.library.error("Capture index was damaged; kept \(salvaged.count) records, recovered \(recovered.count) photos")
+        return (records, Repair(keptRecords: salvaged.count, recoveredPhotos: recovered.count, damagedCopy: damagedCopy))
+    }
+
+    /// The index file's contents, or nil when there's no index yet.
+    private func readIndex() throws -> Data? {
+        do {
+            return try Data(contentsOf: indexURL)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return nil
+        } catch {
+            throw IndexError.unreadable
+        }
+    }
+
+    /// The records in a damaged index that still decode one by one.
+    private static func salvageRecords(from data: Data) -> [CaptureRecord] {
+        guard let items = try? JSONSerialization.jsonObject(with: data) as? [Any] else { return [] }
+        var seen: Set<UUID> = []
+        return items.compactMap { item in
+            guard JSONSerialization.isValidJSONObject(item),
+                  let itemData = try? JSONSerialization.data(withJSONObject: item),
+                  let record = try? JSONDecoder().decode(CaptureRecord.self, from: itemData),
+                  seen.insert(record.id).inserted else { return nil }
+            return record
+        }
+    }
+
+    /// Photos in the folder that no record mentions, as unedited records.
+    /// Originals are named by their record's id, so that id comes back too.
+    private func recoverablePhotos(excludingIDs ids: Set<UUID>, fileNames: Set<String>) -> [CaptureRecord] {
+        let keys: [URLResourceKey] = [.isRegularFileKey, .creationDateKey]
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys)) ?? []
+        return files.compactMap { file in
+            guard !fileNames.contains(file.lastPathComponent),
+                  let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent), !ids.contains(id),
+                  let values = try? file.resourceValues(forKeys: Set(keys)), values.isRegularFile == true,
+                  let data = try? Data(contentsOf: file, options: .mappedIfSafe) else { return nil }
+            let info = Self.inspectImage(data)
+            guard info.isReadable else { return nil }
+            return CaptureRecord(id: id, createdAt: values.creationDate ?? Date(), takenAt: info.takenAt,
+                                 fileName: file.lastPathComponent, recipe: .untouched)
         }
     }
 
     func save(_ records: [CaptureRecord]) throws {
+        // A failed read is never permission to replace an existing index.
+        _ = try load()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(records)
         try data.write(to: indexURL, options: .atomic)

@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import OSLog
 
 // Shared by the app and the Lock Screen camera (SnapperCapture).
@@ -76,6 +77,8 @@ enum LockedCaptureInbox {
     struct Contents: Sendable {
         /// Oldest first.
         var photos: [Photo] = []
+        /// False if any file could not be accounted for; keep the session.
+        var isComplete = true
         /// The camera as the session left it, if the person changed it there.
         var camera: SnapperCameraContext?
     }
@@ -96,26 +99,74 @@ enum LockedCaptureInbox {
         try JSONEncoder().encode(context).write(to: folder.appendingPathComponent(cameraFileName), options: .atomic)
     }
 
-    /// What a session folder holds. Unreadable notes are skipped (and logged).
-    static func read(_ folder: URL) -> Contents {
+    /// What a session folder holds, and whether it may still be missing something.
+    ///
+    /// A photo with no readable note (the camera stopped between writing the
+    /// two) is taken as it is, with the session's camera, once it's
+    /// `orphanGrace` old; until then the session counts as incomplete in case
+    /// its note is on the way. Notes are written after their photos, so a
+    /// note whose photo is gone has nothing left to bring in.
+    static func read(_ folder: URL, now: Date = Date(), orphanGrace: TimeInterval = 60) -> Contents {
         var contents = Contents()
-        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-        for file in files where file.pathExtension == noteExtension {
-            do {
-                let note = try JSONDecoder().decode(Note.self, from: Data(contentsOf: file))
-                let url = folder.appendingPathComponent(note.fileName)
-                guard FileManager.default.fileExists(atPath: url.path) else { continue }
-                contents.photos.append(Photo(note: note, url: url))
-            } catch {
-                Logger.camera.error("Unreadable Lock Screen photo note \(file.lastPathComponent, privacy: .public)")
-            }
+        let files: [URL]
+        do {
+            files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])
+        } catch {
+            contents.isComplete = false
+            return contents
         }
-        contents.photos.sort { $0.note.takenAt < $1.note.takenAt }
         let cameraURL = folder.appendingPathComponent(cameraFileName)
         if let data = try? Data(contentsOf: cameraURL) {
             contents.camera = try? JSONDecoder().decode(SnapperCameraContext.self, from: data)
         }
+        var referencedFiles: Set<String> = []
+        for file in files where file.pathExtension == noteExtension {
+            guard let data = try? Data(contentsOf: file), let note = try? JSONDecoder().decode(Note.self, from: data),
+                  note.fileName == "\(note.id.uuidString).photo" else {
+                // Its photo, if there is one, is picked up below as one without a note.
+                Logger.camera.error("Unreadable Lock Screen photo note \(file.lastPathComponent, privacy: .public)")
+                continue
+            }
+            referencedFiles.insert(note.fileName)
+            let url = folder.appendingPathComponent(note.fileName)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                Logger.camera.error("Lock Screen photo \(note.fileName, privacy: .public) is missing")
+                continue
+            }
+            contents.photos.append(Photo(note: note, url: url))
+        }
+        for file in files where file.pathExtension == "photo" && !referencedFiles.contains(file.lastPathComponent) {
+            guard let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent) else { continue }
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? now
+            guard now.timeIntervalSince(modified) >= orphanGrace else {
+                contents.isComplete = false
+                continue
+            }
+            // Photos are written whole, so one that isn't an image never will be.
+            guard isImage(file) else {
+                Logger.camera.error("Lock Screen file \(file.lastPathComponent, privacy: .public) isn't a photo")
+                continue
+            }
+            contents.photos.append(Photo(note: orphanNote(id: id, fileName: file.lastPathComponent, takenAt: modified,
+                                                          camera: contents.camera), url: file))
+        }
+        contents.photos.sort { $0.note.takenAt < $1.note.takenAt }
         return contents
+    }
+
+    /// A best guess for a photo whose note never arrived: the look and camera
+    /// the session was last on.
+    private static func orphanNote(id: UUID, fileName: String, takenAt: Date, camera: SnapperCameraContext?) -> Note {
+        Note(id: id, fileName: fileName, lookID: camera?.lookID ?? Look.original.id, style: nil,
+             aspect: camera?.captureOptions.aspect ?? .fourThree,
+             isFrontCamera: camera?.cameraPreferences.position == .front, takenAt: takenAt)
+    }
+
+    private static func isImage(_ url: URL) -> Bool {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary) else {
+            return false
+        }
+        return CGImageSourceGetCount(source) > 0
     }
 }
 

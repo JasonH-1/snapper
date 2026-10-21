@@ -14,7 +14,7 @@ final class CaptureStoreTests: XCTestCase {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    func testRecordsRoundTripAndMissingFilesAreDropped() throws {
+    func testRecordsRoundTripAndMissingFilesKeepTheirEdits() throws {
         let store = CaptureStore(directory: directory)
         var recipe = PhotoRecipe(lookID: "boardwalk", strength: 0.8)
         recipe.adjustments.brightness = 0.2
@@ -25,8 +25,8 @@ final class CaptureStoreTests: XCTestCase {
         try store.write(Data([0xFF, 0xD8, 0xFF]), fileName: kept.fileName)
         try store.save([kept, missing])
 
-        let loaded = store.load()
-        XCTAssertEqual(loaded.map(\.id), [kept.id])
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.map(\.id), [kept.id, missing.id])
         XCTAssertEqual(loaded.first?.recipe, recipe)
         XCTAssertEqual(loaded.first?.source, .imported)
         XCTAssertEqual(loaded.first?.initialRecipe, recipe)

@@ -207,6 +207,19 @@ struct SettingsView: View {
     private var librarySection: some View {
         let savedCount = app.captures.alreadySavedIDs.count
         return Section {
+            if let message = app.captures.storageError {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                Button("Retry Library") {
+                    Task {
+                        guard await app.captures.load() else { return }
+                        do {
+                            try await app.captures.flush()
+                            await app.importLockScreenPhotos()
+                        } catch { /* The Library keeps the error visible for another retry. */ }
+                    }
+                }
+            }
             LabeledContent("Photos in Snapper") {
                 if let storageUsed {
                     Text("\(LibraryModel.photoCount(app.captures.records.count)) · \(storageUsed.formatted(.byteCount(style: .file)))")
