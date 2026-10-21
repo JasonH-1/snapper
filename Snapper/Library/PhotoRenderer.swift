@@ -174,14 +174,68 @@ actor PhotoRenderer {
         result.removeValue(forKey: kCGImagePropertyGPSDictionary as String)
         result.removeValue(forKey: kCGImagePropertyMakerAppleDictionary as String)
         if var iptc = result[kCGImagePropertyIPTCDictionary as String] as? [String: Any] {
-            let placeKeys = [kCGImagePropertyIPTCCity, kCGImagePropertyIPTCSubLocation, kCGImagePropertyIPTCProvinceState,
-                             kCGImagePropertyIPTCCountryPrimaryLocationCode, kCGImagePropertyIPTCCountryPrimaryLocationName,
-                             kCGImagePropertyIPTCContentLocationCode, kCGImagePropertyIPTCContentLocationName,
-                             kCGImagePropertyIPTCExtLocationCreated, kCGImagePropertyIPTCExtLocationShown]
-            for key in placeKeys { iptc.removeValue(forKey: key as String) }
+            for key in iptcPlaceKeys { iptc.removeValue(forKey: key) }
             result[kCGImagePropertyIPTCDictionary as String] = iptc
         }
         return result
+    }
+
+    /// IPTC fields that name a place.
+    private static let iptcPlaceKeys: [String] = [
+        kCGImagePropertyIPTCCity, kCGImagePropertyIPTCSubLocation, kCGImagePropertyIPTCProvinceState,
+        kCGImagePropertyIPTCCountryPrimaryLocationCode, kCGImagePropertyIPTCCountryPrimaryLocationName,
+        kCGImagePropertyIPTCContentLocationCode, kCGImagePropertyIPTCContentLocationName,
+        kCGImagePropertyIPTCExtLocationCreated, kCGImagePropertyIPTCExtLocationShown,
+    ].map { $0 as String }
+
+    /// XMP tags, by namespace, that name a place (IPTC's, as Image I/O reads them).
+    private static let xmpPlaceTags: [String: Set<String>] = [
+        kCGImageMetadataNamespacePhotoshop as String: ["City", "State", "Country"],
+        kCGImageMetadataNamespaceIPTCCore as String: ["Location", "CountryCode"],
+        kCGImageMetadataNamespaceIPTCExtension as String: ["LocationCreated", "LocationShown"],
+    ]
+
+    /// The original as it is, without its place: GPS and the IPTC place
+    /// fields are removed and nothing is re-encoded, so the pixels (HDR
+    /// included), format, orientation and capture details are untouched.
+    /// Apple's maker note is kept too: it holds exposure, focus and HDR
+    /// data, not location, and Image I/O can't drop it without re-encoding.
+    /// Throws if the format can't be copied this way or any location
+    /// survives the copy, so the caller can re-encode instead.
+    static func copyWithoutLocation(from source: URL, into folder: URL) throws -> URL {
+        guard let image = CGImageSourceCreateWithURL(source as CFURL, nil), let type = CGImageSourceGetType(image),
+              let metadata = CGImageSourceCopyMetadataAtIndex(image, 0, nil),
+              let kept = CGImageMetadataCreateMutableCopy(metadata) else { throw RenderError.unreadableImage }
+        var placeTags: [CFString] = []
+        CGImageMetadataEnumerateTagsUsingBlock(metadata, nil, nil) { path, tag in
+            let name = CGImageMetadataTagCopyName(tag) as String? ?? ""
+            let namespace = CGImageMetadataTagCopyNamespace(tag) as String? ?? ""
+            if name.hasPrefix("GPS") || xmpPlaceTags[namespace]?.contains(name) == true { placeTags.append(path) }
+            return true
+        }
+        for path in placeTags { CGImageMetadataRemoveTagWithPath(kept, nil, path) }
+
+        let fileExtension = UTType(type as String)?.preferredFilenameExtension ?? source.pathExtension
+        let url = folder.appendingPathComponent("Original").appendingPathExtension(fileExtension)
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, type, 1, nil) else { throw RenderError.encodingFailed }
+        // Replaces the metadata with the filtered copy. (Excluding GPS on its
+        // own leaves GPS in HEIF and drops everything else from JPEG.)
+        let options: [CFString: Any] = [kCGImageDestinationMetadata: kept, kCGImageDestinationMergeMetadata: false,
+                                        kCGImageMetadataShouldExcludeGPS: true]
+        guard CGImageDestinationCopyImageSource(destination, image, options as CFDictionary, nil), !hasLocation(url) else {
+            try? FileManager.default.removeItem(at: url)
+            throw RenderError.encodingFailed
+        }
+        return url
+    }
+
+    /// Whether the file still says where it was taken.
+    static func hasLocation(_ url: URL) -> Bool {
+        guard let image = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(image, 0, nil) as? [String: Any] else { return true }
+        if properties[kCGImagePropertyGPSDictionary as String] != nil { return true }
+        let iptc = properties[kCGImagePropertyIPTCDictionary as String] as? [String: Any] ?? [:]
+        return iptcPlaceKeys.contains { iptc[$0] != nil }
     }
 
     // MARK: - Previews
