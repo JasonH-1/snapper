@@ -9,7 +9,7 @@ root = Path(__file__).resolve().parents[1]
 issues = []
 for path in [root / 'Snapper/App/AppConfig.swift', *sorted((root / 'docs').glob('*.html'))]:
     text = path.read_text()
-    for marker in ['Your Name or Company', 'support@example.com', 'class="placeholder"']:
+    for marker in ['Your Name or Company', 'support@example.com', 'class="placeholder"', 'APP_STORE_ID']:
         if marker in text:
             issues.append(f'{path.relative_to(root)}: unresolved {marker}')
 config = (root / 'Snapper/App/AppConfig.swift').read_text()

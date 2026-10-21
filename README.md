@@ -141,7 +141,7 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 ## Before you submit
 
 - [ ] Fill in the placeholders in `Snapper/App/AppConfig.swift`: developer name, support email, and the App Store ID once the app exists. The ID turns on the "Rate Snapper" deep link.
-- [ ] Replace the highlighted placeholders in `docs/*.html` (name, email, governing law).
+- [ ] Replace the highlighted placeholders in `docs/*.html` (name, email, governing law), and `APP_STORE_ID` in the landing page's App Store links (`docs/index.html`).
 - [ ] Check the sample photos in `Snapper/Resources/Showcase/`. They appear in onboarding, on the paywall, in the look thumbnails and in the Simulator. They're Unsplash photos at 1800 px (credits in `docs/photo-credits.md`); Unsplash includes no model releases, so get a release for the portrait or swap in your own photo shot with consent.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
@@ -183,7 +183,7 @@ SnapperControls/ Control Center control (WidgetKit)
 SnapperDemos/   UI-test scripts for the Guide's videos (scripts/record-guide-demo.sh)
 SnapperTests/   LUT parser, manifest, capture store, export, Core Image vs generator, StoreKit
 tools/lutgen/   Look generator, quality gates, contact sheets
-docs/           Privacy Policy, Terms of Use, Support (GitHub Pages)
+docs/           Landing page, Privacy Policy, Terms of Use, Support (GitHub Pages)
 ```
 
 - **MVVM.** SwiftUI views over `@Observable` models on the main actor. Camera and rendering work never touches the main actor.
