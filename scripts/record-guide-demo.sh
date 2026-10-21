@@ -8,7 +8,8 @@
 # keeps only the part between its "DEMO START" and "DEMO END" marks, and
 # writes Snapper/Resources/GuideDemos/guide-<topic id>.mp4 with the camera
 # moves and holds the test marked (see encode-guide-demo.swift). The guide
-# shows that clip in place of the topic's sample. FRAMES=<dir> also writes
+# shows that clip in place of the topic's sample. OUTPUT=<file> writes it
+# elsewhere (the website's clips go in docs/). FRAMES=<dir> also writes
 # review stills there.
 #
 # SIMULATOR_ID picks the device (default: the first booted iPhone).
@@ -23,7 +24,8 @@ derived=${DERIVED_DATA:-$root/build/guide-demos}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 destination="platform=iOS Simulator,id=$device"
-output="$root/Snapper/Resources/GuideDemos/guide-$topic.mp4"
+output=${OUTPUT:-$root/Snapper/Resources/GuideDemos/guide-$topic.mp4}
+[[ $output = /* ]] || output="$root/$output"
 
 cd "$root"
 xcodegen generate --quiet

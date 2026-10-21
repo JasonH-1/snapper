@@ -882,6 +882,34 @@ final class GuideDemoTests: XCTestCase {
         if button("Done", in: app).exists { tap(button("Done", in: app)) }
     }
 
+    // MARK: - Website
+
+    /// site-hero, for docs/: the camera on a street at dusk, swiping through
+    /// the Neon Nights looks. Record with `OUTPUT=docs/assets/hero.mp4`, then
+    /// make `hero-h264.mp4` with scripts/transcode-h264.swift (1000000) and
+    /// update `hero-poster.jpg` from its first second.
+    /// Unsplash photo only: no people who could be recognized. Framed on the
+    /// preview and dial from the first frame, so the Library button's latest
+    /// photo never shows.
+    @MainActor
+    func testSiteHero() {
+        let app = launch(demoImage: "showcase-night")
+        let preview = app.otherElements["Camera preview"]
+        let dial = buttonStarting("Browse looks", in: app)
+        chooseLook("Afterglow", in: app)
+        focus(preview, dial, padding: 8)
+        wait(0.3)
+        start(app)
+        hold(1.2)
+        for _ in 0..<5 {
+            stroke(on: preview, from: CGVector(dx: 0.82, dy: 0.55), to: CGVector(dx: 0.22, dy: 0.55), velocity: 1100)
+            hold(1.3)
+        }
+        end()
+
+        chooseLook("Blue Hour", in: app)
+    }
+
     // MARK: - Colour
 
     /// guide-color-mixer: pick a colour and shift its hue and saturation.

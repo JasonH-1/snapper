@@ -2,31 +2,334 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Snapper — find your look</title>
-  <meta name="description" content="Find your look, shoot with it, and style your whole weekend with Snapper.">
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Snapper — film looks for iPhone</title>
+  <meta name="description" content="A camera for film looks. Swipe through 47 looks on the live preview, shoot with the one you like and keep it as your own style. Free to start, no account.">
+  <meta name="theme-color" content="#111113">
+  <meta name="color-scheme" content="dark">
+  <meta property="og:title" content="Snapper — film looks for iPhone">
+  <meta property="og:description" content="Swipe through 47 film looks on the live preview, shoot with the one you like and keep it as your own style.">
+  <meta property="og:type" content="website">
+  <!-- Once the app is live: <meta name="apple-itunes-app" content="app-id=APP_STORE_ID"> -->
+  <link rel="icon" href="assets/icon-64.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <link rel="stylesheet" href="landing.css">
+  <script>document.documentElement.classList.add("js")</script>
 </head>
 <body>
-<main>
-  <header class="site"><span class="mark" aria-hidden="true"></span><a href="./">Snapper</a></header>
-  <h1>Find your look.<br>Shoot with it.</h1>
-  <p class="muted">Style your whole weekend. Choose a film look for friends, travel or nights out, see it live, and make it your own. Keep a personal preset for your next shot or apply it to photos already on your iPhone.</p>
-  <div class="card">
-    <ul class="summary">
-      <li>Swipe the live preview to change looks.</li>
-      <li>Save your style, shoot with it, and share the preset with a friend.</li>
-      <li>With Premium, style a photo set and preview matching frames and layouts before sharing.</li>
-      <li>Start with nine free looks, one personal preset and clean exports. Your photos are never locked behind Premium.</li>
-      <li>Everything happens on your iPhone. No account, no tracking.</li>
-    </ul>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <a class="brand" href="./"><img src="assets/icon-64.png" alt="" width="28" height="28">Snapper</a>
+    <nav class="bar-links" aria-label="Sections">
+      <a href="#looks">Looks</a>
+      <a href="#camera">Camera</a>
+      <a href="#editor">Editor</a>
+      <a href="#premium">Premium</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <a class="button small" href="https://apps.apple.com/app/idAPP_STORE_ID">Get the app</a>
   </div>
-  <nav class="links">
-    <a href="support.html">Support</a>
-    <a href="privacy.html">Privacy Policy</a>
-    <a href="terms.html">Terms of Use</a>
-  </nav>
-  <footer>© 2026 <span class="placeholder">Your Name or Company</span></footer>
+</header>
+
+<main>
+
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="readout">47 looks · 6 collections</p>
+      <h1>Find your look.<br>Shoot with it.</h1>
+      <p class="lead">Snapper is a camera for film looks. Swipe through them on the live preview, take the shot in the one you like, then keep it as your own style for every photo after.</p>
+      <div class="actions">
+        <a class="button" href="https://apps.apple.com/app/idAPP_STORE_ID">Get Snapper on the App Store</a>
+        <a class="button quiet" href="#looks">See the looks</a>
+      </div>
+      <p class="fine">Free to download, with 9 looks, editing and a personal style. iPhone, iOS 17 or later.</p>
+    </div>
+    <div class="hero-media">
+      <div class="screen">
+        <video muted loop playsinline preload="metadata" poster="assets/hero-poster.jpg"
+               aria-label="Snapper's camera on a street at dusk, swiping through the Neon Nights looks">
+          <source src="assets/hero.mp4" type='video/mp4; codecs="hvc1"'>
+          <source src="assets/hero-h264.mp4" type="video/mp4">
+        </video>
+        <button class="play" type="button" aria-label="Play video" hidden>
+          <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>
+          <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4a.8.8 0 0 0 1.2.7l8.4-5.2a.8.8 0 0 0 0-1.4L5.7 2.1a.8.8 0 0 0-1.2.7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <dl class="stats">
+      <div><dt>Looks</dt><dd>47</dd></div>
+      <div><dt>Free looks</dt><dd>9</dd></div>
+      <div><dt>Watermarks</dt><dd>0</dd></div>
+      <div><dt>Accounts</dt><dd>0</dd></div>
+    </dl>
+  </div>
+
+  <section id="looks" class="section wrap">
+    <div class="section-head">
+      <p class="readout">Looks</p>
+      <h2>Six collections, one for every kind of light.</h2>
+      <p>Every collection has at least one free look. Drag across a photo to compare it with the original.</p>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Collections">
+      <button role="tab" id="tab-disposable" aria-controls="look-disposable" aria-selected="true">Disposable</button>
+      <button role="tab" id="tab-neon" aria-controls="look-neon" aria-selected="false" tabindex="-1">Neon Nights</button>
+      <button role="tab" id="tab-soft" aria-controls="look-soft" aria-selected="false" tabindex="-1">Soft Portrait</button>
+      <button role="tab" id="tab-overclock" aria-controls="look-overclock" aria-selected="false" tabindex="-1">Overclock</button>
+      <button role="tab" id="tab-darkroom" aria-controls="look-darkroom" aria-selected="false" tabindex="-1">Darkroom</button>
+      <button role="tab" id="tab-digicam" aria-controls="look-digicam" aria-selected="false" tabindex="-1">Digicam</button>
+    </div>
+
+    <div class="collection active" id="look-disposable" role="tabpanel" aria-labelledby="tab-disposable">
+      <div class="compare">
+        <img src="assets/looks/beach.jpg" alt="Two people on a mossy rock in a blue sea, unedited" width="1073" height="1620">
+        <img class="after" src="assets/looks/beach-boardwalk.jpg" alt="The same photo with the Boardwalk look" width="1073" height="1620">
+        <span class="tag left">Original</span><span class="tag right">Boardwalk</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Compare the original with Boardwalk">
+      </div>
+      <div class="about">
+        <p class="readout">Collection 01/06</p>
+        <h3>Disposable</h3>
+        <p>Sun-faded, warm and a little overexposed, like a 90s throwaway camera.</p>
+        <ul class="names" aria-label="Looks in Disposable">
+          <li class="free shown">Boardwalk</li><li class="free">Postcard</li><li>Flashbulb</li><li>Sunburn</li><li>Backyard</li><li>Road Trip</li><li>Pool Party</li><li>Corner Shop</li><li>Expired</li><li>Mixtape</li>
+        </ul>
+        <p class="key"><span class="dot"></span>Free look</p>
+      </div>
+    </div>
+
+    <div class="collection" id="look-neon" role="tabpanel" aria-labelledby="tab-neon">
+      <div class="compare">
+        <img src="assets/looks/night.jpg" alt="People walking down a city street at dusk under string lights, unedited" width="1076" height="1620" loading="lazy">
+        <img class="after" src="assets/looks/night-bluehour.jpg" alt="The same photo with the Blue Hour look" width="1076" height="1620" loading="lazy">
+        <span class="tag left">Original</span><span class="tag right">Blue Hour</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Compare the original with Blue Hour">
+      </div>
+      <div class="about">
+        <p class="readout">Collection 02/06</p>
+        <h3>Neon Nights</h3>
+        <p>Teal shadows, warm skin and glowing signs for the city after dark.</p>
+        <ul class="names" aria-label="Looks in Neon Nights">
+          <li class="free">Afterglow</li><li class="free">Last Train</li><li>Neon</li><li>Midnight</li><li>Lantern</li><li>Arcade</li><li class="shown">Blue Hour</li><li>Downpour</li><li>Taxi</li><li>Vapor</li>
+        </ul>
+        <p class="key"><span class="dot"></span>Free look</p>
+      </div>
+    </div>
+
+    <div class="collection" id="look-soft" role="tabpanel" aria-labelledby="tab-soft">
+      <div class="compare">
+        <img src="assets/looks/cafe.jpg" alt="A café with wooden tables and chairs, unedited" width="1080" height="1440" loading="lazy">
+        <img class="after" src="assets/looks/cafe-cream.jpg" alt="The same photo with the Cream look" width="1080" height="1440" loading="lazy">
+        <span class="tag left">Original</span><span class="tag right">Cream</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Compare the original with Cream">
+      </div>
+      <div class="about">
+        <p class="readout">Collection 03/06</p>
+        <h3>Soft Portrait</h3>
+        <p>Gentle contrast, creamy highlights and skin that looks like skin.</p>
+        <ul class="names" aria-label="Looks in Soft Portrait">
+          <li class="free shown">Cream</li><li class="free">Silver</li><li>Studio</li><li>Peach</li><li>Linen</li><li>Honey</li><li>Silk</li><li>Porcelain</li><li>Petal</li><li>Matte</li>
+        </ul>
+        <p class="key"><span class="dot"></span>Free look</p>
+      </div>
+    </div>
+
+    <div class="collection" id="look-overclock" role="tabpanel" aria-labelledby="tab-overclock">
+      <div class="compare">
+        <img src="assets/looks/arcade.jpg" alt="People playing an arcade game in a dark room, unedited" width="1080" height="1440" loading="lazy">
+        <img class="after" src="assets/looks/arcade-overdrive.jpg" alt="The same photo with the Overdrive look" width="1080" height="1440" loading="lazy">
+        <span class="tag left">Original</span><span class="tag right">Overdrive</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Compare the original with Overdrive">
+      </div>
+      <div class="about">
+        <p class="readout">Collection 04/06</p>
+        <h3>Overclock</h3>
+        <p>Neon glow, broken signals and chrome-edged colour from a future that never happened.</p>
+        <ul class="names" aria-label="Looks in Overclock">
+          <li class="shown">Overdrive</li><li>Redline</li><li class="free">Signal</li><li>Chrome</li><li>Hologram</li>
+        </ul>
+        <p class="key"><span class="dot"></span>Free look</p>
+      </div>
+    </div>
+
+    <div class="collection" id="look-darkroom" role="tabpanel" aria-labelledby="tab-darkroom">
+      <div class="compare">
+        <img src="assets/looks/beach.jpg" alt="Two people on a mossy rock in a blue sea, unedited" width="1073" height="1620" loading="lazy">
+        <img class="after" src="assets/looks/beach-leak.jpg" alt="The same photo with the Leak look" width="1073" height="1620" loading="lazy">
+        <span class="tag left">Original</span><span class="tag right">Leak</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Compare the original with Leak">
+      </div>
+      <div class="about">
+        <p class="readout">Collection 05/06</p>
+        <h3>Darkroom</h3>
+        <p>Grain, halation and faded colour from old film and shoebox prints.</p>
+        <ul class="names" aria-label="Looks in Darkroom">
+          <li>Halo</li><li>Crossroad</li><li class="free">Instant</li><li class="shown">Leak</li><li>Grit</li><li>Heirloom</li>
+        </ul>
+        <p class="key"><span class="dot"></span>Free look</p>
+      </div>
+    </div>
+
+    <div class="collection" id="look-digicam" role="tabpanel" aria-labelledby="tab-digicam">
+      <div class="compare">
+        <img src="assets/looks/cake.jpg" alt="A cake with lit candles, unedited" width="1080" height="1620" loading="lazy">
+        <img class="after" src="assets/looks/cake-afterparty.jpg" alt="The same photo with the Afterparty look" width="1080" height="1620" loading="lazy">
+        <span class="tag left">Original</span><span class="tag right">Afterparty</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Compare the original with Afterparty">
+      </div>
+      <div class="about">
+        <p class="readout">Collection 06/06</p>
+        <h3>Digicam</h3>
+        <p>Harsh flash, cool skin and crunchy pixels from a 2000s pocket camera.</p>
+        <ul class="names" aria-label="Looks in Digicam">
+          <li class="free">Pocket</li><li class="shown">Afterparty</li><li>Y2K</li><li>Memory Card</li><li>Fluoro</li><li>Low Batt</li>
+        </ul>
+        <p class="key"><span class="dot"></span>Free look</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="camera" class="section wrap">
+    <div class="section-head">
+      <p class="readout">Camera</p>
+      <h2>See the look before you take the shot.</h2>
+      <p>Every look runs on the live preview, so what you frame is what you get.</p>
+    </div>
+    <ol class="features">
+      <li><h3>Swipe to change looks</h3><p>Swipe across the preview to try the next look, or turn the dial to browse a collection. Your favorites come first.</p></li>
+      <li><h3>Shoot with your style</h3><p>Pick a saved style on the camera and its strength and adjustments are in every shot.</p></li>
+      <li><h3>Camera Control</h3><p>On iPhone 16 and later, light-press Camera Control to scroll looks and exposure without touching the screen.</p></li>
+      <li><h3>Straight from the Lock Screen</h3><p>Make Snapper the camera for the Lock Screen, Control Center and Camera Control, with your look ready to go (iOS 18).</p></li>
+      <li><h3>Manual when you want it</h3><p>Manual focus, ISO and shutter speed, white balance presets and exposure compensation.</p></li>
+      <li><h3>Framing tools</h3><p>Grid, level, photo ratios, a self-timer and flash.</p></li>
+    </ol>
+  </section>
+
+  <section id="editor" class="section wrap">
+    <div class="section-head">
+      <p class="readout">Editor</p>
+      <h2>Edit any photo. Keep the original.</h2>
+      <p>Edit what you shot or import from your library. Every edit stays adjustable, and the original is never changed.</p>
+    </div>
+    <ul class="strip" aria-label="One photo in six looks">
+      <li><img src="assets/looks/strip/cafe-original.jpg" alt="" width="480" height="640" loading="lazy"><span>Original</span></li>
+      <li><img src="assets/looks/strip/cafe-cream.jpg" alt="" width="480" height="640" loading="lazy"><span>Cream</span><small>Soft Portrait</small></li>
+      <li><img src="assets/looks/strip/cafe-honey.jpg" alt="" width="480" height="640" loading="lazy"><span>Honey</span><small>Soft Portrait</small></li>
+      <li><img src="assets/looks/strip/cafe-silver.jpg" alt="" width="480" height="640" loading="lazy"><span>Silver</span><small>Soft Portrait</small></li>
+      <li><img src="assets/looks/strip/cafe-heirloom.jpg" alt="" width="480" height="640" loading="lazy"><span>Heirloom</span><small>Darkroom</small></li>
+      <li><img src="assets/looks/strip/cafe-crossroad.jpg" alt="" width="480" height="640" loading="lazy"><span>Crossroad</span><small>Darkroom</small></li>
+    </ul>
+    <dl class="tools">
+      <div><dt>Adjust</dt><dd>Brightness, contrast, saturation, warmth, fade, grain, highlights and shadows.</dd></div>
+      <div><dt>Crop &amp; straighten</dt><dd>Ratios or free crop, straighten, rotate and flip.</dd></div>
+      <div><dt>Curves <span class="pro">Premium</span></dt><dd>RGB and single-channel tone curves over a live histogram.</dd></div>
+      <div><dt>Color mixer <span class="pro">Premium</span></dt><dd>Change the hue, saturation or brightness of one color family.</dd></div>
+      <div><dt>Split toning <span class="pro">Premium</span></dt><dd>One color in the highlights, another in the shadows.</dd></div>
+      <div><dt>Film effects <span class="pro">Premium</span></dt><dd>Bloom, halation and vignette, scaled to every size you export.</dd></div>
+      <div><dt>Subject &amp; background <span class="pro">Premium</span></dt><dd>Snapper finds the subject on your iPhone. Edit it and the background separately, and refine with a brush.</dd></div>
+      <div><dt>Frames &amp; layouts <span class="pro">Premium</span></dt><dd>Borders and square, post or story canvases that keep your whole photo.</dd></div>
+      <div><dt>Date stamp</dt><dd>A printed date in the corner, checked before you save.</dd></div>
+      <div><dt>Versions</dt><dd>Keep Warm, Black &amp; White and the Original side by side, sharing one original.</dd></div>
+      <div><dt>Styles</dt><dd>Save a look with its adjustments, shoot with it, or share it as a file. One is free.</dd></div>
+      <div><dt>Style a set <span class="pro">Premium</span></dt><dd>Apply a style, frame or layout to a whole set of photos at once.</dd></div>
+    </dl>
+  </section>
+
+  <section id="premium" class="section wrap">
+    <div class="section-head">
+      <p class="readout">Premium</p>
+      <h2>Try everything. Pay to keep it.</h2>
+      <p>Every Premium look and tool works in the preview for free. Premium is only needed to save them, and any photo can always be saved without its Premium parts.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <h3>Free</h3>
+        <ul>
+          <li>9 looks, at least one in every collection</li>
+          <li>Adjust, highlights and shadows, crop</li>
+          <li>Date stamp and versions</li>
+          <li>One personal style</li>
+          <li>Backup to a single file</li>
+          <li>Clean exports, never a watermark</li>
+        </ul>
+      </div>
+      <div class="plan featured">
+        <h3>Premium</h3>
+        <ul>
+          <li>All 47 looks and the curated collections</li>
+          <li>Curves, color mixer and split toning</li>
+          <li>Film effects and subject &amp; background</li>
+          <li>Frames and export layouts</li>
+          <li>Unlimited styles, and styling whole sets</li>
+          <li>Edits made with Premium stay exportable if it ends</li>
+        </ul>
+        <p class="fine">Monthly, yearly, or once for lifetime.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" class="section wrap privacy">
+    <p class="readout">Privacy</p>
+    <h2>Your photos stay on your iPhone.</h2>
+    <p>No account to make, nothing tracked, no data collected. Looks, editing and subject detection all run on the device. <a href="privacy.html">Privacy Policy</a></p>
+  </section>
+
+  <section id="faq" class="section wrap">
+    <div class="section-head">
+      <p class="readout">Questions</p>
+      <h2>Good to know</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Is Snapper free?</summary>
+        <p>Yes. It's free to download, with 9 looks, editing, the date stamp, one personal style and watermark-free exports. Premium adds every look and tool.</p>
+      </details>
+      <details>
+        <summary>Can I save a photo I edited with a Premium look?</summary>
+        <p>With Premium, yes. Without it, tap Save Without in the editor to save the photo free without its Premium parts. Snapper keeps your full edit.</p>
+      </details>
+      <details>
+        <summary>Is there a one-time purchase?</summary>
+        <p>Yes. Lifetime is paid once, never renews and covers all current and future looks and tools.</p>
+      </details>
+      <details>
+        <summary>Which iPhones does it work on?</summary>
+        <p>Any iPhone with iOS 17 or later. The Lock Screen camera and Control Center button need iOS 18, and Camera Control needs iPhone 16 or later.</p>
+      </details>
+      <details>
+        <summary>How do I move to a new iPhone?</summary>
+        <p>Settings › Backup makes one file with every original, edit, version and style. Open it in Snapper on the new iPhone.</p>
+      </details>
+    </div>
+    <p class="more">More answers on the <a href="support.html">Support page</a>.</p>
+  </section>
+
+  <section class="cta wrap">
+    <img src="assets/icon-180.png" alt="" width="88" height="88" loading="lazy">
+    <h2>Find your look.</h2>
+    <a class="button" href="https://apps.apple.com/app/idAPP_STORE_ID">Get Snapper on the App Store</a>
+    <p class="fine">Free on iPhone</p>
+  </section>
+
 </main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <nav aria-label="Pages">
+      <a href="support.html">Support</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Use</a>
+    </nav>
+    <p>Sample photos from <a href="https://unsplash.com">Unsplash</a> by Maksim Golovko, Kira Laktionov, Natali N, Taylor Friehl and prosha amiri.</p>
+    <p>© 2026 <span class="placeholder">Your Name or Company</span></p>
+  </div>
+</footer>
+
+<script src="site.js" defer></script>
 </body>
 </html>
