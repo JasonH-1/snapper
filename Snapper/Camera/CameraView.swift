@@ -178,7 +178,7 @@ struct CameraView: View {
             }
 
             VStack(spacing: 8) {
-                if model.status == .noCamera {
+                if model.status == .noCamera && !DemoScene.isChosen {
                     Text("Simulator — demo image")
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 10)

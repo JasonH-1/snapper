@@ -15,4 +15,16 @@ enum DemoScene {
         #endif
         return Bundle.main.url(forResource: "demo-scene", withExtension: "jpg")
     }
+
+    /// True when `SNAPPER_DEMO_IMAGE` picked the scene. Whoever set it knows
+    /// it's a demo, so the camera leaves out its "demo image" badge (which
+    /// would otherwise show in the Guide's and the website's clips).
+    static var isChosen: Bool {
+        #if DEBUG
+        if let path = ProcessInfo.processInfo.environment["SNAPPER_DEMO_IMAGE"] {
+            return FileManager.default.isReadableFile(atPath: path)
+        }
+        #endif
+        return false
+    }
 }
