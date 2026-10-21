@@ -462,6 +462,33 @@ final class ExportOptionsTests: XCTestCase {
         XCTAssertEqual(reloaded.photoFormat, .jpeg)
     }
 
+    /// A photo with a place in every field that can hold one, plus details
+    /// that aren't a place.
+    private func photoWithLocation(type: UTType, orientation: Int) throws -> Data {
+        let gps: [CFString: Any] = [kCGImagePropertyGPSLatitude: 48.8584, kCGImagePropertyGPSLatitudeRef: "N",
+                                    kCGImagePropertyGPSLongitude: 2.2945, kCGImagePropertyGPSLongitudeRef: "E"]
+        let iptc: [CFString: Any] = [kCGImagePropertyIPTCCity: "Paris", kCGImagePropertyIPTCProvinceState: "Île-de-France",
+                                     kCGImagePropertyIPTCSubLocation: "Champ de Mars",
+                                     kCGImagePropertyIPTCCountryPrimaryLocationName: "France", kCGImagePropertyIPTCKeywords: ["tower"]]
+        let exif: [CFString: Any] = [kCGImagePropertyExifLensModel: "Test Lens"]
+        let apple: [String: Any] = ["8": [0.1, 0.2, 0.3]]
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(XCTUnwrap(CGImageSourceCreateWithData(photoWithLocation() as CFData, nil)), 0, nil))
+        let data = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, [kCGImagePropertyGPSDictionary: gps, kCGImagePropertyIPTCDictionary: iptc,
+                                                        kCGImagePropertyExifDictionary: exif, kCGImagePropertyMakerAppleDictionary: apple,
+                                                        kCGImagePropertyOrientation: orientation] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return data as Data
+    }
+
+    /// The decoded pixels, to tell a copy from a re-encode.
+    private func pixels(_ data: Data) throws -> Data {
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        return try XCTUnwrap(image.dataProvider?.data as Data?)
+    }
+
     private func photoWithLocation() throws -> Data {
         let gps: [CFString: Any] = [kCGImagePropertyGPSLatitude: 48.8584, kCGImagePropertyGPSLatitudeRef: "N",
                                     kCGImagePropertyGPSLongitude: 2.2945, kCGImagePropertyGPSLongitudeRef: "E"]
@@ -536,6 +563,10 @@ final class ExportOptionsTests: XCTestCase {
         }
         XCTAssertEqual(try properties(copies[0])[kCGImagePropertyPixelWidth] as? Int, 300)
         XCTAssertEqual(try properties(copies[1])[kCGImagePropertyPixelWidth] as? Int, 400, "original stays uncropped")
+        // The original isn't re-encoded: same pixels, and its other metadata stays.
+        XCTAssertEqual(try pixels(copies[1]), try pixels(source))
+        XCTAssertEqual((try properties(copies[1])[kCGImagePropertyIPTCDictionary] as? [CFString: Any])?[kCGImagePropertyIPTCKeywords] as? [String],
+                       ["tower"])
         XCTAssertEqual(try Data(contentsOf: captures.url(for: record)), source)
         try await captures.flush()
         // Location on preserves the byte-for-byte additional original.
@@ -543,6 +574,35 @@ final class ExportOptionsTests: XCTestCase {
                                         options: ExportOptions(format: .jpeg, includesLocation: true))
         XCTAssertEqual(received.withLock { $0.last }, source)
         try await captures.flush()
+    }
+
+    /// The location-free original is a lossless copy in its own format, with
+    /// orientation, capture details and Apple's maker note kept.
+    func testCopyWithoutLocationIsLosslessForJPEGAndHEIF() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        for type in [UTType.jpeg, UTType.heic] {
+            let source = folder.appendingPathComponent("source").appendingPathExtension(try XCTUnwrap(type.preferredFilenameExtension))
+            try photoWithLocation(type: type, orientation: 6).write(to: source)
+            XCTAssertTrue(PhotoRenderer.hasLocation(source))
+            let output = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
+                                                      appropriateFor: folder, create: true)
+            let copy = try PhotoRenderer.copyWithoutLocation(from: source, into: output)
+            XCTAssertEqual(copy.pathExtension, type.preferredFilenameExtension)
+            XCTAssertFalse(PhotoRenderer.hasLocation(copy), type.identifier)
+            let copied = try Data(contentsOf: copy)
+            XCTAssertEqual(try pixels(copied), try pixels(Data(contentsOf: source)), type.identifier)
+            let metadata = try properties(copied)
+            XCTAssertEqual(metadata[kCGImagePropertyOrientation] as? Int, 6)
+            XCTAssertEqual((metadata[kCGImagePropertyExifDictionary] as? [CFString: Any])?[kCGImagePropertyExifLensModel] as? String, "Test Lens")
+            XCTAssertNotNil(metadata[kCGImagePropertyMakerAppleDictionary], "exposure and HDR data, no location")
+            let iptc = metadata[kCGImagePropertyIPTCDictionary] as? [CFString: Any] ?? [:]
+            for key in [kCGImagePropertyIPTCCity, kCGImagePropertyIPTCProvinceState, kCGImagePropertyIPTCSubLocation,
+                        kCGImagePropertyIPTCCountryPrimaryLocationName] {
+                XCTAssertNil(iptc[key], "\(type.identifier) \(key)")
+            }
+        }
     }
 
     func testSizeAndQualityChangeTheFile() async throws {

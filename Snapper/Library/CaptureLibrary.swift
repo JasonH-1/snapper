@@ -426,17 +426,25 @@ final class CaptureLibrary {
         defer { try? FileManager.default.removeItem(at: export.url.deletingLastPathComponent()) }
         var original = includeOriginal ? store.url(for: record) : nil
         if let source = original, !options.includesLocation {
-            // Export an unedited, full-size copy without location. Never mutate
-            // the source kept in Snapper or pass it to Photos in this mode.
-            let sanitized = export.url.deletingLastPathComponent()
-                .appendingPathComponent("Original.\(options.format.fileExtension)")
-            let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: source) }.value
-            var originalOptions = ExportOptions(format: options.format)
-            originalOptions.quality = 1
-            originalOptions.includesLocation = false
-            try await renderer.exportFile(source: data, look: .original, recipe: .untouched,
-                                          watermark: false, options: originalOptions, to: sanitized)
-            original = sanitized
+            // The original without its place. Never mutate the source kept in
+            // Snapper or pass it to Photos in this mode.
+            let folder = export.url.deletingLastPathComponent()
+            if let copy = try? await Task.detached(priority: .userInitiated, operation: {
+                try PhotoRenderer.copyWithoutLocation(from: source, into: folder)
+            }).value {
+                original = copy
+            } else {
+                // A format Image I/O can't copy as it is: an unedited,
+                // full-size re-encode instead.
+                let sanitized = folder.appendingPathComponent("Original.\(options.format.fileExtension)")
+                let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: source) }.value
+                var originalOptions = ExportOptions(format: options.format)
+                originalOptions.quality = 1
+                originalOptions.includesLocation = false
+                try await renderer.exportFile(source: data, look: .original, recipe: .untouched,
+                                              watermark: false, options: originalOptions, to: sanitized)
+                original = sanitized
+            }
         }
         try await photoSaver(export.url, original)
         markSaved(id: record.id, recipe: export.recipe)
