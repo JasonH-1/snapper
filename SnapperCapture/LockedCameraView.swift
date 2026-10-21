@@ -9,7 +9,6 @@ struct LockedCameraView: View {
     @Bindable var model: LockedCameraModel
 
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showBanner = false
     @State private var bannerTask: Task<Void, Never>?
     @State private var zoomAtGestureStart: CGFloat?
@@ -319,9 +318,10 @@ struct LockedCameraView: View {
         }
     }
 
-    /// Snapper's look dial and style readout, to read only: there's no look
-    /// picker while locked, so looks change by swiping the preview. A style
-    /// from Snapper shows until a swipe moves off it.
+    /// Snapper's look dial and My styles readout, to read only: there's no
+    /// look picker while locked, so looks change by swiping the preview. The
+    /// readout is always there, as in Snapper, so unlocking moves nothing; it
+    /// names a style from Snapper until a swipe moves off it.
     private var lookRow: some View {
         HStack(spacing: 10) {
             let place = LookDial.position(of: camera.currentLook, in: camera.library)
@@ -338,27 +338,23 @@ struct LockedCameraView: View {
                     @unknown default: break
                     }
                 }
-            if let preset = camera.activePreset {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("My styles")
-                        .font(.system(.caption2, design: .monospaced, weight: .medium))
-                        .textCase(.uppercase)
-                        .foregroundStyle(.secondary)
-                    Text(preset.name)
-                        .font(.subheadline.weight(.semibold)).lineLimit(1)
-                        .foregroundStyle(Theme.accent)
-                }
-                .padding(.horizontal, 12)
-                .frame(maxHeight: .infinity)
-                .dialPanel()
-                .transition(.opacity)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text("Style: \(preset.name)"))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("My styles")
+                    .font(.system(.caption2, design: .monospaced, weight: .medium))
+                    .textCase(.uppercase)
+                    .foregroundStyle(.secondary)
+                Text(camera.activePreset?.name ?? String(localized: "Presets"))
+                    .font(.subheadline.weight(.semibold)).lineLimit(1)
+                    .foregroundStyle(camera.activePreset == nil ? Color.white : Theme.accent)
             }
+            .padding(.horizontal, 12)
+            .frame(maxHeight: .infinity)
+            .dialPanel()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(camera.activePreset.map { Text("Style: \($0.name)") } ?? Text("No style"))
         }
         .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 16)
-        .animation(.snapper(Motion.standard, reduceMotion: reduceMotion), value: camera.activePreset?.id)
     }
 
     /// This session's newest photo. Opens Snapper's Library after unlocking,
