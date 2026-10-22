@@ -64,7 +64,7 @@ final class CaptureLibrary {
         guard !isLoaded else { return }
         if loadTask == nil {
             let store = self.store
-            loadTask = Task.detached(priority: .userInitiated) { try store.loadRepairingDamage() }
+            loadTask = Task.detached(priority: .userInitiated) { try store.loadRecovering() }
         }
         do {
             let loaded = try await loadTask!.value
@@ -96,7 +96,7 @@ final class CaptureLibrary {
     private static func repairNotice(_ repair: CaptureStore.Repair) -> String {
         repair.recoveredPhotos == 0
             ? String(localized: "Snapper repaired its Library index. Every photo kept its edits.")
-            : String(localized: "Snapper repaired its damaged Library index. \(LibraryModel.photoCount(repair.recoveredPhotos)) came back without their edits.")
+            : String(localized: "Snapper repaired its Library index. \(LibraryModel.photoCount(repair.recoveredPhotos)) came back without their edits.")
     }
 
     func url(for record: CaptureRecord) -> URL {
@@ -151,7 +151,9 @@ final class CaptureLibrary {
 
     /// Stores a new capture and returns its record. A shot is never dropped:
     /// if the index can't be read, the photo is still stored and kept in
-    /// memory, and joins the index once it loads (see `ensureLoaded`).
+    /// memory, and joins the index once it loads (see `ensureLoaded`). Until
+    /// an index save holds it, its record is also kept beside the original,
+    /// so it comes back as taken even if the app stops first.
     @discardableResult
     func add(_ photo: CapturedPhoto, look: Look) async throws -> CaptureRecord {
         try? await ensureLoaded()
@@ -181,6 +183,13 @@ final class CaptureLibrary {
                                      isFrontCamera: photo.isFrontCamera, recipe: recipe), at: 0)
         notePremiumEdits(at: 0)
         let record = records[0]
+        await Task.detached(priority: .userInitiated) {
+            do {
+                try store.writePending(record)
+            } catch {
+                Logger.library.error("Could not note new shot \(record.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }.value
         // The photo is in the Library even if the index can't be written yet:
         // the next save writes it, and `storageError` says so meanwhile.
         // (The Lock Screen import flushes before letting a session go.)

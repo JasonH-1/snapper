@@ -104,8 +104,9 @@ enum LockedCaptureInbox {
     /// A photo with no readable note (the camera stopped between writing the
     /// two) is taken as it is, with the session's camera, once it's
     /// `orphanGrace` old; until then the session counts as incomplete in case
-    /// its note is on the way. Notes are written after their photos, so a
-    /// note whose photo is gone has nothing left to bring in.
+    /// its note is on the way. So does one that can't be read yet. Notes are
+    /// written after their photos, so a note whose photo is gone has nothing
+    /// left to bring in.
     static func read(_ folder: URL, now: Date = Date(), orphanGrace: TimeInterval = 60) -> Contents {
         var contents = Contents()
         let files: [URL]
@@ -142,8 +143,15 @@ enum LockedCaptureInbox {
                 contents.isComplete = false
                 continue
             }
-            // Photos are written whole, so one that isn't an image never will be.
-            guard isImage(file) else {
+            // A file that can't be read now may read later, so the session
+            // waits for it rather than being let go with the photo inside.
+            guard let data = try? Data(contentsOf: file, options: .mappedIfSafe) else {
+                Logger.camera.error("Lock Screen photo \(file.lastPathComponent, privacy: .public) couldn't be read yet")
+                contents.isComplete = false
+                continue
+            }
+            // Photos are written whole, so one that reads but isn't an image never will be.
+            guard isImage(data) else {
                 Logger.camera.error("Lock Screen file \(file.lastPathComponent, privacy: .public) isn't a photo")
                 continue
             }
@@ -162,8 +170,8 @@ enum LockedCaptureInbox {
              isFrontCamera: camera?.cameraPreferences.position == .front, takenAt: takenAt)
     }
 
-    private static func isImage(_ url: URL) -> Bool {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary) else {
+    private static func isImage(_ data: Data) -> Bool {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else {
             return false
         }
         return CGImageSourceGetCount(source) > 0
