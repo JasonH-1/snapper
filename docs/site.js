@@ -71,3 +71,49 @@ for (const compare of document.querySelectorAll('.compare')) {
   });
   compare.addEventListener('click', follow);
 }
+
+// Look names: tapping one puts that look on the collection's photo, once
+// its image has loaded. Hovering starts the download early.
+for (const collection of document.querySelectorAll('.collection')) {
+  const after = collection.querySelector('.compare .after');
+  const tag = collection.querySelector('.tag.right');
+  const range = collection.querySelector('.compare input[type="range"]');
+  const buttons = [...collection.querySelectorAll('.names button')];
+  let shown = buttons.find((button) => button.getAttribute('aria-pressed') === 'true');
+  const press = (pressed) => buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === pressed)));
+
+  for (const button of buttons) {
+    button.addEventListener('pointerenter', () => { new Image().src = button.dataset.src; }, { once: true });
+    button.addEventListener('click', async () => {
+      if (button === shown) {
+        // Back to the look on the photo: drop any look still loading.
+        press(shown);
+        collection.classList.remove('loading');
+        return;
+      }
+      press(button);
+      collection.classList.add('loading');
+      const image = new Image();
+      image.src = button.dataset.src;
+      let loaded = true;
+      try {
+        await image.decode();
+      } catch {
+        loaded = false;
+      }
+      // Another look was tapped while this one loaded: that one wins.
+      if (button.getAttribute('aria-pressed') !== 'true') return;
+      collection.classList.remove('loading');
+      if (!loaded) {
+        press(shown);
+        return;
+      }
+      shown = button;
+      const name = button.textContent;
+      after.src = image.src;
+      after.alt = `The same photo with the ${name} look`;
+      tag.textContent = name;
+      range.setAttribute('aria-label', `Compare the original with ${name}`);
+    });
+  }
+}
