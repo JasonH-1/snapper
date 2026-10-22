@@ -6,6 +6,7 @@ This branch implements the proposed $19.99/year product package; it does not est
 
 - [ ] Set the developer/publisher name and real monitored support email in `AppConfig.swift` and `docs/*.html`. Confirm the terms' governing-law placeholder. Do not guess these identities or legal terms.
 - [ ] Set `APP_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config/Local.xcconfig`, and register the app and both extension IDs (`.capture`, `.controls`) in the developer account.
+- [ ] If you hand out promo codes, create them as offer codes in App Store Connect (each subscription's offer codes). Settings › Redeem Code and the paywall's Redeem Code open Apple's code sheet; check one real code on an iPhone before promoting it.
 - [ ] Set the App Store ID when it exists (in `AppConfig.swift` and the landing page's `APP_STORE_ID` links); configure the monthly, yearly and Lifetime products and localized benefits to match the app.
 - [ ] Sample photos are Unsplash photos at 1800 px; their licence and credits are in `docs/photo-credits.md`. Get a model release for the portrait, or replace it with an owned photo shot with consent (at least 1600 px on the long edge), and keep the consent record.
 - [ ] Confirm the privacy/support/terms pages are deployed and accessible.

@@ -45,7 +45,19 @@
 
           ],
           "codeOffers" : [
-
+            {
+              "displayPrice" : "0",
+              "eligibility" : [
+                "expired",
+                "existing",
+                "new"
+              ],
+              "internalID" : "6740000005",
+              "isStackable" : true,
+              "paymentMode" : "free",
+              "referenceName" : "Test Promo Code",
+              "subscriptionPeriod" : "P1M"
+            }
           ],
           "displayPrice" : "19.99",
           "familyShareable" : false,

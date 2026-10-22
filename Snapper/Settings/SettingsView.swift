@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var showGuide = false
     @State private var guideDestination: GuideDestination?
     @State private var isRestoring = false
+    @State private var isRedeemingCode = false
     @State private var restoreMessage: RestoreMessage?
     @State private var storageUsed: Int64?
     @State private var showClearConfirmation = false
@@ -70,6 +71,7 @@ struct SettingsView: View {
                 }
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+            .offerCodeRedemption(isPresented: $isRedeemingCode, onCompletion: codeRedemptionEnded)
             .backupPresentations(backup, app: app)
             .alert(restoreMessage?.title ?? "", isPresented: restoreAlertBinding, presenting: restoreMessage) { _ in
                 Button("OK", role: .cancel) {}
@@ -151,6 +153,7 @@ struct SettingsView: View {
                 }
             }
             .disabled(isRestoring)
+            Button("Redeem Code") { isRedeemingCode = true }
         } header: {
             Text("Premium")
         } footer: {
@@ -362,6 +365,17 @@ struct SettingsView: View {
                                                 detail: error.localizedDescription)
             }
         }
+    }
+
+    /// After the App Store's offer code sheet closes. A redeemed code arrives
+    /// as a transaction like any purchase; checking now shows Premium at once.
+    private func codeRedemptionEnded(_ result: Result<Void, any Error>) {
+        if case .failure(let error) = result {
+            restoreMessage = RestoreMessage(title: String(localized: "Couldn't redeem a code"),
+                                            detail: error.localizedDescription)
+            return
+        }
+        Task { await app.store.refreshEntitlements() }
     }
 
     private func rateApp() {
