@@ -8,6 +8,7 @@ struct PaywallView: View {
 
     @State private var slideTimer: Task<Void, Never>?
     @State private var showManageSubscriptions = false
+    @State private var isRedeemingCode = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -40,6 +41,9 @@ struct PaywallView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: model.showsSubscriptionReminder)
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+        .offerCodeRedemption(isPresented: $isRedeemingCode) { result in
+            Task { await model.codeRedemptionEnded(result) }
+        }
         .task {
             await model.load()
         }
@@ -288,19 +292,28 @@ struct PaywallView: View {
 
     private var footer: some View {
         VStack(spacing: 14) {
-            HStack(spacing: 18) {
-                Button {
-                    Task { await model.restore() }
-                } label: {
-                    if model.isRestoring {
-                        ProgressView()
-                    } else {
-                        Text("Restore Purchases")
+            // Two rows, so all four fit on the smallest iPhone.
+            VStack(spacing: 10) {
+                HStack(spacing: 18) {
+                    Button {
+                        Task { await model.restore() }
+                    } label: {
+                        if model.isRestoring {
+                            ProgressView()
+                        } else {
+                            Text("Restore Purchases")
+                        }
+                    }
+                    .disabled(model.isRestoring || model.isPurchasing)
+                    if model.offersCodeRedemption {
+                        Button("Redeem Code") { isRedeemingCode = true }
+                            .disabled(model.isRestoring || model.isPurchasing)
                     }
                 }
-                .disabled(model.isRestoring || model.isPurchasing)
-                Link("Terms of Use", destination: AppConfig.termsOfUseURL)
-                Link("Privacy Policy", destination: AppConfig.privacyPolicyURL)
+                HStack(spacing: 18) {
+                    Link("Terms of Use", destination: AppConfig.termsOfUseURL)
+                    Link("Privacy Policy", destination: AppConfig.privacyPolicyURL)
+                }
             }
             .font(.footnote.weight(.medium))
             .tint(.primary)

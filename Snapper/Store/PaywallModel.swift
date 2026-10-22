@@ -201,4 +201,21 @@ final class PaywallModel: Identifiable {
             alert = .error(error.localizedDescription)
         }
     }
+
+    /// Offer codes are for people without Premium; a subscriber switching to
+    /// Lifetime isn't offered one.
+    var offersCodeRedemption: Bool { !offersOnlyLifetime }
+
+    /// After the App Store's offer code sheet closes. A redeemed code arrives
+    /// as a transaction like any purchase; checking entitlements now unlocks
+    /// without waiting for it. The sheet confirms or explains the code itself.
+    func codeRedemptionEnded(_ result: Result<Void, any Error>) async {
+        if case .failure(let error) = result {
+            Logger.store.error("Offer code redemption failed: \(error.localizedDescription, privacy: .public)")
+            alert = .error(error.localizedDescription)
+            return
+        }
+        await store.refreshEntitlements()
+        if offersCodeRedemption && store.isPremium { didUnlock = true }
+    }
 }

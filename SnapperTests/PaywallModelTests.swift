@@ -13,6 +13,8 @@ final class FakePurchaseService: PurchaseService {
     var plans: [SubscriptionPlan] = []
     var plansState: PlansState = .idle
     var nextOutcome: PurchaseOutcome = .purchased
+    /// What the next entitlement check finds, as after an offer code is redeemed.
+    var premiumAfterRefresh: Bool?
 
     func start() {}
 
@@ -42,7 +44,9 @@ final class FakePurchaseService: PurchaseService {
     }
 
     func restore() async throws -> Bool { isPremium }
-    func refreshEntitlements() async {}
+    func refreshEntitlements() async {
+        if let premiumAfterRefresh { isPremium = premiumAfterRefresh }
+    }
 }
 
 final class PaywallModelTests: XCTestCase {
@@ -216,6 +220,42 @@ final class PaywallModelTests: XCTestCase {
         await model.purchase()
         XCTAssertFalse(model.didUnlock)
         if case .pending = model.alert {} else { XCTFail("expected the pending alert") }
+    }
+
+    @MainActor
+    func testRedeemedCodeUnlocks() async {
+        let store = FakePurchaseService()
+        store.premiumAfterRefresh = true
+        let model = makeModel(store: store)
+        XCTAssertTrue(model.offersCodeRedemption)
+        await model.codeRedemptionEnded(.success(()))
+        XCTAssertTrue(model.didUnlock)
+        XCTAssertNil(model.alert)
+    }
+
+    @MainActor
+    func testClosingTheCodeSheetWithoutACodeKeepsThePaywall() async {
+        let model = makeModel(store: FakePurchaseService())
+        await model.codeRedemptionEnded(.success(()))
+        XCTAssertFalse(model.didUnlock)
+        XCTAssertNil(model.alert, "the sheet already explains a code it couldn't use")
+    }
+
+    @MainActor
+    func testCodeSheetErrorIsShown() async {
+        let model = makeModel(store: FakePurchaseService())
+        await model.codeRedemptionEnded(.failure(PurchaseError.network))
+        XCTAssertFalse(model.didUnlock)
+        if case .error = model.alert {} else { XCTFail("expected the error alert") }
+    }
+
+    @MainActor
+    func testSubscribersSwitchingToLifetimeAreNotOfferedCodes() async {
+        let store = makeSubscriber()
+        let model = makeModel(store: store, context: .switchToLifetime)
+        XCTAssertFalse(model.offersCodeRedemption)
+        await model.codeRedemptionEnded(.success(()))
+        XCTAssertFalse(model.didUnlock, "an active subscription isn't a newly redeemed code")
     }
 
     @MainActor
