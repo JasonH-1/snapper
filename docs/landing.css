@@ -314,16 +314,28 @@ html:not(.js) .tabs { display: none; }
 .about h3 { font-size: clamp(2.25rem, 2vw + 1.4rem, 3rem); line-height: 1.05; }
 .about > p:not(.readout):not(.key) { max-width: 30em; font-size: 1.125rem; color: var(--soft); }
 .names { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
-.names li {
-  padding: 6px 12px;
+.names button {
+  padding: 8px 14px;
+  border: 0;
   border-radius: 999px;
   background: var(--surface);
   color: var(--soft);
-  font-family: var(--serif);
-  font-size: 1rem;
+  font: 1rem/1.35 var(--serif);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
 }
-.names li.shown { background: var(--text); color: #111113; }
-.names li.free::after,
+.names button:hover { background: #2a2b2f; color: var(--text); }
+.names [aria-pressed="true"],
+.names [aria-pressed="true"]:hover { background: var(--text); color: #111113; }
+/* While a look's photo loads, its name pulses. */
+.loading .names [aria-pressed="true"] { animation: pulse 0.9s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  .loading .names [aria-pressed="true"] { animation: none; opacity: 0.7; }
+}
+/* Without JavaScript the names are only a list. */
+html:not(.js) .names button { cursor: default; pointer-events: none; }
+.names .free::after,
 .key .dot {
   content: "";
   display: inline-block;
@@ -336,6 +348,18 @@ html:not(.js) .tabs { display: none; }
 }
 .key { color: var(--faint); font: 500 0.72rem/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
 .key .dot { margin: 0 8px 0 0; }
+@media (max-width: 899.98px) {
+  /* On one column the look names go right under the photo, so tapping one
+     changes a photo that's still on screen; the collection's name follows. */
+  .collection { gap: 0; }
+  .about { display: contents; }
+  .compare { order: 1; }
+  .names { order: 2; margin-top: 14px; }
+  .key { order: 3; margin-top: 12px; }
+  .about > .readout { order: 4; margin-top: 32px; }
+  .about > h3 { order: 5; margin-top: 8px; }
+  .about > p:not(.readout):not(.key) { order: 6; margin-top: 12px; }
+}
 
 /* Camera */
 
