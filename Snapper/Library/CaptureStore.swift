@@ -135,6 +135,8 @@ extension CaptureRecord: Codable {
 struct CaptureStore: Sendable {
     let directory: URL
     private var indexURL: URL { directory.appendingPathComponent("captures.json") }
+    /// New shots' records, each kept until an index save holds it.
+    private var pendingDirectory: URL { directory.appendingPathComponent("Pending", isDirectory: true) }
 
     static let `default`: CaptureStore = {
         let base = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
@@ -165,18 +167,23 @@ struct CaptureStore: Sendable {
         }
     }
 
-    /// What `loadRepairingDamage()` did with a damaged index.
+    /// What `loadRecovering()` did with a damaged or missing index.
     struct Repair: Equatable, Sendable {
         /// Records that still read from the damaged index, edits and all.
         var keptRecords: Int
         /// Photos in the folder without a readable record, back without their edits.
         var recoveredPhotos: Int
-        /// The damaged index, moved aside rather than deleted.
-        var damagedCopy: URL
+        /// A copy of the damaged index, kept rather than deleted; nil when
+        /// there was no index left to copy.
+        var damagedCopy: URL?
     }
 
     func load() throws -> [CaptureRecord] {
         guard let data = try readIndex() else { return [] }
+        return try Self.decodeIndex(data)
+    }
+
+    private static func decodeIndex(_ data: Data) throws -> [CaptureRecord] {
         do {
             // Keep records even when an original is temporarily unavailable.
             return try JSONDecoder().decode([CaptureRecord].self, from: data)
@@ -185,23 +192,72 @@ struct CaptureStore: Sendable {
         }
     }
 
-    /// The index, rebuilt if it's damaged: it's moved aside, every record that
-    /// still reads keeps its edits, and photos in the folder that no record
-    /// mentions come back unedited. A damaged index can't be fixed by
-    /// retrying, and without this the Library could never be used again.
+    /// The index, with whatever a stopped app or a failed save left out put
+    /// back:
+    /// - New shots the index never got come back as they were taken, from
+    ///   their pending records (see `writePending`).
+    /// - A damaged index is rebuilt: every record that still reads keeps its
+    ///   edits, and photos in the folder that no record mentions come back
+    ///   unedited. A damaged index can't be fixed by retrying, and without
+    ///   this the Library could never be used again. The damaged index is
+    ///   copied aside and stays in place until the rebuilt one is written
+    ///   over it in one step, so a repair that stops partway leaves it there
+    ///   for the next launch to repair again.
+    /// - A missing index with photos in the folder (it was lost) is rebuilt
+    ///   from those photos the same way.
+    ///
     /// Read errors still throw, since those can pass.
-    func loadRepairingDamage() throws -> (records: [CaptureRecord], repair: Repair?) {
-        do {
-            return (try load(), nil)
-        } catch IndexError.damaged {}
-        let salvaged = Self.salvageRecords(from: try readIndex() ?? Data())
-        let damagedCopy = directory.appendingPathComponent("captures.damaged-\(UUID().uuidString).json")
-        try FileManager.default.moveItem(at: indexURL, to: damagedCopy)
-        let recovered = recoverablePhotos(excludingIDs: Set(salvaged.map(\.id)), fileNames: Set(salvaged.map(\.fileName)))
-        let records = salvaged + recovered
-        try save(records)
-        Logger.library.error("Capture index was damaged; kept \(salvaged.count) records, recovered \(recovered.count) photos")
-        return (records, Repair(keptRecords: salvaged.count, recoveredPhotos: recovered.count, damagedCopy: damagedCopy))
+    func loadRecovering() throws -> (records: [CaptureRecord], repair: Repair?) {
+        var records: [CaptureRecord] = []
+        var damaged: Data?
+        let index = try readIndex()
+        if let index {
+            do {
+                records = try Self.decodeIndex(index)
+            } catch {
+                records = Self.salvageRecords(from: index)
+                damaged = index
+            }
+        }
+        let salvaged = records.count
+        var changed = false
+
+        // Pending shots go back first, so they keep their look rather than
+        // coming back as unlisted, unedited photos.
+        let listed = Set(records.map(\.id))
+        for record in pendingRecords() where !listed.contains(record.id) {
+            if FileManager.default.fileExists(atPath: url(for: record).path) {
+                records.append(record)
+                changed = true
+            } else {
+                // Its original is gone, so there's nothing left to bring back.
+                discardPending(record.id)
+            }
+        }
+
+        var repair: Repair?
+        if index == nil || damaged != nil {
+            let recovered = recoverablePhotos(excludingIDs: Set(records.map(\.id)), fileNames: Set(records.map(\.fileName)))
+            records += recovered
+            // A missing index with no unlisted photos is just a new Library.
+            if damaged != nil || !recovered.isEmpty {
+                var copy: URL?
+                if damaged != nil {
+                    let url = directory.appendingPathComponent("captures.damaged-\(UUID().uuidString).json")
+                    try FileManager.default.copyItem(at: indexURL, to: url)
+                    copy = url
+                }
+                repair = Repair(keptRecords: salvaged, recoveredPhotos: recovered.count, damagedCopy: copy)
+                Logger.library.error("Capture index was damaged or missing; kept \(salvaged) records, recovered \(recovered.count) photos")
+                changed = true
+            }
+        }
+        if changed {
+            // Written over the damaged index in one step, if there is one.
+            try writeIndex(records)
+        }
+        clearPending(heldIn: records)
+        return (records, repair)
     }
 
     /// The index file's contents, or nil when there's no index yet.
@@ -248,6 +304,13 @@ struct CaptureStore: Sendable {
     func save(_ records: [CaptureRecord]) throws {
         // A failed read is never permission to replace an existing index.
         _ = try load()
+        try writeIndex(records)
+        clearPending(heldIn: records)
+    }
+
+    /// Replaces the index in one step: a write that stops partway leaves
+    /// the previous index as it was.
+    private func writeIndex(_ records: [CaptureRecord]) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(records)
         try data.write(to: indexURL, options: .atomic)
@@ -260,6 +323,50 @@ struct CaptureStore: Sendable {
 
     func delete(_ record: CaptureRecord) {
         try? FileManager.default.removeItem(at: url(for: record))
+        discardPending(record.id)
+    }
+
+    // MARK: - Pending shots
+
+    /// Keeps a new shot's record beside its original until an index save
+    /// holds it (`save` then drops it), so a shot whose index save never
+    /// happened, because the app stopped or the disk was full, comes back
+    /// as it was taken at the next load.
+    func writePending(_ record: CaptureRecord) throws {
+        try FileManager.default.createDirectory(at: pendingDirectory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(record).write(to: pendingURL(for: record.id), options: .atomic)
+    }
+
+    private func pendingURL(for id: UUID) -> URL {
+        pendingDirectory.appendingPathComponent("\(id.uuidString).json")
+    }
+
+    private func pendingFiles() -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(at: pendingDirectory, includingPropertiesForKeys: nil)) ?? []
+    }
+
+    /// Pending records that still read.
+    private func pendingRecords() -> [CaptureRecord] {
+        pendingFiles().compactMap { file in
+            guard let data = try? Data(contentsOf: file) else { return nil }
+            return try? JSONDecoder().decode(CaptureRecord.self, from: data)
+        }
+    }
+
+    private func discardPending(_ id: UUID) {
+        try? FileManager.default.removeItem(at: pendingURL(for: id))
+    }
+
+    /// Drops the pending records an index holding `records` has taken over.
+    private func clearPending(heldIn records: [CaptureRecord]) {
+        let files = pendingFiles()
+        guard !files.isEmpty else { return }
+        let held = Set(records.map(\.id))
+        for file in files {
+            if let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent), held.contains(id) {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
     }
 
     /// Total size on disk of the given files (missing ones count as zero).
