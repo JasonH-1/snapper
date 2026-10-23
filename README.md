@@ -6,7 +6,7 @@ An iPhone camera and photo editor with live film looks and reusable personal sty
 
 - **Live preview through every look:** Core Image + Metal, 30 fps, off the main thread. Swipe the preview to change looks, with a live split as you drag.
 - **What you see is what you save:** the preview, the full-resolution photo and every export go through the same pipeline (`LookPipeline`).
-- **87 original looks in ten collections:** Disposable, Neon Nights, Soft Portrait, Overclock, Darkroom, Digicam, Everyday Film, Black & White, Cinema and Instant Prints. Thirteen are free, at least one in every collection.
+- **69 original looks in ten collections:** Disposable, Neon Nights, Soft Portrait, Overclock, Darkroom, Digicam, Everyday Film, Black & White, Cinema and Instant Prints. Thirteen are free, at least one in every collection.
 - **Looks are data:** each look is a 33-point `.cube` file listed in `filters.json`, plus optional effects (sky gradient, direct flash, glow, CCD smear, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, sharpening, noise, film grain, vignette) drawn after it. A Python tool generates and quality-checks them.
 - **Opens from Camera Control, the Lock Screen and Control Center (iOS 18):** a Lock Screen camera extension with the same live looks, a Control Center control, and a look picker and exposure slider on Camera Control. Snapper also keeps the last look, flash, exposure and front/back camera between launches. See [docs/camera-launch.md](docs/camera-launch.md).
 - **StoreKit 2:** monthly and yearly plans (7-day trial on yearly) and a one-time Lifetime unlock. There are no accounts and no backend; the Apple ID is the account.

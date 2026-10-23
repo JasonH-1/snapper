@@ -137,7 +137,7 @@ final class PaywallModel: Identifiable {
     /// One premium look from each collection, each on a different photo,
     /// newest collection first.
     private func showcasePairs() -> [(Look, URL)] {
-        let preferred = ["afterparty", "sunburn", "neon", "peach", "lantern", "honey", "arcade"]
+        let preferred = ["afterparty", "sunburn", "neon", "linen", "lantern", "honey", "arcade"]
         var looks = preferred.compactMap(library.look(id:)).filter(\.isPremium)
         if looks.isEmpty { looks = Array(library.premiumLooks.prefix(3)) }
         var seenCollections = Set<String>()

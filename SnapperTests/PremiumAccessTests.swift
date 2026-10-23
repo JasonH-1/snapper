@@ -37,7 +37,7 @@ final class FreeTierTests: XCTestCase {
         for collection in library.collections {
             XCTAssertTrue(library.freeLooks.contains { $0.collectionID == collection.id }, collection.id)
         }
-        for id in ["instant", "signal", "pocket", "dayroll", "graphite", "daybreak", "peel"] {
+        for id in ["instant", "signal", "pocket", "sunday", "graphite", "daybreak", "peel"] {
             XCTAssertEqual(library.look(id: id)?.tier, .free, id)
         }
         XCTAssertEqual(library.freeLooks.count - 1, 13, "thirteen free looks besides Original")

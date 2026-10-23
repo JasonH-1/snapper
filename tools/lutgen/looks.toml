@@ -263,17 +263,6 @@ saturation = 0.85
 shadow_tint = { hue = 235, amount = 0.05 }
 
 [[look]]
-id = "downpour"
-name = "Downpour"
-collection = "neon"
-description = "Rain-soaked streets: muted colour, crisp contrast."
-contrast = 0.25
-saturation = 0.75
-hue_sat = { red = 0.9 }
-shadow_tint = { hue = 205, amount = 0.035 }
-highlight_tint = { hue = 70, amount = 0.03 }
-
-[[look]]
 id = "arcade"
 name = "Arcade"
 collection = "neon"
@@ -296,19 +285,6 @@ hue_sat = { yellow = 1.1, orange = 1.05, green = 0.8 }
 temperature = 0.1
 shadow_tint = { hue = 185, amount = 0.045 }
 highlight_tint = { hue = 70, amount = 0.03 }
-
-[[look]]
-id = "taxi"
-name = "Taxi"
-collection = "neon"
-description = "Sodium-vapour yellow and green mixed light."
-contrast = 0.2
-saturation = 0.95
-hue_sat = { yellow = 1.15, green = 0.9 }
-temperature = 0.05
-tint = -0.04
-shadow_tint = { hue = 165, amount = 0.04 }
-highlight_tint = { hue = 95, amount = 0.02 }
 
 [[look]]
 id = "bluehour"
@@ -374,18 +350,6 @@ saturation = 0.82
 highlight_tint = { hue = 85, amount = 0.012 }
 
 [[look]]
-id = "peach"
-name = "Peach"
-collection = "soft"
-description = "Warm, flattering glow for faces."
-temperature = 0.15
-contrast = 0.08
-saturation = 0.98
-hue_sat = { orange = 1.05, red = 0.95 }
-skin_protect = 0.9
-highlight_tint = { hue = 55, amount = 0.02 }
-
-[[look]]
 id = "honey"
 name = "Honey"
 collection = "soft"
@@ -422,16 +386,6 @@ hue_light = { green = 0.06, blue = 0.05 }
 shadow_tint = { hue = 300, amount = 0.015 }
 highlight_tint = { hue = 30, amount = 0.012 }
 skin_protect = 0.9
-
-[[look]]
-id = "studio"
-name = "Studio"
-collection = "soft"
-description = "Clean, natural colour with a polished finish."
-temperature = 0.03
-highlight_rolloff = 0.6
-contrast = 0.1
-saturation = 1.0
 
 [[look]]
 id = "matte"
@@ -956,17 +910,6 @@ name = "Instant Prints"
 tagline = "Creamy paper whites, pastel color and the feel of a keepsake print."
 
 [[look]]
-id = "dayroll"
-name = "Day Roll"
-collection = "film"
-description = "Everyday negative: neutral faces, open shadows and gentle highlight compression."
-contrast = 0.16
-saturation = 0.94
-black = 0.015
-highlight_rolloff = 0.65
-skin_protect = 0.9
-
-[[look]]
 id = "sundial"
 name = "Sundial"
 collection = "film"
@@ -990,17 +933,6 @@ hue_sat = { green = 1.26, red = 0.8 }
 hue_shift = { green = 12 }
 contrast = 0.19
 black = 0.025
-
-[[look]]
-id = "harbor"
-name = "Harbor"
-collection = "film"
-description = "Blue water, restrained yellows and crisp maritime daylight."
-temperature = -0.12
-contrast = 0.2
-hue_sat = { blue = 1.22, aqua = 1.12, yellow = 0.65 }
-saturation = 0.94
-highlight_rolloff = 0.6
 
 [[look]]
 id = "terracotta"
@@ -1041,17 +973,6 @@ highlight_rolloff = 0.55
 exposure = -0.13
 
 [[look]]
-id = "market"
-name = "Market"
-collection = "film"
-description = "Lively food and street color with balanced skin and strong reds."
-contrast = 0.18
-vibrance = 0.24
-hue_sat = { red = 1.15, yellow = 1.08, green = 0.9 }
-skin_protect = 0.95
-highlight_rolloff = 0.65
-
-[[look]]
 id = "amber100"
 name = "Amber 100"
 collection = "film"
@@ -1078,19 +999,6 @@ black = 0.03
 white = 0.95
 
 [[look]]
-id = "orchard"
-name = "Orchard"
-collection = "film"
-description = "Olive foliage and peach daylight for parks and gardens."
-temperature = 0.1
-contrast = 0.12
-saturation = 0.92
-hue_shift = { green = -18 }
-hue_sat = { green = 0.8, blue = 0.7 }
-black = 0.04
-skin_protect = 0.9
-
-[[look]]
 id = "travelogue"
 name = "Travelogue"
 collection = "film"
@@ -1109,15 +1017,6 @@ description = "Balanced black and white for everyday street photography."
 monochrome = true
 contrast = 0.22
 highlight_rolloff = 0.6
-
-[[look]]
-id = "newsprint"
-name = "Newsprint"
-collection = "mono"
-description = "Documentary midtones with deep blacks and restrained whites."
-monochrome = true
-curve = [[0, 0.015], [0.2, 0.15], [0.5, 0.47], [0.8, 0.76], [1, 0.94]]
-contrast = 0.12
 
 [[look]]
 id = "noir"
@@ -1152,26 +1051,6 @@ white = 0.92
 mono_tone = { hue = 255, amount = 0.008 }
 
 [[look]]
-id = "carbon"
-name = "Carbon"
-collection = "mono"
-description = "Dense midtones and cool blacks for architecture and concrete."
-monochrome = true
-exposure = -0.15
-contrast = 0.36
-mono_tone = { hue = 235, amount = 0.018 }
-highlight_rolloff = 0.5
-
-[[look]]
-id = "silhouette"
-name = "Silhouette"
-collection = "mono"
-description = "Graphic dark shapes and bright skies with a steeper upper curve."
-monochrome = true
-curve = [[0, 0.005], [0.15, 0.11], [0.4, 0.27], [0.7, 0.78], [1, 1]]
-highlight_rolloff = 0.5
-
-[[look]]
 id = "blueprint"
 name = "Blueprint"
 collection = "mono"
@@ -1193,18 +1072,6 @@ shadow_tint = { hue = 255, amount = 0.03 }
 highlight_tint = { hue = 55, amount = 0.024 }
 black = 0.025
 skin_protect = 0.9
-
-[[look]]
-id = "desert"
-name = "Desert"
-collection = "cinema"
-description = "Dusty amber landscapes, pale skies and restrained greens."
-temperature = 0.2
-contrast = 0.28
-saturation = 0.72
-hue_sat = { green = 0.55, blue = 0.65 }
-highlight_desat = 0.3
-skin_protect = 0.95
 
 [[look]]
 id = "raincheck"
@@ -1252,31 +1119,6 @@ contrast = 0.42
 saturation = 0.45
 shadow_desat = 0.45
 highlight_desat = 0.25
-skin_protect = 0.95
-
-[[look]]
-id = "moss"
-name = "Moss"
-collection = "cinema"
-description = "Muted forest color with green shade and warm natural faces."
-contrast = 0.24
-saturation = 0.76
-hue_shift = { green = -12 }
-shadow_tint = { hue = 145, amount = 0.022 }
-highlight_tint = { hue = 70, amount = 0.014 }
-skin_protect = 0.95
-
-[[look]]
-id = "dusk"
-name = "Dusk"
-collection = "cinema"
-description = "Lavender evenings with rose light and quiet blues."
-temperature = -0.04
-contrast = 0.08
-black = 0.035
-saturation = 0.8
-shadow_tint = { hue = 290, amount = 0.025 }
-highlight_tint = { hue = 340, amount = 0.014 }
 skin_protect = 0.95
 
 [[look]]
@@ -1357,29 +1199,6 @@ shadow_desat = 0.3
 skin_protect = 0.95
 
 [[look]]
-id = "ccdday"
-name = "CCD Day"
-collection = "digicam"
-description = "Bright compact-camera daylight, with hard blues and clean warm faces."
-exposure = 0.08
-contrast = 0.32
-saturation = 1.13
-hue_sat = { blue = 1.25, green = 0.85 }
-skin_protect = 0.95
-
-[[look]]
-id = "ccdnight"
-name = "CCD Night"
-collection = "digicam"
-description = "Cool blue evening color with glowing magenta accents."
-temperature = -0.12
-contrast = 0.28
-saturation = 0.92
-shadow_tint = { hue = 265, amount = 0.028 }
-hue_sat = { magenta = 1.2 }
-skin_protect = 0.95
-
-[[look]]
 id = "mall"
 name = "Mall"
 collection = "digicam"
@@ -1393,30 +1212,13 @@ skin_protect = 0.95
 shadow_tint = { hue = 155, amount = 0.022 }
 black = 0.018
 
-[[look]]
-id = "slumber"
-name = "Slumber"
-collection = "digicam"
-description = "Soft pink compact-camera color for indoor friends and cozy rooms."
-exposure = 0.14
-tint = 0.05
-contrast = -0.02
-saturation = 0.72
-black = 0.065
-hue_shift = { blue = 12 }
-skin_protect = 0.95
-shadow_tint = { hue = 330, amount = 0.033 }
+[look.effects.sharpen]
+amount = 0.45
 
-[[look]]
-id = "redeye"
-name = "Red Eye"
-collection = "digicam"
-description = "Warm party color against blue-black shadows; try it with real flash."
-contrast = 0.36
-temperature = 0.12
-saturation = 0.92
-shadow_tint = { hue = 255, amount = 0.02 }
-skin_protect = 0.95
+[look.effects.grain]
+amount = 0.08
+roughness = 0.25
+color = 0.8
 
 [[look]]
 id = "pixelpop"
@@ -1431,3 +1233,14 @@ highlight_rolloff = 0.7
 hue_shift = { blue = 25, green = -22 }
 shadow_tint = { hue = 205, amount = 0.028 }
 black = 0.035
+
+[look.effects.chromatic_aberration]
+amount = 0.0015
+
+[look.effects.sharpen]
+amount = 0.6
+
+[look.effects.grain]
+amount = 0.06
+roughness = 0.2
+color = 0.8

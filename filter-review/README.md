@@ -46,10 +46,8 @@ _Teal shadows, warm skin and glowing signs for the city after dark._
 | **Afterglow** — Balanced teal and amber with rich, cinematic contrast. | free | ✅ | 0.107 | 0.038 | -2.1° … +3.9° | ×0.80 … ×1.22 |  |
 | **Neon** — Vivid signs and deep teal shadows; skin stays warm. | premium | ✅ | 0.185 | 0.035 | -2.6° … +3.2° | ×0.96 … ×1.17 |  |
 | **Midnight** — Moody blue-teal night with warm faces. | premium | ✅ | 0.087 | 0.058 | -8.5° … +0.8° | ×0.69 … ×0.92 |  |
-| **Downpour** — Rain-soaked streets: muted colour, crisp contrast. | premium | ✅ | 0.194 | 0.043 | -3.7° … +6.4° | ×0.73 … ×1.19 |  |
 | **Arcade** — Electric violet and cyan with hard contrast. | premium | ✅ | 0.180 | 0.037 | -6.2° … +9.6° | ×0.83 … ×1.14 |  |
 | **Lantern** — Paper-lantern amber over green-teal shadows. | premium | ✅ | 0.198 | 0.040 | -2.6° … +9.3° | ×0.88 … ×1.41 |  |
-| **Taxi** — Sodium-vapour yellow and green mixed light. | premium | ✅ | 0.198 | 0.043 | +0.0° … +10.1° | ×0.88 … ×1.29 |  |
 | **Blue Hour** — Cool dusk blues with warm lights left glowing. | premium | ✅ | 0.193 | 0.034 | -6.1° … +0.9° | ×0.84 … ×1.14 |  |
 | **Vapor** — Soft pastel neon: pink highlights, teal shade. | premium | ✅ | 0.097 | 0.049 | -7.2° … +3.8° | ×0.80 … ×0.92 |  |
 | **Last Train** — Low saturation, hard contrast, cold teal shadows. | free | ✅ | 0.188 | 0.040 | -2.2° … +7.0° | ×0.71 … ×0.84 |  |
@@ -64,11 +62,9 @@ _Gentle contrast, creamy highlights and skin that looks like skin._
 |---|---|---|---|---|---|---|---|
 | **Cream** — Gentle contrast and creamy, rolled-off highlights. | free | ✅ | 0.108 | 0.036 | -1.3° … +1.5° | ×0.94 … ×1.20 |  |
 | **Linen** — Airy and bright with quiet colour. | premium | ✅ | 0.118 | 0.029 | -0.1° … +1.5° | ×0.83 … ×1.01 |  |
-| **Peach** — Warm, flattering glow for faces. | premium | ✅ | 0.208 | 0.042 | -3.9° … +1.8° | ×1.06 … ×1.26 |  |
 | **Honey** — Golden-hour warmth, soft and glowing. | premium | ✅ | 0.207 | 0.035 | -2.0° … +1.7° | ×1.09 … ×1.35 |  |
 | **Silk** — Smooth neutral skin with cool, quiet shadows. | premium | ✅ | 0.201 | 0.040 | -2.2° … +0.6° | ×0.83 … ×1.10 |  |
 | **Petal** — Pastel and minty with a whisper of rose. | premium | ✅ | 0.119 | 0.031 | -5.4° … +0.0° | ×0.83 … ×0.85 |  |
-| **Studio** — Clean, natural colour with a polished finish. | premium | ✅ | 0.207 | 0.040 | -1.4° … +1.3° | ×0.98 … ×1.09 |  |
 | **Matte** — Faded blacks and low contrast for a printed feel. | premium | ✅ | 0.072 | 0.037 | -2.2° … +4.3° | ×0.82 … ×0.93 |  |
 | **Porcelain** — Cool, bright and clean. | premium | ✅ | 0.215 | 0.027 | -3.4° … +1.8° | ×0.81 … ×0.88 |  |
 | **Silver** — Soft black and white with a hint of warmth. | free | ✅ | 0.110 | 0.038 | +0.0° … +0.0° | ×0.00 … ×0.00 |  |
