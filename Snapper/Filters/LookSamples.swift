@@ -14,6 +14,10 @@ enum LookSamples {
         "overclock": "showcase-arcade",
         "darkroom": "showcase-cafe",
         "digicam": "showcase-cake",
+        "film": "showcase-beach",
+        "mono": "showcase-cafe",
+        "cinema": "showcase-night",
+        "instantprint": "showcase-cafe",
     ]
 
     static func url(for look: Look) -> URL? {
