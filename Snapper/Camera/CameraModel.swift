@@ -109,9 +109,6 @@ final class CameraModel {
     @ObservationIgnored private var hasStarted = false
     /// The camera to open: the one last used (see `restore(_:)`).
     @ObservationIgnored private var preferredPosition: CameraPosition = .back
-    /// Parse every look's LUT up front (the app), or only the looks either
-    /// side of the current one (the Lock Screen camera, to start fast and small).
-    @ObservationIgnored private let preloadsEveryLook: Bool
     @ObservationIgnored private var cameraControlUpdates: [CameraControlUpdate] = []
     @ObservationIgnored private var cameraControlTask: Task<Void, Never>?
 
@@ -126,12 +123,11 @@ final class CameraModel {
     /// with its seed, and each shot advances it, like winding on a roll.
     @ObservationIgnored private var nextFrameID = UUID()
 
-    init(library: LookLibrary, lutStore: LUTStore = .shared, preloadsEveryLook: Bool = true) {
+    init(library: LookLibrary, lutStore: LUTStore = .shared) {
         let renderer = PreviewRenderer()
         self.renderer = renderer
         self.library = library
         self.lutStore = lutStore
-        self.preloadsEveryLook = preloadsEveryLook
         self.looks = library.looks
         self.captureService = CaptureService(renderer: renderer)
         renderer.show(lookState(for: currentLook))
@@ -369,7 +365,7 @@ final class CameraModel {
     /// change that came from the picker isn't sent back, so a fast scroll
     /// on Camera Control is never pulled back to an older look.
     private func lookSelectionChanged(fromCameraControl: Bool) {
-        if !preloadsEveryLook { preloadLooks() }
+        preloadLooks()
         if !fromCameraControl { sendCameraControl(cameraControlLooks) }
     }
 
@@ -409,10 +405,12 @@ final class CameraModel {
         renderer.finishSwipe(commit: false)
     }
 
+    /// Loads the looks either side of the current one, so a swipe never waits
+    /// on disk. Any other look loads when it's picked (see `LUTStore`), and
+    /// only the most recent few stay in memory.
     private func preloadLooks() {
-        let looks = preloadsEveryLook || self.looks.isEmpty
-            ? self.looks
-            : [-1, 0, 1].map { self.looks[wrapped(lookIndex + $0)] }
+        guard !self.looks.isEmpty else { return }
+        let looks = [-1, 0, 1].map { self.looks[wrapped(lookIndex + $0)] }
         let store = lutStore
         Task.detached(priority: .utility) {
             store.preload(looks)

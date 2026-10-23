@@ -24,8 +24,8 @@ final class LookLibraryTests: XCTestCase {
         {"version": 1,
          "collections": [{"id": "c", "name": "C"}],
          "looks": [
-           {"id": "a", "name": "A", "collection": "c", "lut": "boardwalk.cube", "tier": "free"},
-           {"id": "b", "name": "B", "collection": "c", "lut": "boardwalk.cube", "enabled": false},
+           {"id": "a", "name": "A", "collection": "c", "lut": "boardwalk.snaplut", "tier": "free"},
+           {"id": "b", "name": "B", "collection": "c", "lut": "boardwalk.snaplut", "enabled": false},
            {"id": "x", "name": "X", "collection": "c", "lut": "does-not-exist.cube"}
          ]}
         """
@@ -41,10 +41,10 @@ final class LookLibraryTests: XCTestCase {
         {"version": 1,
          "collections": [{"id": "c", "name": "C"}, {"id": "d", "name": "D"}],
          "looks": [
-           {"id": "a", "name": "A", "collection": "c", "lut": "boardwalk.cube"},
-           {"id": "z", "name": "Z", "collection": "d", "lut": "boardwalk.cube"},
-           {"id": "b", "name": "B", "collection": "c", "lut": "boardwalk.cube"},
-           {"id": "e", "name": "E", "collection": "c", "lut": "boardwalk.cube"}
+           {"id": "a", "name": "A", "collection": "c", "lut": "boardwalk.snaplut"},
+           {"id": "z", "name": "Z", "collection": "d", "lut": "boardwalk.snaplut"},
+           {"id": "b", "name": "B", "collection": "c", "lut": "boardwalk.snaplut"},
+           {"id": "e", "name": "E", "collection": "c", "lut": "boardwalk.snaplut"}
          ]}
         """
         let library = LookLibrary(manifest: try JSONDecoder().decode(LookManifest.self, from: Data(json.utf8)))

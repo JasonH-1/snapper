@@ -2,7 +2,7 @@
 
 A cube only maps colours, so glow, colour fringing, scanlines and the like are
 drawn by the app (Snapper/Filters/LookPipeline+Effects.swift) after the cube.
-They are not part of the .cube files, the quality gates or the contact
+They are not part of the LUTs, the quality gates or the contact
 sheets: review them in the app. `lutgen.py build` validates each look's
 `effects`, fills in the defaults below and writes them to filters.json.
 

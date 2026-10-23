@@ -57,189 +57,189 @@
       "id": "boardwalk",
       "name": "Boardwalk",
       "collection": "disposable",
-      "lut": "boardwalk.cube",
+      "lut": "boardwalk.snaplut",
       "tier": "free"
     },
     {
       "id": "postcard",
       "name": "Postcard",
       "collection": "disposable",
-      "lut": "postcard.cube",
+      "lut": "postcard.snaplut",
       "tier": "free"
     },
     {
       "id": "flashbulb",
       "name": "Flashbulb",
       "collection": "disposable",
-      "lut": "flashbulb.cube",
+      "lut": "flashbulb.snaplut",
       "tier": "premium"
     },
     {
       "id": "sunburn",
       "name": "Sunburn",
       "collection": "disposable",
-      "lut": "sunburn.cube",
+      "lut": "sunburn.snaplut",
       "tier": "premium"
     },
     {
       "id": "backyard",
       "name": "Backyard",
       "collection": "disposable",
-      "lut": "backyard.cube",
+      "lut": "backyard.snaplut",
       "tier": "premium"
     },
     {
       "id": "roadtrip",
       "name": "Road Trip",
       "collection": "disposable",
-      "lut": "roadtrip.cube",
+      "lut": "roadtrip.snaplut",
       "tier": "premium"
     },
     {
       "id": "poolparty",
       "name": "Pool Party",
       "collection": "disposable",
-      "lut": "poolparty.cube",
+      "lut": "poolparty.snaplut",
       "tier": "premium"
     },
     {
       "id": "cornershop",
       "name": "Corner Shop",
       "collection": "disposable",
-      "lut": "cornershop.cube",
+      "lut": "cornershop.snaplut",
       "tier": "premium"
     },
     {
       "id": "expired",
       "name": "Expired",
       "collection": "disposable",
-      "lut": "expired.cube",
+      "lut": "expired.snaplut",
       "tier": "premium"
     },
     {
       "id": "mixtape",
       "name": "Mixtape",
       "collection": "disposable",
-      "lut": "mixtape.cube",
+      "lut": "mixtape.snaplut",
       "tier": "premium"
     },
     {
       "id": "afterglow",
       "name": "Afterglow",
       "collection": "neon",
-      "lut": "afterglow.cube",
+      "lut": "afterglow.snaplut",
       "tier": "free"
     },
     {
       "id": "lasttrain",
       "name": "Last Train",
       "collection": "neon",
-      "lut": "lasttrain.cube",
+      "lut": "lasttrain.snaplut",
       "tier": "free"
     },
     {
       "id": "neon",
       "name": "Neon",
       "collection": "neon",
-      "lut": "neon.cube",
+      "lut": "neon.snaplut",
       "tier": "premium"
     },
     {
       "id": "midnight",
       "name": "Midnight",
       "collection": "neon",
-      "lut": "midnight.cube",
+      "lut": "midnight.snaplut",
       "tier": "premium"
     },
     {
       "id": "lantern",
       "name": "Lantern",
       "collection": "neon",
-      "lut": "lantern.cube",
+      "lut": "lantern.snaplut",
       "tier": "premium"
     },
     {
       "id": "arcade",
       "name": "Arcade",
       "collection": "neon",
-      "lut": "arcade.cube",
+      "lut": "arcade.snaplut",
       "tier": "premium"
     },
     {
       "id": "bluehour",
       "name": "Blue Hour",
       "collection": "neon",
-      "lut": "bluehour.cube",
+      "lut": "bluehour.snaplut",
       "tier": "premium"
     },
     {
       "id": "vapor",
       "name": "Vapor",
       "collection": "neon",
-      "lut": "vapor.cube",
+      "lut": "vapor.snaplut",
       "tier": "premium"
     },
     {
       "id": "cream",
       "name": "Cream",
       "collection": "soft",
-      "lut": "cream.cube",
+      "lut": "cream.snaplut",
       "tier": "free"
     },
     {
       "id": "silver",
       "name": "Silver",
       "collection": "soft",
-      "lut": "silver.cube",
+      "lut": "silver.snaplut",
       "tier": "free"
     },
     {
       "id": "linen",
       "name": "Linen",
       "collection": "soft",
-      "lut": "linen.cube",
+      "lut": "linen.snaplut",
       "tier": "premium"
     },
     {
       "id": "honey",
       "name": "Honey",
       "collection": "soft",
-      "lut": "honey.cube",
+      "lut": "honey.snaplut",
       "tier": "premium"
     },
     {
       "id": "silk",
       "name": "Silk",
       "collection": "soft",
-      "lut": "silk.cube",
+      "lut": "silk.snaplut",
       "tier": "premium"
     },
     {
       "id": "porcelain",
       "name": "Porcelain",
       "collection": "soft",
-      "lut": "porcelain.cube",
+      "lut": "porcelain.snaplut",
       "tier": "premium"
     },
     {
       "id": "petal",
       "name": "Petal",
       "collection": "soft",
-      "lut": "petal.cube",
+      "lut": "petal.snaplut",
       "tier": "premium"
     },
     {
       "id": "matte",
       "name": "Matte",
       "collection": "soft",
-      "lut": "matte.cube",
+      "lut": "matte.snaplut",
       "tier": "premium"
     },
     {
       "id": "overdrive",
       "name": "Overdrive",
       "collection": "overclock",
-      "lut": "overdrive.cube",
+      "lut": "overdrive.snaplut",
       "tier": "premium",
       "effects": {
         "glow": {
@@ -263,7 +263,7 @@
       "id": "redline",
       "name": "Redline",
       "collection": "overclock",
-      "lut": "redline.cube",
+      "lut": "redline.snaplut",
       "tier": "premium",
       "effects": {
         "gradient": {
@@ -290,7 +290,7 @@
       "id": "signal",
       "name": "Signal",
       "collection": "overclock",
-      "lut": "signal.cube",
+      "lut": "signal.snaplut",
       "tier": "free",
       "effects": {
         "chromatic_aberration": {
@@ -313,7 +313,7 @@
       "id": "chrome",
       "name": "Chrome",
       "collection": "overclock",
-      "lut": "chrome.cube",
+      "lut": "chrome.snaplut",
       "tier": "premium",
       "effects": {
         "glow": {
@@ -337,7 +337,7 @@
       "id": "hologram",
       "name": "Hologram",
       "collection": "overclock",
-      "lut": "hologram.cube",
+      "lut": "hologram.snaplut",
       "tier": "premium",
       "effects": {
         "glow": {
@@ -362,7 +362,7 @@
       "id": "halo",
       "name": "Halo",
       "collection": "darkroom",
-      "lut": "halo.cube",
+      "lut": "halo.snaplut",
       "tier": "premium",
       "effects": {
         "halation": {
@@ -386,7 +386,7 @@
       "id": "crossroad",
       "name": "Crossroad",
       "collection": "darkroom",
-      "lut": "crossroad.cube",
+      "lut": "crossroad.snaplut",
       "tier": "premium",
       "effects": {
         "grain": {
@@ -405,7 +405,7 @@
       "id": "instant",
       "name": "Instant",
       "collection": "darkroom",
-      "lut": "instant.cube",
+      "lut": "instant.snaplut",
       "tier": "free",
       "effects": {
         "halation": {
@@ -429,7 +429,7 @@
       "id": "leak",
       "name": "Leak",
       "collection": "darkroom",
-      "lut": "leak.cube",
+      "lut": "leak.snaplut",
       "tier": "premium",
       "effects": {
         "light_leak": {
@@ -449,7 +449,7 @@
       "id": "grit",
       "name": "Grit",
       "collection": "darkroom",
-      "lut": "grit.cube",
+      "lut": "grit.snaplut",
       "tier": "premium",
       "effects": {
         "grain": {
@@ -468,7 +468,7 @@
       "id": "heirloom",
       "name": "Heirloom",
       "collection": "darkroom",
-      "lut": "heirloom.cube",
+      "lut": "heirloom.snaplut",
       "tier": "premium",
       "effects": {
         "grain": {
@@ -487,7 +487,7 @@
       "id": "pocket",
       "name": "Pocket",
       "collection": "digicam",
-      "lut": "pocket.cube",
+      "lut": "pocket.snaplut",
       "tier": "free",
       "effects": {
         "flash": {
@@ -513,7 +513,7 @@
       "id": "afterparty",
       "name": "Afterparty",
       "collection": "digicam",
-      "lut": "afterparty.cube",
+      "lut": "afterparty.snaplut",
       "tier": "premium",
       "effects": {
         "flash": {
@@ -546,7 +546,7 @@
       "id": "y2k",
       "name": "Y2K",
       "collection": "digicam",
-      "lut": "y2k.cube",
+      "lut": "y2k.snaplut",
       "tier": "premium",
       "effects": {
         "chromatic_aberration": {
@@ -568,7 +568,7 @@
       "id": "memorycard",
       "name": "Memory Card",
       "collection": "digicam",
-      "lut": "memorycard.cube",
+      "lut": "memorycard.snaplut",
       "tier": "premium",
       "effects": {
         "flash": {
@@ -594,7 +594,7 @@
       "id": "fluoro",
       "name": "Fluoro",
       "collection": "digicam",
-      "lut": "fluoro.cube",
+      "lut": "fluoro.snaplut",
       "tier": "premium",
       "effects": {
         "flash": {
@@ -620,7 +620,7 @@
       "id": "lowbatt",
       "name": "Low Batt",
       "collection": "digicam",
-      "lut": "lowbatt.cube",
+      "lut": "lowbatt.snaplut",
       "tier": "premium",
       "effects": {
         "smear": {
@@ -650,7 +650,7 @@
       "id": "mall",
       "name": "Mall",
       "collection": "digicam",
-      "lut": "mall.cube",
+      "lut": "mall.snaplut",
       "tier": "premium",
       "effects": {
         "sharpen": {
@@ -669,7 +669,7 @@
       "id": "pixelpop",
       "name": "Pixel Pop",
       "collection": "digicam",
-      "lut": "pixelpop.cube",
+      "lut": "pixelpop.snaplut",
       "tier": "premium",
       "effects": {
         "chromatic_aberration": {
@@ -691,168 +691,168 @@
       "id": "sundial",
       "name": "Sundial",
       "collection": "film",
-      "lut": "sundial.cube",
+      "lut": "sundial.snaplut",
       "tier": "premium"
     },
     {
       "id": "evergreen",
       "name": "Evergreen",
       "collection": "film",
-      "lut": "evergreen.cube",
+      "lut": "evergreen.snaplut",
       "tier": "premium"
     },
     {
       "id": "terracotta",
       "name": "Terracotta",
       "collection": "film",
-      "lut": "terracotta.cube",
+      "lut": "terracotta.snaplut",
       "tier": "premium"
     },
     {
       "id": "sunday",
       "name": "Sunday",
       "collection": "film",
-      "lut": "sunday.cube",
+      "lut": "sunday.snaplut",
       "tier": "free"
     },
     {
       "id": "alpine",
       "name": "Alpine",
       "collection": "film",
-      "lut": "alpine.cube",
+      "lut": "alpine.snaplut",
       "tier": "premium"
     },
     {
       "id": "amber100",
       "name": "Amber 100",
       "collection": "film",
-      "lut": "amber100.cube",
+      "lut": "amber100.snaplut",
       "tier": "premium"
     },
     {
       "id": "coast",
       "name": "Coast",
       "collection": "film",
-      "lut": "coast.cube",
+      "lut": "coast.snaplut",
       "tier": "premium"
     },
     {
       "id": "travelogue",
       "name": "Travelogue",
       "collection": "film",
-      "lut": "travelogue.cube",
+      "lut": "travelogue.snaplut",
       "tier": "premium"
     },
     {
       "id": "graphite",
       "name": "Graphite",
       "collection": "mono",
-      "lut": "graphite.cube",
+      "lut": "graphite.snaplut",
       "tier": "free"
     },
     {
       "id": "noir",
       "name": "Noir",
       "collection": "mono",
-      "lut": "noir.cube",
+      "lut": "noir.snaplut",
       "tier": "premium"
     },
     {
       "id": "chalk",
       "name": "Chalk",
       "collection": "mono",
-      "lut": "chalk.cube",
+      "lut": "chalk.snaplut",
       "tier": "premium"
     },
     {
       "id": "platinum",
       "name": "Platinum",
       "collection": "mono",
-      "lut": "platinum.cube",
+      "lut": "platinum.snaplut",
       "tier": "premium"
     },
     {
       "id": "blueprint",
       "name": "Blueprint",
       "collection": "mono",
-      "lut": "blueprint.cube",
+      "lut": "blueprint.snaplut",
       "tier": "premium"
     },
     {
       "id": "daybreak",
       "name": "Daybreak",
       "collection": "cinema",
-      "lut": "daybreak.cube",
+      "lut": "daybreak.snaplut",
       "tier": "free"
     },
     {
       "id": "raincheck",
       "name": "Rain Check",
       "collection": "cinema",
-      "lut": "raincheck.cube",
+      "lut": "raincheck.snaplut",
       "tier": "premium"
     },
     {
       "id": "velvet",
       "name": "Velvet",
       "collection": "cinema",
-      "lut": "velvet.cube",
+      "lut": "velvet.snaplut",
       "tier": "premium"
     },
     {
       "id": "copper",
       "name": "Copper",
       "collection": "cinema",
-      "lut": "copper.cube",
+      "lut": "copper.snaplut",
       "tier": "premium"
     },
     {
       "id": "reel",
       "name": "Reel",
       "collection": "cinema",
-      "lut": "reel.cube",
+      "lut": "reel.snaplut",
       "tier": "premium"
     },
     {
       "id": "peel",
       "name": "Peel",
       "collection": "instantprint",
-      "lut": "peel.cube",
+      "lut": "peel.snaplut",
       "tier": "free"
     },
     {
       "id": "pastel",
       "name": "Pastel",
       "collection": "instantprint",
-      "lut": "pastel.cube",
+      "lut": "pastel.snaplut",
       "tier": "premium"
     },
     {
       "id": "keepsake",
       "name": "Keepsake",
       "collection": "instantprint",
-      "lut": "keepsake.cube",
+      "lut": "keepsake.snaplut",
       "tier": "premium"
     },
     {
       "id": "mintprint",
       "name": "Mint Print",
       "collection": "instantprint",
-      "lut": "mintprint.cube",
+      "lut": "mintprint.snaplut",
       "tier": "premium"
     },
     {
       "id": "roseprint",
       "name": "Rose Print",
       "collection": "instantprint",
-      "lut": "roseprint.cube",
+      "lut": "roseprint.snaplut",
       "tier": "premium"
     },
     {
       "id": "fadedpaper",
       "name": "Faded Paper",
       "collection": "instantprint",
-      "lut": "fadedpaper.cube",
+      "lut": "fadedpaper.snaplut",
       "tier": "premium"
     }
   ]

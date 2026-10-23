@@ -4,7 +4,7 @@ import XCTest
 
 /// Renders reference colours through the app's real Core Image pipeline and
 /// compares them with what the Python look generator computed from the same
-/// .cube files (`SnapperTests/Fixtures/lut-reference.json`, written by
+/// LUT files (`SnapperTests/Fixtures/lut-reference.json`, written by
 /// `tools/lutgen/lutgen.py build`). This is what guarantees that the looks
 /// reviewed on the contact sheets are the looks the app renders.
 final class LookPipelineReferenceTests: XCTestCase {

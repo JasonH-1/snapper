@@ -2,15 +2,18 @@
 """Snapper look generator.
 
 Looks are defined by parameters in looks.toml. This tool turns them into
-33-point .cube files for the app, checks them against objective quality
-gates, and renders contact sheets for review.
+33-point LUTs for the app (.snaplut, a compact binary form; see engine.py),
+checks them against objective quality gates, and renders contact sheets for
+review.
 
-    python3 tools/lutgen/lutgen.py build    # write .cube files (+ add new looks to the app manifest)
+    python3 tools/lutgen/lutgen.py build    # write the LUTs (+ add new looks to the app manifest)
     python3 tools/lutgen/lutgen.py review   # contact sheets + report in filter-review/
-    python3 tools/lutgen/lutgen.py verify   # CI: committed cubes match looks.toml and pass the gates
+    python3 tools/lutgen/lutgen.py verify   # CI: committed LUTs match looks.toml and pass the gates
     python3 tools/lutgen/lutgen.py check    # print the quality report
+    python3 tools/lutgen/lutgen.py cube     # the LUTs as .cube text for other apps, in build/cubes/
 
-Options: --only <look-id>[,<look-id>...] limits build/review/check to some looks.
+Options: --only <look-id>[,<look-id>...] limits build/review/check/cube to some looks.
+         --out <dir> writes cube's .cube files somewhere else.
 """
 from __future__ import annotations
 
@@ -24,12 +27,14 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from engine import Look, apply_cube, build_cube, format_cube, parse_cube  # noqa: E402
+from engine import Look, apply_cube, build_cube, decode_lut, encode_lut, format_cube  # noqa: E402
 from quality import Report, evaluate  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 LOOKS_FILE = Path(__file__).resolve().parent / "looks.toml"
 LUT_DIR = ROOT / "Snapper/Resources/Filters/LUTs"
+LUT_EXT = ".snaplut"
+CUBE_DIR = ROOT / "build/cubes"
 MANIFEST = ROOT / "Snapper/Resources/Filters/filters.json"
 REVIEW_DIR = ROOT / "filter-review"
 FIXTURE = ROOT / "SnapperTests/Fixtures/lut-reference.json"
@@ -44,6 +49,14 @@ REFERENCE_INPUTS = [
 ]
 PHOTOS_DIR = ROOT / "test-photos"
 N = 33
+
+
+def lut_path(look_id: str) -> Path:
+    return LUT_DIR / f"{look_id}{LUT_EXT}"
+
+
+def read_lut(look_id: str) -> tuple[int, np.ndarray]:
+    return decode_lut(lut_path(look_id).read_bytes())
 
 
 def load_config() -> tuple[dict, list[Look]]:
@@ -89,8 +102,9 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
     """Adds looks/collections that are missing from the app manifest.
 
     Existing entries (order, names, tiers) are never changed: the manifest is
-    the app's source of truth and is meant to be edited by hand. The one
-    exception is `effects`, which looks.toml owns and is rewritten every build.
+    the app's source of truth and is meant to be edited by hand. The
+    exceptions are `lut` and `effects`, which looks.toml owns and are
+    rewritten every build.
     """
     if MANIFEST.exists():
         manifest = json.loads(MANIFEST.read_text())
@@ -108,7 +122,7 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
                 "id": lk.id,
                 "name": lk.name,
                 "collection": lk.collection,
-                "lut": f"{lk.id}.cube",
+                "lut": lut_path(lk.id).name,
                 "tier": "premium",
             }
             # The camera swipes in manifest order, so a new look joins the
@@ -121,6 +135,7 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
         lk = by_id.get(entry["id"])
         if lk is None:
             continue
+        entry["lut"] = lut_path(lk.id).name
         if lk.effects:
             entry["effects"] = lk.effects
         else:
@@ -132,14 +147,14 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
     known = {lk.id for lk in looks}
     for entry in manifest["looks"]:
         if not (LUT_DIR / entry["lut"]).exists() and entry["id"] not in known:
-            print(f"warning: manifest look '{entry['id']}' has no cube file {entry['lut']}")
+            print(f"warning: manifest look '{entry['id']}' has no LUT file {entry['lut']}")
 
 
 def reference_fixture(looks: list[Look]) -> dict:
     inputs = np.array(REFERENCE_INPUTS)
     fixture = {"inputs": REFERENCE_INPUTS, "looks": {}}
     for lk in looks:
-        _, cube = parse_cube((LUT_DIR / f"{lk.id}.cube").read_text())
+        _, cube = read_lut(lk.id)
         out = apply_cube(cube, N, inputs)
         fixture["looks"][lk.id] = [[round(float(v), 4) for v in row] for row in out]
     return fixture
@@ -150,9 +165,11 @@ def cmd_build(args) -> int:
     LUT_DIR.mkdir(parents=True, exist_ok=True)
     reports = []
     for lk in select(looks, args.only):
-        cube = build_cube(lk, N)
-        (LUT_DIR / f"{lk.id}.cube").write_text(format_cube(lk, cube, N))
-        reports.append(evaluate(lk.id, np.round(cube, 4), N, lk.monochrome))
+        blob = encode_lut(build_cube(lk, N), N)
+        lut_path(lk.id).write_bytes(blob)
+        (LUT_DIR / f"{lk.id}.cube").unlink(missing_ok=True)  # the .snaplut replaces it
+        _, shipped = decode_lut(blob)
+        reports.append(evaluate(lk.id, shipped, N, lk.monochrome))
     print_report(reports)
     update_manifest(collections, looks)
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
@@ -164,7 +181,7 @@ def cmd_check(args) -> int:
     _, looks = load_config()
     reports = []
     for lk in select(looks, args.only):
-        _, cube = parse_cube((LUT_DIR / f"{lk.id}.cube").read_text())
+        _, cube = read_lut(lk.id)
         reports.append(evaluate(lk.id, cube, N, lk.monochrome))
     print_report(reports)
     return 0 if all(r.ok for r in reports) else 1
@@ -181,14 +198,22 @@ def cmd_verify(args) -> int:
     for lk in looks:
         if lk.id in entries and entries[lk.id].get("effects", {}) != lk.effects:
             problems.append(f"effects for '{lk.id}' in {MANIFEST.name} are stale — run lutgen.py build")
+        if lk.id in entries and entries[lk.id]["lut"] != lut_path(lk.id).name:
+            problems.append(f"'{lk.id}' in {MANIFEST.name} should use {lut_path(lk.id).name} — run lutgen.py build")
+        if (LUT_DIR / f"{lk.id}.cube").exists():
+            problems.append(f"{lk.id}.cube is left over next to {lut_path(lk.id).name} and would ship too — run lutgen.py build")
     for lk in looks:
-        path = LUT_DIR / f"{lk.id}.cube"
+        path = lut_path(lk.id)
         if not path.exists():
             problems.append(f"{path.name} missing — run lutgen.py build")
             continue
-        n, committed = parse_cube(path.read_text())
-        fresh = np.round(build_cube(lk, N), 4)
-        diff = float(np.max(np.abs(committed - fresh)))
+        try:
+            n, committed = decode_lut(path.read_bytes())
+        except ValueError as error:
+            problems.append(f"{path.name} is unreadable ({error}) — run lutgen.py build")
+            continue
+        fresh = build_cube(lk, N)
+        diff = float(np.max(np.abs(committed - fresh))) if n == N else float("inf")
         if n != N or diff > 6e-4:
             problems.append(f"{path.name} is stale (max diff {diff:.4f}) — run lutgen.py build")
         rep = evaluate(lk.id, committed, n, lk.monochrome)
@@ -201,7 +226,7 @@ def cmd_verify(args) -> int:
     if problems:
         print("\n".join(problems))
         return 1
-    print(f"{len(looks)} looks verified: cubes up to date, all quality gates pass.")
+    print(f"{len(looks)} looks verified: LUTs up to date, all quality gates pass.")
     return 0
 
 
@@ -213,8 +238,7 @@ def cmd_review(args) -> int:
     cubes = {}
     reports = {}
     for lk in looks:
-        path = LUT_DIR / f"{lk.id}.cube"
-        _, cube = parse_cube(path.read_text())
+        _, cube = read_lut(lk.id)
         cubes[lk.id] = cube
         reports[lk.id] = evaluate(lk.id, cube, N, lk.monochrome)
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"looks": []}
@@ -223,12 +247,27 @@ def cmd_review(args) -> int:
     return 0
 
 
+def cmd_cube(args) -> int:
+    """Writes the committed LUTs as .cube text, to open the looks in other apps."""
+    _, looks = load_config()
+    out = Path(args.out) if args.out else CUBE_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    chosen = select(looks, args.only)
+    for lk in chosen:
+        n, cube = read_lut(lk.id)
+        (out / f"{lk.id}.cube").write_text(format_cube(lk, cube, n))
+    print(f"wrote {len(chosen)} .cube files to {out}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=["build", "check", "verify", "review"])
+    parser.add_argument("command", choices=["build", "check", "verify", "review", "cube"])
     parser.add_argument("--only", help="comma-separated look ids")
+    parser.add_argument("--out", help="output folder for cube (default build/cubes)")
     args = parser.parse_args()
-    return {"build": cmd_build, "check": cmd_check, "verify": cmd_verify, "review": cmd_review}[args.command](args)
+    commands = {"build": cmd_build, "check": cmd_check, "verify": cmd_verify, "review": cmd_review, "cube": cmd_cube}
+    return commands[args.command](args)
 
 
 if __name__ == "__main__":

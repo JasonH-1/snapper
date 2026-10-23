@@ -2,7 +2,7 @@
 
 One sheet per collection: rows are looks (with "Original" on top), columns
 are the photos in test-photos/ followed by the synthetic charts. Every cell
-is produced through the look's .cube with trilinear lookup, like the app.
+is produced through the look's LUT with trilinear lookup, like the app.
 """
 from __future__ import annotations
 
@@ -136,7 +136,7 @@ def write_report(collections: dict, looks: list[Look], reports: dict, tiers: dic
     lines = [
         "# Filter review",
         "",
-        "Contact sheets for every look, rendered through the exact `.cube` files the app ships.",
+        "Contact sheets for every look, rendered through the exact LUTs the app ships.",
         "Each sheet shows one style direction: rows are looks, columns are the photos in",
         "`test-photos/` plus three synthetic charts (skin tones, colour checker + gradients, neon night).",
         "",
@@ -144,7 +144,7 @@ def write_report(collections: dict, looks: list[Look], reports: dict, tiers: dic
         "Regenerate after changing `tools/lutgen/looks.toml` or adding photos:",
         "",
         "```sh",
-        "python3 tools/lutgen/lutgen.py build    # rewrite the .cube files",
+        "python3 tools/lutgen/lutgen.py build    # rewrite the LUTs",
         "python3 tools/lutgen/lutgen.py review   # rewrite these sheets",
         "```",
         "",
