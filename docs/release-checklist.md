@@ -5,12 +5,12 @@ This branch implements the proposed $19.99/year product package; it does not est
 ## Required owner inputs
 
 - [x] Real monitored support email: support@snappercam.com (Cloudflare Email Routing to the owner's inbox), in `AppConfig.swift` and `docs/*.html`.
-- [ ] Set the developer/publisher name in `AppConfig.swift` and `docs/*.html`. Confirm the terms' governing-law placeholder. Do not guess these identities or legal terms.
-- [ ] Set `APP_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config/Local.xcconfig`, and register the app and both extension IDs (`.capture`, `.controls`) in the developer account.
+- [x] Developer/publisher name: Jason Huang (the seller in App Store Connect), in `AppConfig.swift` and `docs/*.html`. The terms are governed by the laws of the State of New York.
+- [x] `APP_BUNDLE_ID` (`com.snappercam.snapper`) and `DEVELOPMENT_TEAM` are set in the owner's `Config/Local.xcconfig`; automatic signing registered the app and both extension IDs (`.capture`, `.controls`) when the first TestFlight build was uploaded.
 - [ ] If you hand out promo codes, create them as offer codes in App Store Connect (each subscription's offer codes). Settings › Redeem Code and the paywall's Redeem Code open Apple's code sheet; check one real code on an iPhone before promoting it.
-- [ ] Set the App Store ID when it exists (in `AppConfig.swift` and the landing page's `APP_STORE_ID` links); configure the monthly, yearly and Lifetime products and localized benefits to match the app.
+- [x] App Store ID 6826104701, in `AppConfig.swift` and the landing page's App Store links. The monthly, yearly and Lifetime products are configured in App Store Connect.
 - [ ] Sample photos are Unsplash photos at 1800 px; their licence and credits are in `docs/photo-credits.md`. Get a model release for the portrait, or replace it with an owned photo shot with consent (at least 1600 px on the long edge), and keep the consent record.
-- [ ] Confirm the privacy/support/terms pages are deployed and accessible.
+- [x] The privacy, support and terms pages are live at https://snappercam.com.
 
 Run `python3 scripts/check-release.py` to report unresolved configuration and showcase checks. It deliberately fails until the required inputs are supplied; it is not part of ordinary development CI.
 

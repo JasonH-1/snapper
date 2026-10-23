@@ -144,8 +144,8 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 
 ## Before you submit
 
-- [ ] Fill in the placeholders in `Snapper/App/AppConfig.swift`: developer name and the App Store ID once the app exists. The ID turns on the "Rate Snapper" deep link.
-- [ ] Replace the highlighted placeholders in `docs/*.html` (name and governing law), and `APP_STORE_ID` in the landing page's App Store links (`docs/index.html`).
+- [x] `Snapper/App/AppConfig.swift` has the developer name and App Store ID. The ID turns on the "Rate Snapper" deep link.
+- [x] `docs/*.html` have the developer name, governing law and App Store links.
 - [ ] Check the sample photos in `Snapper/Resources/Showcase/`. They appear in onboarding, on the paywall, in the look thumbnails and in the Simulator. They're Unsplash photos at 1800 px (credits in `docs/photo-credits.md`); Unsplash includes no model releases, so get a release for the portrait or swap in your own photo shot with consent.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
