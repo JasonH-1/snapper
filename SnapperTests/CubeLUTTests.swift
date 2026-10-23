@@ -16,6 +16,28 @@ final class CubeLUTTests: XCTestCase {
         return Data(lines.joined(separator: "\n").utf8)
     }
 
+    /// A `.snaplut` file as tools/lutgen writes it.
+    private func snaplut(size: Int, version: UInt16 = 1, transform: (Float, Float, Float) -> (Float, Float, Float)) -> Data {
+        var data = Data("SNLT".utf8)
+        func append(_ value: UInt16) {
+            withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+        }
+        append(version)
+        append(UInt16(size))
+        let scale = 1 / Float(size - 1)
+        for b in 0..<size {
+            for g in 0..<size {
+                for r in 0..<size {
+                    let out = transform(Float(r) * scale, Float(g) * scale, Float(b) * scale)
+                    for value in [out.0, out.1, out.2] {
+                        append(UInt16((value * 65535).rounded()))
+                    }
+                }
+            }
+        }
+        return data
+    }
+
     private func floats(_ data: Data) -> [Float] {
         data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
     }
@@ -67,5 +89,42 @@ final class CubeLUTTests: XCTestCase {
 
     func testRejects1DLUT() {
         XCTAssertThrowsError(try CubeLUT.parse(Data("LUT_1D_SIZE 16\n".utf8)))
+    }
+
+    // MARK: - .snaplut
+
+    func testDecodesIdentitySnapperLUTExactly() throws {
+        // Offset by a byte, so the entries are unaligned in memory.
+        let file = (Data([0]) + snaplut(size: 2) { ($0, $1, $2) }).dropFirst()
+        let lut = try CubeLUT.decode(file)
+        XCTAssertEqual(lut.dimension, 2)
+        XCTAssertEqual(floats(lut.data), floats(CubeLUT.identity(dimension: 2).data))
+    }
+
+    func testSnapperLUTMatchesTheSameCube() throws {
+        let transform: (Float, Float, Float) -> (Float, Float, Float) = { r, g, b in (r * r, 1 - g, (r + b) / 2) }
+        let binary = floats(try CubeLUT.decode(snaplut(size: 5, transform: transform)).data)
+        let text = floats(try CubeLUT.parse(cubeText(size: 5, transform: transform)).data)
+        XCTAssertEqual(binary.count, text.count)
+        for (a, b) in zip(binary, text) {
+            XCTAssertEqual(a, b, accuracy: 1e-5)
+        }
+    }
+
+    func testRejectsMalformedSnapperLUTs() {
+        XCTAssertThrowsError(try CubeLUT.decode(cubeText(size: 2) { ($0, $1, $2) })) { error in
+            XCTAssertEqual(error as? CubeLUT.ParseError, .notSnapperLUT)
+        }
+        XCTAssertThrowsError(try CubeLUT.decode(snaplut(size: 2, version: 2) { ($0, $1, $2) })) { error in
+            XCTAssertEqual(error as? CubeLUT.ParseError, .unsupportedVersion(2))
+        }
+        XCTAssertThrowsError(try CubeLUT.decode(snaplut(size: 2) { ($0, $1, $2) }.dropLast(6))) { error in
+            XCTAssertEqual(error as? CubeLUT.ParseError, .wrongEntryCount(expected: 8, found: 7))
+        }
+        var tooSmall = snaplut(size: 2) { ($0, $1, $2) }
+        tooSmall[6] = 1 // the size's low byte
+        XCTAssertThrowsError(try CubeLUT.decode(tooSmall)) { error in
+            XCTAssertEqual(error as? CubeLUT.ParseError, .unsupportedSize(1))
+        }
     }
 }

@@ -1,9 +1,10 @@
 """Colour engine for Snapper looks.
 
 A look is a pure function from display-referred sRGB (gamma encoded, 0..1) to
-display-referred sRGB. It is sampled on a 33-point grid and written as a .cube
-file; the app applies that cube with CIColorCubeWithColorSpace in sRGB, so the
-cube sees exactly the values this module sees.
+display-referred sRGB. It is sampled on a 33-point grid and written as a
+compact binary LUT (see encode_lut); the app applies that cube with
+CIColorCubeWithColorSpace in sRGB, so the cube sees exactly the values this
+module sees.
 
 Pipeline (each stage is optional and neutral by default):
 
@@ -23,6 +24,7 @@ Pipeline (each stage is optional and neutral by default):
 """
 from __future__ import annotations
 
+import struct
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -471,23 +473,30 @@ def format_cube(look: Look, cube: np.ndarray, n: int = 33) -> str:
     return "\n".join(lines) + "\n"
 
 
-def parse_cube(text: str) -> tuple[int, np.ndarray]:
-    size = None
-    rows = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith("TITLE") or line.startswith("DOMAIN"):
-            continue
-        if line.startswith("LUT_3D_SIZE"):
-            size = int(line.split()[1])
-            continue
-        rows.append([float(t) for t in line.split()])
-    if size is None:
-        raise ValueError("missing LUT_3D_SIZE")
-    data = np.array(rows, dtype=np.float64)
-    if data.shape != (size ** 3, 3):
-        raise ValueError(f"expected {size ** 3} rows, got {data.shape}")
-    return size, data
+# Snapper's binary LUT (.snaplut), what the app ships: an 8-byte header ("SNLT",
+# then the version and size as little-endian UInt16s), then size³ RGB entries
+# in .cube order, each channel a little-endian UInt16 where 65535 is 1.0. Each
+# value is within 1/131070 of the generator's output, finer than the 4 decimals
+# of .cube text, at under a third of its size.
+LUT_MAGIC = b"SNLT"
+LUT_VERSION = 1
+
+
+def encode_lut(cube: np.ndarray, n: int = 33) -> bytes:
+    values = np.round(np.clip(cube, 0.0, 1.0) * 65535).astype("<u2")
+    return LUT_MAGIC + struct.pack("<HH", LUT_VERSION, n) + values.tobytes()
+
+
+def decode_lut(blob: bytes) -> tuple[int, np.ndarray]:
+    if blob[:4] != LUT_MAGIC:
+        raise ValueError("not a Snapper LUT")
+    version, size = struct.unpack_from("<HH", blob, 4)
+    if version != LUT_VERSION:
+        raise ValueError(f"unsupported LUT version {version}")
+    if len(blob) != 8 + size ** 3 * 6:
+        raise ValueError(f"{len(blob)} bytes, expected {8 + size ** 3 * 6} for size {size}")
+    values = np.frombuffer(blob, dtype="<u2", offset=8)
+    return size, values.reshape(-1, 3).astype(np.float64) / 65535
 
 
 def apply_cube(cube: np.ndarray, n: int, srgb: np.ndarray) -> np.ndarray:

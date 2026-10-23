@@ -16,7 +16,7 @@ Remembered between launches (`AppSettings`): look and preset (as before), plus f
 
 ## Size
 
-The Lock Screen camera bundles its own copy of `Resources/Filters` (about 30 MB of `.cube` text, much smaller once compressed in the App Store download), because an extension reads resources from its own bundle. If that matters, try loading LUTs from the containing app's bundle on a device first. It parses only the current look and its neighbours up front (`CameraModel(preloadsEveryLook: false)`) so it starts fast.
+The Lock Screen camera bundles its own copy of `Resources/Filters` (about 15 MB of `.snaplut` LUTs), because an extension reads resources from its own bundle. Reading the LUTs from the containing app's bundle instead would save that copy, but whether the Lock Screen camera's sandbox allows it can only be checked on a locked iPhone (see the last check below), so it isn't done yet. Like the app, it loads only the current look and its neighbours up front, so it starts fast, and keeps at most 12 LUTs in memory (`LUTStore`).
 
 ## Adding shared code
 
@@ -38,3 +38,4 @@ None of this can run in the Simulator: there is no camera, no Camera Control, an
 - [ ] Camera permission never granted: the Lock Screen camera explains and opens Snapper.
 - [ ] Measure the Lock Screen camera's launch time and memory during 50 shots and fast look scrolling.
 - [ ] On an iOS 17 device, Snapper still launches and works (the extensions are simply absent).
+- [ ] Optional, to drop the Lock Screen camera's copy of the LUTs: in a test build, have the extension load one LUT from the containing app (`Bundle.main.bundleURL` up two folders is `Snapper.app`) and log whether that works while the iPhone is locked, including after a restart before the first unlock. Only if it does, point `LUTStore` there and remove the LUTs from `SnapperCapture`'s resources in `project.yml`.

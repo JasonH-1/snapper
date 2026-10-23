@@ -32,9 +32,9 @@ final class LockedCameraModel {
 
     init(session: LockedCameraCaptureSession) {
         self.session = session
-        // Only the looks beside the current one are parsed up front, so the
+        // Only the looks beside the current one are loaded up front, so the
         // camera is ready the moment the Lock Screen hands over.
-        camera = CameraModel(library: .bundled(), preloadsEveryLook: false)
+        camera = CameraModel(library: .bundled())
         camera.onCapture = { [weak self] photo, look in
             self?.save(photo, look: look)
         }

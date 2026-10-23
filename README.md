@@ -7,7 +7,7 @@ An iPhone camera and photo editor with live film looks and reusable personal sty
 - **Live preview through every look:** Core Image + Metal, 30 fps, off the main thread. Swipe the preview to change looks, with a live split as you drag.
 - **What you see is what you save:** the preview, the full-resolution photo and every export go through the same pipeline (`LookPipeline`).
 - **69 original looks in ten collections:** Disposable, Neon Nights, Soft Portrait, Overclock, Darkroom, Digicam, Everyday Film, Black & White, Cinema and Instant Prints. Thirteen are free, at least one in every collection.
-- **Looks are data:** each look is a 33-point `.cube` file listed in `filters.json`, plus optional effects (sky gradient, direct flash, glow, CCD smear, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, sharpening, noise, film grain, vignette) drawn after it. A Python tool generates and quality-checks them.
+- **Looks are data:** each look is a 33-point LUT (a compact `.snaplut`, or any `.cube`) listed in `filters.json`, plus optional effects (sky gradient, direct flash, glow, CCD smear, halation, chromatic aberration, chroma bleed, glitch, light leak, scanlines, sharpening, noise, film grain, vignette) drawn after it. A Python tool generates and quality-checks them.
 - **Opens from Camera Control, the Lock Screen and Control Center (iOS 18):** a Lock Screen camera extension with the same live looks, a Control Center control, and a look picker and exposure slider on Camera Control. Snapper also keeps the last look, flash, exposure and front/back camera between launches. See [docs/camera-launch.md](docs/camera-launch.md).
 - **StoreKit 2:** monthly and yearly plans (7-day trial on yearly) and a one-time Lifetime unlock. There are no accounts and no backend; the Apple ID is the account.
 
@@ -83,7 +83,7 @@ Run `xcodegen generate` again whenever you add, remove or rename files. The `.xc
 ### Swap, reorder, rename, or move between free and premium (no code)
 Edit `Snapper/Resources/Filters/filters.json`:
 ```json
-{ "id": "boardwalk", "name": "Boardwalk", "collection": "disposable", "lut": "boardwalk.cube", "tier": "free" }
+{ "id": "boardwalk", "name": "Boardwalk", "collection": "disposable", "lut": "boardwalk.snaplut", "tier": "free" }
 ```
 - **Order:** the order in the file is the swipe order. Original always comes first, followed by the person's favorites.
 - **Tier:** `"tier": "free"` or `"premium"`.
@@ -101,11 +101,14 @@ Each look is a set of parameters in `tools/lutgen/looks.toml`: white balance, ex
 
 ```sh
 pip install -r tools/lutgen/requirements.txt
-python3 tools/lutgen/lutgen.py build     # write .cube files + test fixture; new looks are added to filters.json as premium
+python3 tools/lutgen/lutgen.py build     # write the .snaplut LUTs + test fixture; new looks are added to filters.json as premium
 python3 tools/lutgen/lutgen.py review    # contact sheets + report in filter-review/
-python3 tools/lutgen/lutgen.py verify    # what CI runs: cubes up to date, quality gates pass
+python3 tools/lutgen/lutgen.py verify    # what CI runs: LUTs up to date, quality gates pass
 python3 tools/lutgen/lutgen.py build --only boardwalk,cream
+python3 tools/lutgen/lutgen.py cube      # the looks as .cube text for other apps, in build/cubes/
 ```
+
+The app ships `.snaplut` files: the same 33-point cube as 16-bit integers (215 KB a look, against 755 KB of `.cube` text), which load without parsing. Only `looks.toml` is edited by hand; `cube` writes `.cube` copies when you want to try a look in another editor.
 
 Every look must pass these quality gates:
 - the tone curve never inverts
@@ -170,7 +173,7 @@ Snapper/
   App/          SnapperApp, AppModel (navigation + wiring), AppSettings, AppConfig, RootView
   Camera/       CaptureService (actor on the session queue), PhotoCapture, PreviewRenderer
                 (Metal/Core Image, own queue), CameraModel, CameraView + components, LookPicker
-  Filters/      Look/LookLibrary (filters.json), CubeLUT (.cube parser), LUTStore, LookPipeline
+  Filters/      Look/LookLibrary (filters.json), CubeLUT (.snaplut and .cube loader), LUTStore, LookPipeline
   Library/      CaptureLibrary (in-app roll), CaptureStore, PhotoRenderer (exports), Watermark,
                 PhotoLibrarySaver (add-only Photos access)
   Review/       ReviewModel + ReviewView (change look/strength, save, share, delete)

@@ -1,9 +1,10 @@
+import Accelerate
 import Foundation
 
-/// A 3D colour lookup table loaded from an Adobe/Resolve style `.cube` file,
-/// stored in the layout Core Image's colour cube filters expect: RGBA Float32
-/// texels with red varying fastest, then green, then blue (the same order as
-/// the rows of a .cube file).
+/// A 3D colour lookup table loaded from Snapper's compact `.snaplut` files or
+/// an Adobe/Resolve style `.cube` file, stored in the layout Core Image's
+/// colour cube filters expect: RGBA Float32 texels with red varying fastest,
+/// then green, then blue (the same order as the rows of a .cube file).
 struct CubeLUT: Sendable {
     enum ParseError: Error, Equatable {
         case missingSize
@@ -12,6 +13,8 @@ struct CubeLUT: Sendable {
         case unsupportedDomain
         case malformedRow(line: Int)
         case wrongEntryCount(expected: Int, found: Int)
+        case notSnapperLUT
+        case unsupportedVersion(Int)
     }
 
     let dimension: Int
@@ -65,6 +68,52 @@ struct CubeLUT: Sendable {
             }
         }
         return out.withUnsafeBufferPointer { Data(buffer: $0) }
+    }
+
+    // MARK: - Snapper's binary format
+
+    /// Reads a `.snaplut` file, the compact form tools/lutgen writes for
+    /// Snapper's own looks: "SNLT", then the format version and the size as
+    /// little-endian UInt16s, then size³ RGB entries in .cube order, each
+    /// channel a little-endian UInt16 where 65535 is 1.0.
+    static func decode(_ file: Data) throws -> CubeLUT {
+        let headerSize = 8
+        guard file.count >= headerSize, file.prefix(4).elementsEqual("SNLT".utf8) else {
+            throw ParseError.notSnapperLUT
+        }
+        return try file.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            func uint16(at offset: Int) -> UInt16 {
+                UInt16(littleEndian: raw.loadUnaligned(fromByteOffset: offset, as: UInt16.self))
+            }
+            let version = Int(uint16(at: 4))
+            guard version == 1 else { throw ParseError.unsupportedVersion(version) }
+            let dimension = Int(uint16(at: 6))
+            guard (2...128).contains(dimension) else { throw ParseError.unsupportedSize(dimension) }
+            let entries = dimension * dimension * dimension
+            guard raw.count == headerSize + entries * 6 else {
+                throw ParseError.wrongEntryCount(expected: entries, found: (raw.count - headerSize) / 6)
+            }
+            // Copied out first, as `file` needn't keep them aligned. iOS is
+            // little-endian, so the values are already in host byte order.
+            let channels = [UInt16](unsafeUninitializedCapacity: entries * 3) { buffer, count in
+                UnsafeMutableRawBufferPointer(buffer).copyMemory(from: UnsafeRawBufferPointer(rebasing: raw[headerSize...]))
+                count = entries * 3
+            }
+            var data = Data(count: entries * 4 * MemoryLayout<Float>.size)
+            data.withUnsafeMutableBytes { out in
+                let texels = out.bindMemory(to: Float.self).baseAddress!
+                channels.withUnsafeBufferPointer { source in
+                    for channel in 0..<3 {
+                        vDSP_vfltu16(source.baseAddress! + channel, 3, texels + channel, 4, vDSP_Length(entries))
+                    }
+                }
+                var scale = Float(UInt16.max)
+                vDSP_vsdiv(texels, 1, &scale, texels, 1, vDSP_Length(entries * 4))
+                var one: Float = 1
+                vDSP_vfill(&one, texels + 3, 4, vDSP_Length(entries))
+            }
+            return CubeLUT(dimension: dimension, data: data)
+        }
     }
 
     // MARK: - Parsing

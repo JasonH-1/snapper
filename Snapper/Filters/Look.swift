@@ -13,7 +13,7 @@ struct Look: Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let collectionID: String?
-    /// File name of the .cube LUT in the bundle, or `nil` for the unfiltered original.
+    /// File name of the LUT (.snaplut or .cube) in the bundle, or `nil` for the unfiltered original.
     let lutFile: String?
     let tier: LookTier
     var effects: LookEffects = .none

@@ -1,6 +1,6 @@
 # Filter review
 
-Contact sheets for every look, rendered through the exact `.cube` files the app ships.
+Contact sheets for every look, rendered through the exact LUTs the app ships.
 Each sheet shows one style direction: rows are looks, columns are the photos in
 `test-photos/` plus three synthetic charts (skin tones, colour checker + gradients, neon night).
 
@@ -8,7 +8,7 @@ To approve or reject, edit the **Verdict** column below (or just tell me which l
 Regenerate after changing `tools/lutgen/looks.toml` or adding photos:
 
 ```sh
-python3 tools/lutgen/lutgen.py build    # rewrite the .cube files
+python3 tools/lutgen/lutgen.py build    # rewrite the LUTs
 python3 tools/lutgen/lutgen.py review   # rewrite these sheets
 ```
 
