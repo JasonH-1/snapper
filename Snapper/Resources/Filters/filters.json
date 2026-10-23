@@ -30,6 +30,26 @@
       "id": "digicam",
       "name": "Digicam",
       "tagline": "Harsh flash, cool skin and crunchy pixels from a 2000s pocket camera."
+    },
+    {
+      "id": "film",
+      "name": "Everyday Film",
+      "tagline": "Natural negative-film color for travel, faces, food and everyday light."
+    },
+    {
+      "id": "mono",
+      "name": "Black & White",
+      "tagline": "From gentle silver tones to graphic street contrast."
+    },
+    {
+      "id": "cinema",
+      "name": "Cinema",
+      "tagline": "Daylight, interiors and landscapes with a cinematic color palette."
+    },
+    {
+      "id": "instantprint",
+      "name": "Instant Prints",
+      "tagline": "Creamy paper whites, pastel color and the feel of a keepsake print."
     }
   ],
   "looks": [
@@ -653,6 +673,286 @@
           "radius": 0.85
         }
       }
+    },
+    {
+      "id": "dayroll",
+      "name": "Day Roll",
+      "collection": "film",
+      "lut": "dayroll.cube",
+      "tier": "free"
+    },
+    {
+      "id": "sundial",
+      "name": "Sundial",
+      "collection": "film",
+      "lut": "sundial.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "evergreen",
+      "name": "Evergreen",
+      "collection": "film",
+      "lut": "evergreen.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "harbor",
+      "name": "Harbor",
+      "collection": "film",
+      "lut": "harbor.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "terracotta",
+      "name": "Terracotta",
+      "collection": "film",
+      "lut": "terracotta.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "sunday",
+      "name": "Sunday",
+      "collection": "film",
+      "lut": "sunday.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "alpine",
+      "name": "Alpine",
+      "collection": "film",
+      "lut": "alpine.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "market",
+      "name": "Market",
+      "collection": "film",
+      "lut": "market.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "amber100",
+      "name": "Amber 100",
+      "collection": "film",
+      "lut": "amber100.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "coast",
+      "name": "Coast",
+      "collection": "film",
+      "lut": "coast.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "orchard",
+      "name": "Orchard",
+      "collection": "film",
+      "lut": "orchard.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "travelogue",
+      "name": "Travelogue",
+      "collection": "film",
+      "lut": "travelogue.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "graphite",
+      "name": "Graphite",
+      "collection": "mono",
+      "lut": "graphite.cube",
+      "tier": "free"
+    },
+    {
+      "id": "newsprint",
+      "name": "Newsprint",
+      "collection": "mono",
+      "lut": "newsprint.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "noir",
+      "name": "Noir",
+      "collection": "mono",
+      "lut": "noir.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "chalk",
+      "name": "Chalk",
+      "collection": "mono",
+      "lut": "chalk.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "platinum",
+      "name": "Platinum",
+      "collection": "mono",
+      "lut": "platinum.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "carbon",
+      "name": "Carbon",
+      "collection": "mono",
+      "lut": "carbon.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "silhouette",
+      "name": "Silhouette",
+      "collection": "mono",
+      "lut": "silhouette.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "blueprint",
+      "name": "Blueprint",
+      "collection": "mono",
+      "lut": "blueprint.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "daybreak",
+      "name": "Daybreak",
+      "collection": "cinema",
+      "lut": "daybreak.cube",
+      "tier": "free"
+    },
+    {
+      "id": "desert",
+      "name": "Desert",
+      "collection": "cinema",
+      "lut": "desert.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "raincheck",
+      "name": "Rain Check",
+      "collection": "cinema",
+      "lut": "raincheck.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "velvet",
+      "name": "Velvet",
+      "collection": "cinema",
+      "lut": "velvet.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "copper",
+      "name": "Copper",
+      "collection": "cinema",
+      "lut": "copper.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "reel",
+      "name": "Reel",
+      "collection": "cinema",
+      "lut": "reel.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "moss",
+      "name": "Moss",
+      "collection": "cinema",
+      "lut": "moss.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "dusk",
+      "name": "Dusk",
+      "collection": "cinema",
+      "lut": "dusk.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "peel",
+      "name": "Peel",
+      "collection": "instantprint",
+      "lut": "peel.cube",
+      "tier": "free"
+    },
+    {
+      "id": "pastel",
+      "name": "Pastel",
+      "collection": "instantprint",
+      "lut": "pastel.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "keepsake",
+      "name": "Keepsake",
+      "collection": "instantprint",
+      "lut": "keepsake.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "mintprint",
+      "name": "Mint Print",
+      "collection": "instantprint",
+      "lut": "mintprint.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "roseprint",
+      "name": "Rose Print",
+      "collection": "instantprint",
+      "lut": "roseprint.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "fadedpaper",
+      "name": "Faded Paper",
+      "collection": "instantprint",
+      "lut": "fadedpaper.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "ccdday",
+      "name": "CCD Day",
+      "collection": "digicam",
+      "lut": "ccdday.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "ccdnight",
+      "name": "CCD Night",
+      "collection": "digicam",
+      "lut": "ccdnight.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "mall",
+      "name": "Mall",
+      "collection": "digicam",
+      "lut": "mall.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "slumber",
+      "name": "Slumber",
+      "collection": "digicam",
+      "lut": "slumber.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "redeye",
+      "name": "Red Eye",
+      "collection": "digicam",
+      "lut": "redeye.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "pixelpop",
+      "name": "Pixel Pop",
+      "collection": "digicam",
+      "lut": "pixelpop.cube",
+      "tier": "premium"
     }
   ]
 }

@@ -936,3 +936,498 @@ color = 1.0
 [look.effects.vignette]
 intensity = 0.3
 radius = 0.85
+
+# Research-led expansion: see docs/filter-expansion.md.
+
+[collections.film]
+name = "Everyday Film"
+tagline = "Natural negative-film color for travel, faces, food and everyday light."
+
+[collections.mono]
+name = "Black & White"
+tagline = "From gentle silver tones to graphic street contrast."
+
+[collections.cinema]
+name = "Cinema"
+tagline = "Daylight, interiors and landscapes with a cinematic color palette."
+
+[collections.instantprint]
+name = "Instant Prints"
+tagline = "Creamy paper whites, pastel color and the feel of a keepsake print."
+
+[[look]]
+id = "dayroll"
+name = "Day Roll"
+collection = "film"
+description = "Everyday negative: neutral faces, open shadows and gentle highlight compression."
+contrast = 0.16
+saturation = 0.94
+black = 0.015
+highlight_rolloff = 0.65
+skin_protect = 0.9
+
+[[look]]
+id = "sundial"
+name = "Sundial"
+collection = "film"
+description = "Amber daylight, deep blue skies and bright red accents."
+temperature = 0.23
+contrast = 0.24
+saturation = 1.08
+hue_sat = { blue = 1.18, green = 0.8 }
+hue_shift = { blue = 8 }
+skin_protect = 0.9
+curve = [[0, 0.025], [0.25, 0.2], [0.5, 0.51], [0.75, 0.8], [1, 1]]
+
+[[look]]
+id = "evergreen"
+name = "Evergreen"
+collection = "film"
+description = "Cool forest greens with quiet reds and clean highlights."
+temperature = -0.07
+saturation = 0.88
+hue_sat = { green = 1.26, red = 0.8 }
+hue_shift = { green = 12 }
+contrast = 0.19
+black = 0.025
+
+[[look]]
+id = "harbor"
+name = "Harbor"
+collection = "film"
+description = "Blue water, restrained yellows and crisp maritime daylight."
+temperature = -0.12
+contrast = 0.2
+hue_sat = { blue = 1.22, aqua = 1.12, yellow = 0.65 }
+saturation = 0.94
+highlight_rolloff = 0.6
+
+[[look]]
+id = "terracotta"
+name = "Terracotta"
+collection = "film"
+description = "Earthy reds and ochre walls with muted blue skies."
+temperature = 0.09
+contrast = 0.22
+saturation = 0.88
+hue_sat = { red = 1.35, orange = 1.1, blue = 0.52, green = 0.52 }
+skin_protect = 0.95
+hue_shift = { red = 10, green = -23 }
+black = 0.02
+
+[[look]]
+id = "sunday"
+name = "Sunday"
+collection = "film"
+description = "Soft neutral daylight with luminous midtones and gentle color."
+exposure = 0.18
+contrast = -0.12
+saturation = 0.82
+black = 0.025
+highlight_rolloff = 0.8
+skin_protect = 0.9
+
+[[look]]
+id = "alpine"
+name = "Alpine"
+collection = "film"
+description = "Clear mountain air: dark blues, bright whites and fresh green detail."
+temperature = -0.18
+contrast = 0.32
+saturation = 0.92
+hue_light = { blue = -0.07 }
+hue_sat = { green = 1.25, blue = 1.3 }
+highlight_rolloff = 0.55
+exposure = -0.13
+
+[[look]]
+id = "market"
+name = "Market"
+collection = "film"
+description = "Lively food and street color with balanced skin and strong reds."
+contrast = 0.18
+vibrance = 0.24
+hue_sat = { red = 1.15, yellow = 1.08, green = 0.9 }
+skin_protect = 0.95
+highlight_rolloff = 0.65
+
+[[look]]
+id = "amber100"
+name = "Amber 100"
+collection = "film"
+description = "Rich golden midtones with restrained color and deep neutral blacks."
+temperature = 0.22
+contrast = 0.13
+saturation = 0.78
+shadow_desat = 0.35
+highlight_desat = 0.18
+skin_protect = 0.9
+
+[[look]]
+id = "coast"
+name = "Coast"
+collection = "film"
+description = "Cool cyan seas and pale sand, with soft bright highlights."
+exposure = 0.12
+temperature = -0.05
+contrast = -0.06
+saturation = 0.9
+hue_shift = { blue = -30 }
+hue_sat = { aqua = 1.38, blue = 1.12, yellow = 0.55 }
+black = 0.03
+white = 0.95
+
+[[look]]
+id = "orchard"
+name = "Orchard"
+collection = "film"
+description = "Olive foliage and peach daylight for parks and gardens."
+temperature = 0.1
+contrast = 0.12
+saturation = 0.92
+hue_shift = { green = -18 }
+hue_sat = { green = 0.8, blue = 0.7 }
+black = 0.04
+skin_protect = 0.9
+
+[[look]]
+id = "travelogue"
+name = "Travelogue"
+collection = "film"
+description = "Slide-inspired travel color: vivid blues, solid shadows and clean reds."
+contrast = 0.34
+saturation = 1.15
+hue_sat = { blue = 1.15, red = 1.08 }
+highlight_rolloff = 0.7
+skin_protect = 0.95
+
+[[look]]
+id = "graphite"
+name = "Graphite"
+collection = "mono"
+description = "Balanced black and white for everyday street photography."
+monochrome = true
+contrast = 0.22
+highlight_rolloff = 0.6
+
+[[look]]
+id = "newsprint"
+name = "Newsprint"
+collection = "mono"
+description = "Documentary midtones with deep blacks and restrained whites."
+monochrome = true
+curve = [[0, 0.015], [0.2, 0.15], [0.5, 0.47], [0.8, 0.76], [1, 0.94]]
+contrast = 0.12
+
+[[look]]
+id = "noir"
+name = "Noir"
+collection = "mono"
+description = "Dramatic shadows and bright highlights for hard side light."
+monochrome = true
+contrast = 0.36
+curve = [[0, 0.008], [0.2, 0.17], [0.5, 0.46], [0.8, 0.79], [1, 0.98]]
+highlight_rolloff = 0.5
+
+[[look]]
+id = "chalk"
+name = "Chalk"
+collection = "mono"
+description = "Airy, low-contrast monochrome for pale interiors and soft portraits."
+monochrome = true
+exposure = 0.2
+contrast = -0.22
+black = 0.055
+white = 0.98
+
+[[look]]
+id = "platinum"
+name = "Platinum"
+collection = "mono"
+description = "Long, gentle grey tones with a subtle cool silver cast."
+monochrome = true
+contrast = -0.05
+black = 0.025
+white = 0.92
+mono_tone = { hue = 255, amount = 0.008 }
+
+[[look]]
+id = "carbon"
+name = "Carbon"
+collection = "mono"
+description = "Dense midtones and cool blacks for architecture and concrete."
+monochrome = true
+exposure = -0.15
+contrast = 0.36
+mono_tone = { hue = 235, amount = 0.018 }
+highlight_rolloff = 0.5
+
+[[look]]
+id = "silhouette"
+name = "Silhouette"
+collection = "mono"
+description = "Graphic dark shapes and bright skies with a steeper upper curve."
+monochrome = true
+curve = [[0, 0.005], [0.15, 0.11], [0.4, 0.27], [0.7, 0.78], [1, 1]]
+highlight_rolloff = 0.5
+
+[[look]]
+id = "blueprint"
+name = "Blueprint"
+collection = "mono"
+description = "Cyan-toned monochrome for water, metal and geometric details."
+monochrome = true
+contrast = 0.2
+black = 0.04
+mono_tone = { hue = 230, amount = 0.06 }
+
+[[look]]
+id = "daybreak"
+name = "Daybreak"
+collection = "cinema"
+description = "Peach dawn highlights over cool blue shadows."
+temperature = 0.06
+contrast = 0.12
+saturation = 0.8
+shadow_tint = { hue = 255, amount = 0.03 }
+highlight_tint = { hue = 55, amount = 0.024 }
+black = 0.025
+skin_protect = 0.9
+
+[[look]]
+id = "desert"
+name = "Desert"
+collection = "cinema"
+description = "Dusty amber landscapes, pale skies and restrained greens."
+temperature = 0.2
+contrast = 0.28
+saturation = 0.72
+hue_sat = { green = 0.55, blue = 0.65 }
+highlight_desat = 0.3
+skin_protect = 0.95
+
+[[look]]
+id = "raincheck"
+name = "Rain Check"
+collection = "cinema"
+description = "Overcast streets with slate blues and muted shopfronts."
+temperature = -0.13
+exposure = -0.08
+contrast = 0.22
+saturation = 0.66
+shadow_tint = { hue = 250, amount = 0.018 }
+skin_protect = 0.95
+
+[[look]]
+id = "velvet"
+name = "Velvet"
+collection = "cinema"
+description = "Burgundy shade and cream highlights for intimate indoor scenes."
+contrast = 0.14
+saturation = 0.78
+black = 0.045
+shadow_tint = { hue = 345, amount = 0.022 }
+highlight_tint = { hue = 75, amount = 0.012 }
+skin_protect = 0.95
+
+[[look]]
+id = "copper"
+name = "Copper"
+collection = "cinema"
+description = "Burnished orange light, blue steel and rich midtone contrast."
+temperature = 0.08
+contrast = 0.32
+saturation = 0.86
+hue_shift = { blue = 9 }
+hue_sat = { blue = 0.85, yellow = 0.72 }
+highlight_tint = { hue = 55, amount = 0.025 }
+skin_protect = 0.95
+
+[[look]]
+id = "reel"
+name = "Reel"
+collection = "cinema"
+description = "Bleach-inspired silver color: low saturation and clear hard light."
+contrast = 0.42
+saturation = 0.45
+shadow_desat = 0.45
+highlight_desat = 0.25
+skin_protect = 0.95
+
+[[look]]
+id = "moss"
+name = "Moss"
+collection = "cinema"
+description = "Muted forest color with green shade and warm natural faces."
+contrast = 0.24
+saturation = 0.76
+hue_shift = { green = -12 }
+shadow_tint = { hue = 145, amount = 0.022 }
+highlight_tint = { hue = 70, amount = 0.014 }
+skin_protect = 0.95
+
+[[look]]
+id = "dusk"
+name = "Dusk"
+collection = "cinema"
+description = "Lavender evenings with rose light and quiet blues."
+temperature = -0.04
+contrast = 0.08
+black = 0.035
+saturation = 0.8
+shadow_tint = { hue = 290, amount = 0.025 }
+highlight_tint = { hue = 340, amount = 0.014 }
+skin_protect = 0.95
+
+[[look]]
+id = "peel"
+name = "Peel"
+collection = "instantprint"
+description = "Peel-apart inspired color: cool shadows, warm paper and soft contrast."
+contrast = -0.1
+saturation = 0.78
+black = 0.07
+white = 0.94
+shadow_tint = { hue = 210, amount = 0.02 }
+highlight_tint = { hue = 85, amount = 0.015 }
+skin_protect = 0.9
+
+[[look]]
+id = "pastel"
+name = "Pastel"
+collection = "instantprint"
+description = "Pale candy color and bright midtones for flowers and still life."
+exposure = 0.16
+contrast = -0.12
+saturation = 0.58
+black = 0.07
+skin_protect = 0.9
+hue_sat = { blue = 0.6, green = 0.7, magenta = 1.15 }
+white = 0.95
+
+[[look]]
+id = "keepsake"
+name = "Keepsake"
+collection = "instantprint"
+description = "Warm amber paper with deeper shadows and subdued blue color."
+temperature = 0.18
+contrast = 0.16
+black = 0.06
+white = 0.94
+saturation = 0.82
+hue_sat = { blue = 0.55 }
+skin_protect = 0.9
+
+[[look]]
+id = "mintprint"
+name = "Mint Print"
+collection = "instantprint"
+description = "Minty shade and pale yellow highlights on a faded print."
+contrast = -0.06
+black = 0.065
+white = 0.9
+saturation = 0.8
+shadow_tint = { hue = 165, amount = 0.045 }
+highlight_tint = { hue = 100, amount = 0.012 }
+skin_protect = 0.95
+
+[[look]]
+id = "roseprint"
+name = "Rose Print"
+collection = "instantprint"
+description = "Rose-tinted paper and lilac blues for gentle portraits."
+contrast = -0.1
+black = 0.055
+saturation = 0.85
+tint = 0.08
+hue_shift = { blue = 15 }
+highlight_tint = { hue = 350, amount = 0.01 }
+skin_protect = 0.95
+
+[[look]]
+id = "fadedpaper"
+name = "Faded Paper"
+collection = "instantprint"
+description = "Aged neutral print: milky blacks and softly muted color."
+contrast = -0.15
+black = 0.11
+white = 0.91
+saturation = 0.6
+shadow_desat = 0.3
+skin_protect = 0.95
+
+[[look]]
+id = "ccdday"
+name = "CCD Day"
+collection = "digicam"
+description = "Bright compact-camera daylight, with hard blues and clean warm faces."
+exposure = 0.08
+contrast = 0.32
+saturation = 1.13
+hue_sat = { blue = 1.25, green = 0.85 }
+skin_protect = 0.95
+
+[[look]]
+id = "ccdnight"
+name = "CCD Night"
+collection = "digicam"
+description = "Cool blue evening color with glowing magenta accents."
+temperature = -0.12
+contrast = 0.28
+saturation = 0.92
+shadow_tint = { hue = 265, amount = 0.028 }
+hue_sat = { magenta = 1.2 }
+skin_protect = 0.95
+
+[[look]]
+id = "mall"
+name = "Mall"
+collection = "digicam"
+description = "Cool fluorescent whites and bright red accents from a shopping trip."
+temperature = -0.13
+tint = -0.2
+contrast = 0.2
+saturation = 1.06
+hue_sat = { red = 1.22, yellow = 0.72 }
+skin_protect = 0.95
+shadow_tint = { hue = 155, amount = 0.022 }
+black = 0.018
+
+[[look]]
+id = "slumber"
+name = "Slumber"
+collection = "digicam"
+description = "Soft pink compact-camera color for indoor friends and cozy rooms."
+exposure = 0.14
+tint = 0.05
+contrast = -0.02
+saturation = 0.72
+black = 0.065
+hue_shift = { blue = 12 }
+skin_protect = 0.95
+shadow_tint = { hue = 330, amount = 0.033 }
+
+[[look]]
+id = "redeye"
+name = "Red Eye"
+collection = "digicam"
+description = "Warm party color against blue-black shadows; try it with real flash."
+contrast = 0.36
+temperature = 0.12
+saturation = 0.92
+shadow_tint = { hue = 255, amount = 0.02 }
+skin_protect = 0.95
+
+[[look]]
+id = "pixelpop"
+name = "Pixel Pop"
+collection = "digicam"
+description = "Bold primary colors and graphic contrast for playful daylight shots."
+contrast = 0.3
+saturation = 1.24
+hue_sat = { blue = 1.16, red = 1.14, green = 1.08 }
+skin_protect = 0.98
+highlight_rolloff = 0.7
+hue_shift = { blue = 25, green = -22 }
+shadow_tint = { hue = 205, amount = 0.028 }
+black = 0.035
