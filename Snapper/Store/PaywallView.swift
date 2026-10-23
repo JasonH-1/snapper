@@ -68,6 +68,8 @@ struct PaywallView: View {
                 model.offersOnlyLifetime
                     ? Text("No Lifetime purchase was found for this Apple ID. Your subscription is still active.")
                     : Text("No Snapper Premium purchase or active subscription was found for this Apple ID.")
+            case .notShowingYet:
+                Text("The App Store confirmed your purchase but hasn't unlocked it yet. Tap Restore Purchases in a moment to check again.")
             case .error(let message):
                 Text(message)
             }
@@ -402,6 +404,7 @@ struct PaywallView: View {
         switch model.alert {
         case .pending: Text("Purchase pending")
         case .nothingToRestore: Text("Nothing to restore")
+        case .notShowingYet: Text("Not unlocked yet")
         case .error: Text("Purchase didn't complete")
         case nil: Text("")
         }

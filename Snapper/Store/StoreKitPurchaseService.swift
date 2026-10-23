@@ -160,13 +160,14 @@ final class StoreKitPurchaseService: PurchaseService {
 
         switch result {
         case .success(let verification):
-            guard case .verified(let transaction) = verification else {
+            guard let transaction = Self.verified(verification, from: "Purchase") else {
                 throw PurchaseError.verificationFailed
             }
             await transaction.finish()
             await refreshEntitlements()
             return .purchased
         case .pending:
+            Logger.store.notice("Purchase of \(plan.id, privacy: .public) is pending")
             return .pending
         case .userCancelled:
             return .cancelled
@@ -199,19 +200,35 @@ final class StoreKitPurchaseService: PurchaseService {
     /// Premium is active while Lifetime is owned or a subscription is current.
     /// Lifetime has no expiry, so only a refund (revocation) takes it away.
     func refreshEntitlements() async {
+        var owned: [UInt64: Transaction] = [:]
+        // currentEntitlements includes expired transactions during an active
+        // billing grace period. StoreKit determines access, not this date.
+        for await result in Transaction.currentEntitlements {
+            if let transaction = Self.verified(result, from: "Entitlement") {
+                owned[transaction.id] = transaction
+            }
+        }
+        // After a refunded subscription was bought again, a phone's
+        // currentEntitlements stayed empty while the new purchase was valid,
+        // so each product's latest purchase also counts until it expires.
+        for productID in productIDs {
+            guard let result = await Transaction.latest(for: productID),
+                  let transaction = Self.verified(result, from: "Latest"),
+                  transaction.expirationDate.map({ $0 > .now }) ?? true else { continue }
+            owned[transaction.id] = transaction
+        }
+
         var lifetime = false
         var subscribed = false
         var renews = false
-        for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result,
-                  productIDs.contains(transaction.productID),
-                  transaction.revocationDate == nil else { continue }
+        for transaction in owned.values {
+            guard productIDs.contains(transaction.productID),
+                  transaction.revocationDate == nil,
+                  !transaction.isUpgraded else { continue }
             if transaction.productType == .nonConsumable {
                 lifetime = true
                 continue
             }
-            // currentEntitlements includes expired transactions during an active
-            // billing grace period. StoreKit determines access, not this date.
             subscribed = true
             if await Self.willRenew(transaction) { renews = true }
         }
@@ -219,6 +236,7 @@ final class StoreKitPurchaseService: PurchaseService {
         if hasActiveSubscription != subscribed { hasActiveSubscription = subscribed }
         if subscriptionWillRenew != renews { subscriptionWillRenew = renews }
         let active = lifetime || subscribed
+        Logger.store.info("Entitlements: lifetime \(lifetime), subscription \(subscribed), renews \(renews)")
         if isPremium != active {
             isPremium = active
         }
@@ -234,8 +252,30 @@ final class StoreKitPurchaseService: PurchaseService {
     }
 
     private func process(_ update: VerificationResult<Transaction>) async {
-        guard case .verified(let transaction) = update else { return }
+        guard let transaction = Self.verified(update, from: "Update") else { return }
         await transaction.finish()
         await refreshEntitlements()
+    }
+
+    /// The transaction if StoreKit verified it. Logs it either way, saying
+    /// where it came from.
+    private static func verified(_ result: VerificationResult<Transaction>, from source: String) -> Transaction? {
+        switch result {
+        case .verified(let transaction):
+            Logger.store.info("\(source, privacy: .public) \(transaction.productID, privacy: .public) (\(describe(transaction), privacy: .public))")
+            return transaction
+        case .unverified(let transaction, let error):
+            Logger.store.error("\(source, privacy: .public) \(transaction.productID, privacy: .public) failed verification: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    /// What the logs need to tell a missing entitlement apart: which store
+    /// signed it, and whether it was refunded or has run out.
+    private static func describe(_ transaction: Transaction) -> String {
+        var parts = ["id \(transaction.id)", "environment \(transaction.environment.rawValue)"]
+        if let revoked = transaction.revocationDate { parts.append("refunded \(revoked.formatted())") }
+        if let expires = transaction.expirationDate { parts.append("expires \(expires.formatted())") }
+        return parts.joined(separator: ", ")
     }
 }
