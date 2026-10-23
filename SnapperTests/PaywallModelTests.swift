@@ -15,6 +15,10 @@ final class FakePurchaseService: PurchaseService {
     var nextOutcome: PurchaseOutcome = .purchased
     /// What the next entitlement check finds, as after an offer code is redeemed.
     var premiumAfterRefresh: Bool?
+    /// How many entitlement checks a purchase takes to show up, as on a
+    /// device whose store is a moment behind; 0 shows it at once.
+    var purchaseShowsAfterRefreshes = 0
+    private var latePurchase: (plan: SubscriptionPlan, refreshesLeft: Int)?
 
     func start() {}
 
@@ -32,20 +36,36 @@ final class FakePurchaseService: PurchaseService {
 
     func purchase(_ plan: SubscriptionPlan) async throws -> PurchaseOutcome {
         if nextOutcome == .purchased {
-            isPremium = true
-            if plan.period.renews {
-                hasActiveSubscription = true
-                subscriptionWillRenew = true
+            if purchaseShowsAfterRefreshes > 0 {
+                latePurchase = (plan, purchaseShowsAfterRefreshes)
             } else {
-                ownsLifetime = true
+                grant(plan)
             }
         }
         return nextOutcome
     }
 
+    private func grant(_ plan: SubscriptionPlan) {
+        isPremium = true
+        if plan.period.renews {
+            hasActiveSubscription = true
+            subscriptionWillRenew = true
+        } else {
+            ownsLifetime = true
+        }
+    }
+
     func restore() async throws -> Bool { isPremium }
     func refreshEntitlements() async {
         if let premiumAfterRefresh { isPremium = premiumAfterRefresh }
+        if let late = latePurchase {
+            if late.refreshesLeft <= 1 {
+                latePurchase = nil
+                grant(late.plan)
+            } else {
+                latePurchase = (late.plan, late.refreshesLeft - 1)
+            }
+        }
     }
 }
 
@@ -209,6 +229,62 @@ final class PaywallModelTests: XCTestCase {
         XCTAssertFalse(model.showsSubscriptionReminder)
         XCTAssertTrue(model.didUnlock)
         XCTAssertNil(model.alert)
+    }
+
+    /// On a device the store can be a moment behind: a purchase that shows up
+    /// a few checks later still closes the paywall instead of leaving the
+    /// plans on screen.
+    @MainActor
+    func testPurchaseThatShowsUpLateStillUnlocks() async {
+        let store = FakePurchaseService()
+        store.purchaseShowsAfterRefreshes = 3
+        let model = makeModel(store: store)
+        await model.load()
+        await model.purchase()
+        XCTAssertTrue(store.isPremium)
+        XCTAssertTrue(model.didUnlock)
+        XCTAssertNil(model.alert)
+    }
+
+    /// Yearly first, then Lifetime from the same paywall, with the store
+    /// behind: once Lifetime shows, the reminder about the renewing
+    /// subscription appears, not a silent close and not the plans again.
+    @MainActor
+    func testLifetimeShowingUpLateBesideASubscriptionShowsTheReminder() async {
+        let store = makeSubscriber()
+        store.purchaseShowsAfterRefreshes = 3
+        let model = makeModel(store: store)
+        await model.load()
+        model.selectedPlanID = "lifetime"
+        await model.purchase()
+        XCTAssertTrue(store.ownsLifetime)
+        XCTAssertTrue(model.showsSubscriptionReminder)
+        XCTAssertFalse(model.didUnlock)
+    }
+
+    /// Premium that arrives while the paywall is open and nothing is being
+    /// bought (later than the purchase's own wait, or from Ask to Buy)
+    /// closes it; for a subscriber switching to Lifetime, only Lifetime does.
+    @MainActor
+    func testPremiumArrivingLaterClosesThePaywall() async {
+        let store = FakePurchaseService()
+        let model = makeModel(store: store)
+        await model.load()
+        model.entitlementsChanged()
+        XCTAssertFalse(model.didUnlock, "nothing has arrived yet")
+        store.isPremium = true
+        store.hasActiveSubscription = true
+        model.entitlementsChanged()
+        XCTAssertTrue(model.didUnlock)
+
+        let subscriber = makeCancelledSubscriber()
+        let switching = makeModel(store: subscriber, context: .switchToLifetime)
+        await switching.load()
+        switching.entitlementsChanged()
+        XCTAssertFalse(switching.didUnlock, "the subscription alone isn't Lifetime")
+        subscriber.ownsLifetime = true
+        switching.entitlementsChanged()
+        XCTAssertTrue(switching.didUnlock)
     }
 
     @MainActor
