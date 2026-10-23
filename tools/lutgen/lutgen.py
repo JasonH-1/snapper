@@ -104,13 +104,17 @@ def update_manifest(collections: dict, looks: list[Look]) -> None:
     added = []
     for lk in looks:
         if lk.id not in have_l:
-            manifest["looks"].append({
+            entry = {
                 "id": lk.id,
                 "name": lk.name,
                 "collection": lk.collection,
                 "lut": f"{lk.id}.cube",
                 "tier": "premium",
-            })
+            }
+            # The camera swipes in manifest order, so a new look joins the
+            # end of its own collection rather than the end of the list.
+            same = [i for i, e in enumerate(manifest["looks"]) if e["collection"] == lk.collection]
+            manifest["looks"].insert(same[-1] + 1 if same else len(manifest["looks"]), entry)
             added.append(lk.id)
     by_id = {lk.id: lk for lk in looks}
     for entry in manifest["looks"]:

@@ -675,6 +675,48 @@
       }
     },
     {
+      "id": "ccdday",
+      "name": "CCD Day",
+      "collection": "digicam",
+      "lut": "ccdday.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "ccdnight",
+      "name": "CCD Night",
+      "collection": "digicam",
+      "lut": "ccdnight.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "mall",
+      "name": "Mall",
+      "collection": "digicam",
+      "lut": "mall.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "slumber",
+      "name": "Slumber",
+      "collection": "digicam",
+      "lut": "slumber.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "redeye",
+      "name": "Red Eye",
+      "collection": "digicam",
+      "lut": "redeye.cube",
+      "tier": "premium"
+    },
+    {
+      "id": "pixelpop",
+      "name": "Pixel Pop",
+      "collection": "digicam",
+      "lut": "pixelpop.cube",
+      "tier": "premium"
+    },
+    {
       "id": "dayroll",
       "name": "Day Roll",
       "collection": "film",
@@ -910,48 +952,6 @@
       "name": "Faded Paper",
       "collection": "instantprint",
       "lut": "fadedpaper.cube",
-      "tier": "premium"
-    },
-    {
-      "id": "ccdday",
-      "name": "CCD Day",
-      "collection": "digicam",
-      "lut": "ccdday.cube",
-      "tier": "premium"
-    },
-    {
-      "id": "ccdnight",
-      "name": "CCD Night",
-      "collection": "digicam",
-      "lut": "ccdnight.cube",
-      "tier": "premium"
-    },
-    {
-      "id": "mall",
-      "name": "Mall",
-      "collection": "digicam",
-      "lut": "mall.cube",
-      "tier": "premium"
-    },
-    {
-      "id": "slumber",
-      "name": "Slumber",
-      "collection": "digicam",
-      "lut": "slumber.cube",
-      "tier": "premium"
-    },
-    {
-      "id": "redeye",
-      "name": "Red Eye",
-      "collection": "digicam",
-      "lut": "redeye.cube",
-      "tier": "premium"
-    },
-    {
-      "id": "pixelpop",
-      "name": "Pixel Pop",
-      "collection": "digicam",
-      "lut": "pixelpop.cube",
       "tier": "premium"
     }
   ]
