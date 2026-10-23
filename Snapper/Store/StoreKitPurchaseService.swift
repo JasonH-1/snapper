@@ -208,9 +208,10 @@ final class StoreKitPurchaseService: PurchaseService {
                 owned[transaction.id] = transaction
             }
         }
-        // After a refunded subscription was bought again, a phone's
-        // currentEntitlements stayed empty while the new purchase was valid,
-        // so each product's latest purchase also counts until it expires.
+        // On an iPhone running a build from Xcode, currentEntitlements came
+        // back empty for every purchase, even a new one with no refunds, while
+        // each product's latest transaction showed it. So each product's
+        // latest purchase also counts until it expires.
         for productID in productIDs {
             guard let result = await Transaction.latest(for: productID),
                   let transaction = Self.verified(result, from: "Latest"),
