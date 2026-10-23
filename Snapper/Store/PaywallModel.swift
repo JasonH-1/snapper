@@ -166,10 +166,15 @@ final class PaywallModel: Identifiable {
         do {
             switch try await store.purchase(plan) {
             case .purchased:
-                if store.ownsLifetimeWithRenewingSubscription {
-                    showsSubscriptionReminder = true
-                } else {
-                    didUnlock = store.isPremium
+                // The store can take a moment to show a new purchase. Wait
+                // for it rather than leaving the plans on screen as if
+                // nothing happened; a later arrival is caught by
+                // `entitlementsChanged`.
+                var attempts = 0
+                while !settle(after: plan), attempts < 15 {
+                    attempts += 1
+                    try? await Task.sleep(for: .milliseconds(200))
+                    await store.refreshEntitlements()
                 }
             case .pending:
                 alert = .pending
@@ -180,6 +185,35 @@ final class PaywallModel: Identifiable {
             Logger.store.error("Purchase failed: \(error.localizedDescription, privacy: .public)")
             alert = .error(error.localizedDescription)
         }
+    }
+
+    /// What the paywall watches in the store.
+    var entitlement: [Bool] { [store.isPremium, store.ownsLifetime, store.subscriptionWillRenew] }
+
+    /// Premium arrived while the paywall was open: a purchase the store
+    /// showed late, an approved Ask to Buy, or one made on another device.
+    /// A purchase in progress settles itself, knowing what was bought.
+    func entitlementsChanged() {
+        guard !isPurchasing else { return }
+        settle()
+    }
+
+    /// Closes the paywall once the store shows Premium, or first says the
+    /// subscription keeps renewing when Lifetime was bought beside one.
+    /// After buying Lifetime (or when only Lifetime is offered), only
+    /// Lifetime itself counts, even if a subscription already gives Premium.
+    /// Returns whether the paywall has settled.
+    @discardableResult
+    private func settle(after plan: SubscriptionPlan? = nil) -> Bool {
+        if didUnlock || showsSubscriptionReminder { return true }
+        let needsLifetime = offersOnlyLifetime || plan.map { !$0.period.renews } == true
+        if needsLifetime && !store.ownsLifetime { return false }
+        if store.ownsLifetimeWithRenewingSubscription {
+            showsSubscriptionReminder = true
+        } else if store.isPremium {
+            didUnlock = true
+        }
+        return didUnlock || showsSubscriptionReminder
     }
 
     func restore() async {

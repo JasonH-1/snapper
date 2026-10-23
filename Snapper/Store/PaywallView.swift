@@ -52,6 +52,7 @@ struct PaywallView: View {
         .onChange(of: model.didUnlock) { _, unlocked in
             if unlocked { onClose() }
         }
+        .onChange(of: model.entitlement) { model.entitlementsChanged() }
         .sensoryFeedback(.success, trigger: model.didUnlock)
         .sensoryFeedback(.success, trigger: model.showsSubscriptionReminder)
         .sensoryFeedback(.selection, trigger: model.selectedPlanID)
