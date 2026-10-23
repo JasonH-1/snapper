@@ -136,16 +136,16 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 5. If you change product IDs or prices, update `AppConfig.swift` and `Config/Snapper.storekit` to match.
 6. **First submission:** submit the subscriptions and the Lifetime purchase together with app version 1.0. Select them on the version page under *In-App Purchases and Subscriptions*.
 7. **App Information:**
-   - Privacy Policy URL: `https://jasonh-1.github.io/snapper/privacy.html`
-   - Support URL: `https://jasonh-1.github.io/snapper/support.html`
-   - Add `Terms of Use: https://jasonh-1.github.io/snapper/terms.html` to the app description. Apple requires a Terms link in the metadata for auto-renewable subscriptions.
+   - Privacy Policy URL: `https://snappercam.com/privacy.html`
+   - Support URL: `https://snappercam.com/support.html`
+   - Add `Terms of Use: https://snappercam.com/terms.html` to the app description. Apple requires a Terms link in the metadata for auto-renewable subscriptions.
 8. **App Privacy:** choose *Data Not Collected*. The app has no analytics, ads or tracking, and the privacy manifest is in `Snapper/Resources/PrivacyInfo.xcprivacy`.
-9. **GitHub Pages:** in the repo, go to Settings › Pages, choose *Deploy from a branch*, then `main` and `/docs`.
+9. **GitHub Pages:** in the repo, go to Settings › Pages, choose *Deploy from a branch*, then `main` and `/docs`. The custom domain is snappercam.com (`docs/CNAME`, DNS at Cloudflare set to DNS only) with Enforce HTTPS on.
 
 ## Before you submit
 
-- [ ] Fill in the placeholders in `Snapper/App/AppConfig.swift`: developer name, support email, and the App Store ID once the app exists. The ID turns on the "Rate Snapper" deep link.
-- [ ] Replace the highlighted placeholders in `docs/*.html` (name, email, governing law), and `APP_STORE_ID` in the landing page's App Store links (`docs/index.html`).
+- [ ] Fill in the placeholders in `Snapper/App/AppConfig.swift`: developer name and the App Store ID once the app exists. The ID turns on the "Rate Snapper" deep link.
+- [ ] Replace the highlighted placeholders in `docs/*.html` (name and governing law), and `APP_STORE_ID` in the landing page's App Store links (`docs/index.html`).
 - [ ] Check the sample photos in `Snapper/Resources/Showcase/`. They appear in onboarding, on the paywall, in the look thumbnails and in the Simulator. They're Unsplash photos at 1800 px (credits in `docs/photo-credits.md`); Unsplash includes no model releases, so get a release for the portrait or swap in your own photo shot with consent.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
@@ -187,7 +187,7 @@ SnapperControls/ Control Center control (WidgetKit)
 SnapperDemos/   UI-test scripts for the Guide's videos (scripts/record-guide-demo.sh)
 SnapperTests/   LUT parser, manifest, capture store, export, Core Image vs generator, StoreKit
 tools/lutgen/   Look generator, quality gates, contact sheets
-docs/           Landing page, Privacy Policy, Terms of Use, Support (GitHub Pages)
+docs/           Landing page, Privacy Policy, Terms of Use, Support (GitHub Pages at snappercam.com)
 ```
 
 - **MVVM.** SwiftUI views over `@Observable` models on the main actor. Camera and rendering work never touches the main actor.
