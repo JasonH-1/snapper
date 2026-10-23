@@ -215,6 +215,10 @@ p { margin: 0; }
 .tabs [role="tab"]:hover { color: var(--text); }
 .tabs [aria-selected="true"] { border-color: var(--text); background: var(--text); color: #111113; }
 .tabs [aria-selected="true"]:hover { color: #111113; }
+/* Phones swipe the row; wider screens show every collection at once. */
+@media (min-width: 900px) {
+  .tabs { flex-wrap: wrap; margin: 0 0 28px; padding: 3px 0; overflow: visible; }
+}
 /* Without JavaScript there are no tabs: every collection is shown. */
 html:not(.js) .tabs { display: none; }
 .js .collection:not(.active) { display: none; }
