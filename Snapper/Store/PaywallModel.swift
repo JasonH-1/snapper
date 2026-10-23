@@ -16,12 +16,15 @@ final class PaywallModel: Identifiable {
     enum Alert: Identifiable {
         case pending
         case nothingToRestore
+        /// The store confirmed the purchase but doesn't list it yet.
+        case notShowingYet
         case error(String)
 
         var id: String {
             switch self {
             case .pending: "pending"
             case .nothingToRestore: "nothing"
+            case .notShowingYet: "not-showing"
             case .error(let message): message
             }
         }
@@ -175,6 +178,12 @@ final class PaywallModel: Identifiable {
                     attempts += 1
                     try? await Task.sleep(for: .milliseconds(200))
                     await store.refreshEntitlements()
+                }
+                // Say so rather than leaving the plans up as if the purchase
+                // did nothing.
+                if !settle(after: plan) {
+                    Logger.store.error("Purchase of \(plan.id, privacy: .public) completed but isn't in the entitlements")
+                    alert = .notShowingYet
                 }
             case .pending:
                 alert = .pending

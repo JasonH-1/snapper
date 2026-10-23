@@ -287,6 +287,19 @@ final class PaywallModelTests: XCTestCase {
         XCTAssertTrue(switching.didUnlock)
     }
 
+    /// A purchase the store confirms but never lists says so instead of
+    /// leaving the plans on screen as if nothing happened.
+    @MainActor
+    func testPurchaseThatNeverShowsUpSaysSo() async {
+        let store = FakePurchaseService()
+        store.purchaseShowsAfterRefreshes = 100
+        let model = makeModel(store: store)
+        await model.load()
+        await model.purchase()
+        XCTAssertFalse(model.didUnlock)
+        if case .notShowingYet = model.alert {} else { XCTFail("expected the not-unlocked alert") }
+    }
+
     @MainActor
     func testPendingPurchaseExplainsItself() async {
         let store = FakePurchaseService()
