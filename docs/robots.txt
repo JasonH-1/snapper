@@ -1,0 +1,7 @@
+# The site's pages are index.html, privacy.html, terms.html and support.html.
+# The Markdown files in this folder are the project's internal notes.
+User-agent: *
+Disallow: /*.md$
+Allow: /
+
+Sitemap: https://snappercam.com/sitemap.xml
