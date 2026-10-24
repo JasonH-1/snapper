@@ -67,7 +67,7 @@ private struct CuratedStyleCard: View {
         if ProcessInfo.processInfo.environment["SNAPPER_DEMO_IMAGE"] != nil { return DemoScene.url }
         #endif
         return Bundle.main.url(forResource: samplePhoto, withExtension: "jpg")
-            ?? Bundle.main.url(forResource: "demo-scene", withExtension: "jpg")
+            ?? DemoScene.bundledURL
     }
 
     var body: some View {

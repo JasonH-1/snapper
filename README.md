@@ -144,9 +144,9 @@ A unit test renders reference colours through the app's Core Image pipeline and 
 
 ## Before you submit
 
-- [ ] Fill in the placeholders in `Snapper/App/AppConfig.swift`: developer name and the App Store ID once the app exists. The ID turns on the "Rate Snapper" deep link.
-- [ ] Replace the highlighted placeholders in `docs/*.html` (name and governing law), and `APP_STORE_ID` in the landing page's App Store links (`docs/index.html`).
-- [ ] Check the sample photos in `Snapper/Resources/Showcase/`. They appear in onboarding, on the paywall, in the look thumbnails and in the Simulator. They're Unsplash photos at 1800 px (credits in `docs/photo-credits.md`); Unsplash includes no model releases, so get a release for the portrait or swap in your own photo shot with consent.
+- [x] `Snapper/App/AppConfig.swift` has the developer name and App Store ID. The ID turns on the "Rate Snapper" deep link.
+- [x] `docs/*.html` have the developer name, governing law and App Store links.
+- [x] The sample photos in `Snapper/Resources/Showcase/` appear in onboarding, on the paywall, in the look thumbnails and in the Simulator. They're Unsplash photos at 1800 px (credits in `docs/photo-credits.md`) with no recognizable person, so they need no model release. Any photo of a person you add later needs one.
 - [ ] Review `filter-review/` with your own test photos and adjust `filters.json`.
 - [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each upload.
 - [ ] Set `APP_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config/Local.xcconfig` (see Setup). The Lock Screen camera and Control Center control get their own IDs, `<app id>.capture` and `<app id>.controls`; register all three in your developer account.
@@ -164,7 +164,7 @@ SIMULATOR_ID=<device id> scripts/record-guide-demo.sh testColorMixer color-mixer
 
 It builds the `SnapperGuideDemos` scheme, records the screen while the test runs, and encodes the part between the test's DEMO START and DEMO END marks (`scripts/encode-guide-demo.swift`): 720×900 at 60 fps, the phone on a dark backdrop, pauses shortened, a fade at the loop. Touches show as circles (Debug builds launched with `-SnapperShowTouches YES`).
 
-Every photo in the clips is free to use with no credit or model release: the Unsplash photos in `Snapper/Resources/Showcase/` and crops of them (not the portrait), plus three CC0 / public-domain photos from `test-photos/stand-ins/` (see `docs/photo-credits.md`). The camera shows the café photo in place of the Simulator's usual stand-in, the portrait. The scripts expect the Simulator's Library as `scripts/seed-guide-library.sh` fills it (12 photos in a fixed order; photo 5 is a street at night, unedited) and no personal presets. The import picker shows the Simulator's Photos library, so keep only those photos there too (`PHOTOS=1` adds them). Each script undoes its edits afterwards; if one stops part-way, run `testRestoreState` and then `testPrepareCamera` (in `SnapperDemos`) before recording again.
+Every photo in the clips is free to use with no credit or model release: the Unsplash photos in `Snapper/Resources/Showcase/` and crops of them, plus three CC0 / public-domain photos from `test-photos/stand-ins/` (see `docs/photo-credits.md`). The camera shows the café photo in place of the Simulator's usual stand-in, the night street. The scripts expect the Simulator's Library as `scripts/seed-guide-library.sh` fills it (12 photos in a fixed order; photo 5 is a street at night, unedited) and no personal presets. The import picker shows the Simulator's Photos library, so keep only those photos there too (`PHOTOS=1` adds them). Each script undoes its edits afterwards; if one stops part-way, run `testRestoreState` and then `testPrepareCamera` (in `SnapperDemos`) before recording again.
 
 ## How it's built
 

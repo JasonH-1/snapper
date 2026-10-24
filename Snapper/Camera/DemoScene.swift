@@ -2,6 +2,11 @@ import Foundation
 
 /// The photo that stands in for the camera where there is none (Simulator).
 enum DemoScene {
+    /// The bundled sample photo: the camera's stand-in, the Guide's examples
+    /// and any look or style without a photo of its own. Its people are small
+    /// and seen from behind, so it needs no model release.
+    static let bundledURL = Bundle.main.url(forResource: "showcase-night", withExtension: "jpg")
+
     /// The bundled demo photo. In Debug builds, the `SNAPPER_DEMO_IMAGE`
     /// environment variable can name another file (a full path), so looks and
     /// effects can be checked on other scenes, such as test-photos/night-city,
@@ -13,7 +18,7 @@ enum DemoScene {
             return URL(fileURLWithPath: path)
         }
         #endif
-        return Bundle.main.url(forResource: "demo-scene", withExtension: "jpg")
+        return bundledURL
     }
 
     /// True when `SNAPPER_DEMO_IMAGE` picked the scene. Whoever set it knows

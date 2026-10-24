@@ -41,7 +41,7 @@ final class GuideTests: XCTestCase {
 
     @MainActor
     func testGuideSampleCanRenderOriginalAndSquareCrop() async throws {
-        let source = try XCTUnwrap(Bundle.main.url(forResource: "demo-scene", withExtension: "jpg"))
+        let source = try XCTUnwrap(DemoScene.bundledURL)
         let renderer = PhotoRenderer()
         let id = UUID()
         let before = await renderer.original(id: id, sourceURL: source, maxPixelSize: 700)

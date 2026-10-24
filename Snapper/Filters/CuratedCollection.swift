@@ -45,10 +45,10 @@ struct CuratedCollection: Identifiable, Sendable {
     /// collection's light.
     var samplePhoto: String {
         switch id {
-        case "golden-hour-01": "showcase-portrait"
+        case "golden-hour-01": "showcase-cafe"
         case "after-dark-01": "showcase-night"
         case "quiet-days-01": "showcase-cafe"
-        default: "demo-scene"
+        default: "showcase-cake"
         }
     }
     private static func style(_ id: String, _ name: String, _ tip: String, look: String, strength: Double,

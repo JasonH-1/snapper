@@ -2,7 +2,7 @@ import Foundation
 
 /// The example photo each collection's looks are shown on while choosing a
 /// look: one in the light the collection is made for, so night looks are
-/// seen at night and portrait looks on a face. Looks in one collection share
+/// seen at night and portrait looks in soft indoor light. Looks in one collection share
 /// a photo, so they can still be compared side by side.
 enum LookSamples {
     /// Collection id → bundled photo in Resources/Showcase. Collections not
@@ -10,7 +10,7 @@ enum LookSamples {
     static let photos: [String: String] = [
         "disposable": "showcase-beach",
         "neon": "showcase-night",
-        "soft": "showcase-portrait",
+        "soft": "showcase-cafe",
         "overclock": "showcase-arcade",
         "darkroom": "showcase-cafe",
         "digicam": "showcase-cake",

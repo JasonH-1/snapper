@@ -248,7 +248,7 @@ private struct GuidePhotoExample: View {
         }
     }
     private func renderExample() async {
-        guard let url = Bundle.main.url(forResource: "demo-scene", withExtension: "jpg") else { failed = true; return }
+        guard let url = DemoScene.bundledURL else { failed = true; return }
         var recipe = PhotoRecipe(lookID: look.id)
         switch visual {
         case .looks: recipe.strength = amount
