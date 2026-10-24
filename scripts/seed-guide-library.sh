@@ -2,7 +2,7 @@
 # Fills the Simulator's Snapper Library with the 12 photos the Guide's clips
 # expect (SnapperDemos/GuideDemoTests.swift), in their order. All are free to
 # use without credit or a model release: the Unsplash photos in
-# Snapper/Resources/Showcase and crops of them (not the portrait), and three
+# Snapper/Resources/Showcase and crops of them, and three
 # CC0 / public-domain photos from test-photos/stand-ins.
 #
 #   SIMULATOR_ID=<device id> scripts/seed-guide-library.sh

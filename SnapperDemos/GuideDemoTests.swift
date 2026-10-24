@@ -946,9 +946,8 @@ final class GuideDemoTests: XCTestCase {
     // MARK: - Helpers
 
     /// Launches Snapper; `demoImage`, a photo in Snapper/Resources/Showcase,
-    /// replaces the Simulator camera's stand-in photo (a portrait without a
-    /// model release). It also stands in for the looks' and collections'
-    /// sample photos.
+    /// replaces the Simulator camera's stand-in photo (the night street). It also
+    /// stands in for the looks' and collections' sample photos.
     @MainActor
     private func launch(demoImage: String = "showcase-cafe") -> XCUIApplication {
         let app = XCUIApplication()

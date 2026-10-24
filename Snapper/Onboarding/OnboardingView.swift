@@ -242,10 +242,10 @@ struct OnboardingView: View {
 
     private func loadImages() async {
         guard heroPair == nil,
-              let portrait = Bundle.main.url(forResource: "showcase-portrait", withExtension: "jpg") else { return }
+              let photo = Bundle.main.url(forResource: "showcase-cafe", withExtension: "jpg") else { return }
         let signature = library.look(id: "boardwalk") ?? library.looks.dropFirst().first ?? .original
-        if let before = await renderer.showcase(url: portrait, look: .original),
-           let after = await renderer.showcase(url: portrait, look: signature) {
+        if let before = await renderer.showcase(url: photo, look: .original),
+           let after = await renderer.showcase(url: photo, look: signature) {
             heroPair = (before, after)
         }
         var cards: [(name: String, look: String, image: UIImage)] = []
@@ -253,7 +253,7 @@ struct OnboardingView: View {
         for (index, collection) in library.collections.prefix(3).enumerated() {
             let look = library.look(id: picks[index]).flatMap { $0.collectionID == collection.id ? $0 : nil }
                 ?? library.looks.first { $0.collectionID == collection.id }
-            guard let look, let image = await renderer.showcase(url: portrait, look: look, maxPixelSize: 800) else { continue }
+            guard let look, let image = await renderer.showcase(url: photo, look: look, maxPixelSize: 800) else { continue }
             cards.append((collection.name, look.name, image))
         }
         collectionCards = cards
