@@ -11,6 +11,7 @@ This branch implements the proposed $19.99/year product package; it does not est
 - [x] App Store ID 6826104701, in `AppConfig.swift` and the landing page's App Store links. The monthly, yearly and Lifetime products are configured in App Store Connect.
 - [x] Sample photos are Unsplash photos at 1800 px; their licence and credits are in `docs/photo-credits.md`. None shows a recognizable person, so no model release is needed (the portrait was removed).
 - [x] The privacy, support and terms pages are live at https://snappercam.com.
+- [ ] Add snappercam.com to Google Search Console (verify with a TXT record in Cloudflare DNS) and submit `https://snappercam.com/sitemap.xml`.
 
 Run `python3 scripts/check-release.py` to report unresolved configuration and showcase checks. It deliberately fails until the required inputs are supplied; it is not part of ordinary development CI.
 
